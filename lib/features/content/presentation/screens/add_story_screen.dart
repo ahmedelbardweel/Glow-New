@@ -1,0 +1,402 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_3d_controller/flutter_3d_controller.dart';
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../content/domain/entities/mission_entity.dart';
+import '../../../content/domain/entities/story_entity.dart';
+import '../../../content/presentation/bloc/content_bloc.dart';
+import '../../../content/presentation/bloc/content_event.dart';
+import '../../../content/presentation/bloc/content_state.dart';
+
+class AddStoryScreen extends StatefulWidget {
+  final MissionEntity mission;
+
+  const AddStoryScreen({super.key, required this.mission});
+
+  @override
+  State<AddStoryScreen> createState() => _AddStoryScreenState();
+}
+
+class _AddStoryScreenState extends State<AddStoryScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _contentController = TextEditingController();
+  
+  String _selectedCharacter = 'fort_frontal.glb';
+  final List<String> _avatars = [
+    'fort_frontal.glb',
+    'lort_frontal.glb',
+    'mort_frontal.glb',
+    'port_frontal.glb',
+    'qort_frontal.glb',
+  ];
+
+  File? _audioFile;
+  late ContentBloc _contentBloc;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentBloc = sl<ContentBloc>();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    _contentBloc.close();
+    super.dispose();
+  }
+
+  Future<void> _pickAudio() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(AppColors.border_radius),
+              ),
+            ),
+            Text(
+              'اختر ملف صوتي',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'اختر ملفاً صوتياً من هاتفك لإرفاقه بالقصة',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            // Pick file option
+            InkWell(
+              onTap: () async {
+                Navigator.pop(ctx);
+                try {
+                  final result = await FilePicker.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['mp3', 'wav', 'm4a', 'aac'],
+                  );
+                  if (result != null && result.isNotEmpty) {
+                    final pickedPath = result.first.path;
+                    if (pickedPath != null) {
+                      setState(() {
+                        _audioFile = File(pickedPath);
+                      });
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('حدث خطأ: $e')),
+                    );
+                  }
+                }
+              },
+              borderRadius: BorderRadius.circular(AppColors.border_radius),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                      ),
+                      child: const Icon(Icons.folder_open, color: Colors.white),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'اختر من الملفات',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          Text(
+                            'MP3, WAV, M4A, AAC',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.primary),
+                  ],
+                ),
+              ),
+            ),
+            if (_audioFile != null) ...[
+              const SizedBox(height: 12),
+              // Remove file option
+              InkWell(
+                onTap: () {
+                  setState(() => _audioFile = null);
+                  Navigator.pop(ctx);
+                },
+                borderRadius: BorderRadius.circular(AppColors.border_radius),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.error,
+                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        ),
+                        child: const Icon(Icons.delete_outline, color: Colors.white),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'إزالة الملف الصوتي',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    if (_formKey.currentState!.validate()) {
+      final story = StoryEntity(
+        id: '', // Supabase gen_random_uuid will handle this
+        missionId: widget.mission.id,
+        title: _titleController.text.trim(),
+        characterName: _selectedCharacter,
+        content: _contentController.text.trim(),
+        imageUrl: '',
+        orderIndex: 0, // Order can be dynamic later
+      );
+      _contentBloc.add(ContentEvent.addStory(story, audioFile: _audioFile));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider.value(
+      value: _contentBloc,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('إضافة قصة جديدة'),
+        ),
+        body: BlocConsumer<ContentBloc, ContentState>(
+          listener: (context, state) {
+            state.maybeWhen(
+              storyAdded: (_) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة القصة بنجاح!')));
+                context.pop(true);
+              },
+              error: (msg) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
+              },
+              orElse: () {},
+            );
+          },
+          builder: (context, state) {
+            final isLoading = state.maybeWhen(loading: () => true, orElse: () => false);
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Form(
+                  key: _formKey,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          TextFormField(
+                      controller: _titleController,
+                      decoration: const InputDecoration(labelText: 'عنوان القصة'),
+                      validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'الشخصية الراوية',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    // Big 3D Viewer for the selected avatar
+                    Container(
+                      height: 250,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7), // Amber-100
+                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        border: Border.all(color: const Color(0xFFF59E0B), width: 3), // Amber-500
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Flutter3DViewer(
+                        key: ValueKey(_selectedCharacter), // Rebuild when character changes
+                        src: 'assets/3d/$_selectedCharacter',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Selection Grid
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 5,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: _avatars.length,
+                      itemBuilder: (context, index) {
+                        final avatar = _avatars[index];
+                        final isSelected = avatar == _selectedCharacter;
+                        final name = avatar.split('_').first;
+                        final displayName = name[0].toUpperCase() + name.substring(1);
+                        
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedCharacter = avatar),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(AppColors.border_radius),
+                              border: Border.all(
+                                color: isSelected ? const Color(0xFFF59E0B) : Colors.transparent,
+                                width: 3,
+                              ),
+                              color: isSelected ? const Color(0xFFFEF3C7) : Theme.of(context).colorScheme.surface,
+                            ),
+                            child: Center(
+                              child: Text(
+                                displayName,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? const Color(0xFFF59E0B) : Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    InkWell(
+                      onTap: _pickAudio,
+                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _audioFile != null
+                                    ? 'ملف الصوت: ${_audioFile!.path.split('/').last}'
+                                    : 'إرفاق ملف صوتي (اختياري)',
+                                style: TextStyle(
+                                  color: _audioFile != null
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontWeight: _audioFile != null ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(
+                              _audioFile != null ? Icons.check_circle : Icons.audiotrack,
+                              color: _audioFile != null
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _contentController,
+                      decoration: const InputDecoration(
+                        labelText: 'محتوى القصة',
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 10,
+                      validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
+                    ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: isLoading ? null : _submit,
+                        child: isLoading ? const CircularProgressIndicator() : const Text('حفظ القصة'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}

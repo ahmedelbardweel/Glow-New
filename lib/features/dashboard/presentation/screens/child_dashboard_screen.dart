@@ -171,13 +171,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                     // Stars
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
-                        ],
-                      ),
+                      color: Colors.white,
                       child: Row(
                         children: [
                           const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
@@ -225,7 +219,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                 }
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  padding: const EdgeInsets.only(right: 10),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -244,12 +238,12 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                 );
               },
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 0),
             IconButton(
               icon: const Icon(Icons.more_vert, color: Colors.grey),
               onPressed: () => showLogoutBottomSheet(context),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 0),
           ],
           ),
         body: Container(

@@ -8,12 +8,12 @@ void showLogoutBottomSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
     ),
     builder: (context) {
       return SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 24.0),
+          padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 10.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -26,12 +26,6 @@ void showLogoutBottomSheet(BuildContext context) {
                 ),
               ),
               const SizedBox(height: 24),
-              const Icon(
-                Icons.logout_rounded,
-                size: 48,
-                color: Colors.redAccent,
-              ),
-              const SizedBox(height: 16),
               const Text(
                 'تسجيل الخروج',
                 style: TextStyle(
@@ -48,27 +42,14 @@ void showLogoutBottomSheet(BuildContext context) {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => context.pop(),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppColors.border_radius),
-                        ),
-                      ),
-                      child: const Text('إلغاء', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Expanded(
                     child: FilledButton(
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.redAccent,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppColors.border_radius),
                         ),
@@ -80,7 +61,7 @@ void showLogoutBottomSheet(BuildContext context) {
                            context.go('/role-selection');
                         }
                       },
-                      child: const Text('خروج', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('خروج', style: TextStyle(fontWeight: FontWeight.bold,color: Colors.white)),
                     ),
                   ),
                 ],

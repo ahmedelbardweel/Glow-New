@@ -10,8 +10,9 @@ import '../../../content/presentation/bloc/content_state.dart';
 
 class AddMissionScreen extends StatefulWidget {
   final WorldEntity world;
+  final MissionEntity? missionToEdit;
 
-  const AddMissionScreen({super.key, required this.world});
+  const AddMissionScreen({super.key, required this.world, this.missionToEdit});
 
   @override
   State<AddMissionScreen> createState() => _AddMissionScreenState();
@@ -28,6 +29,11 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
   void initState() {
     super.initState();
     _contentBloc = sl<ContentBloc>();
+    if (widget.missionToEdit != null) {
+      _titleController.text = widget.missionToEdit!.title;
+      _badgeController.text = widget.missionToEdit!.badgeName;
+      _starsController.text = widget.missionToEdit!.starsReward.toString();
+    }
   }
 
   @override
@@ -42,14 +48,18 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
   void _submit() {
     if (_formKey.currentState!.validate()) {
       final mission = MissionEntity(
-        id: '', // Supabase gen_random_uuid will handle this
+        id: widget.missionToEdit?.id ?? '', // Supabase gen_random_uuid will handle this
         worldId: widget.world.id,
         title: _titleController.text.trim(),
         badgeName: _badgeController.text.trim(),
         starsReward: int.tryParse(_starsController.text.trim()) ?? 0,
-        orderIndex: 0, // Will be ordered correctly in future
+        orderIndex: widget.missionToEdit?.orderIndex ?? 0,
       );
-      _contentBloc.add(ContentEvent.addMission(mission));
+      if (widget.missionToEdit != null) {
+        _contentBloc.add(ContentEvent.updateMission(mission));
+      } else {
+        _contentBloc.add(ContentEvent.addMission(mission));
+      }
     }
   }
 
@@ -59,7 +69,7 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
       value: _contentBloc,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('إضافة مهمة لـ: ${widget.world.title}'),
+          title: Text(widget.missionToEdit != null ? 'تعديل المهمة' : 'إضافة مهمة لـ: ${widget.world.title}'),
         ),
         body: BlocConsumer<ContentBloc, ContentState>(
           listener: (context, state) {
@@ -67,6 +77,12 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
               missionAdded: (_) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة المهمة بنجاح!')));
                 context.pop(true);
+              },
+              missionsLoaded: (_) {
+                if (widget.missionToEdit != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث المهمة بنجاح!')));
+                  context.pop(true);
+                }
               },
               error: (msg) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
@@ -106,7 +122,7 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: isLoading ? null : _submit,
-                        child: isLoading ? const CircularProgressIndicator() : const Text('حفظ المهمة'),
+                        child: isLoading ? const CircularProgressIndicator() : Text(widget.missionToEdit != null ? 'تحديث المهمة' : 'حفظ المهمة'),
                       ),
                     ),
                   ],

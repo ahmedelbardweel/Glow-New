@@ -10,8 +10,9 @@ import '../../../content/presentation/bloc/content_state.dart';
 
 class AddQuestionScreen extends StatefulWidget {
   final MissionEntity mission;
+  final QuestionEntity? questionToEdit;
 
-  const AddQuestionScreen({super.key, required this.mission});
+  const AddQuestionScreen({super.key, required this.mission, this.questionToEdit});
 
   @override
   State<AddQuestionScreen> createState() => _AddQuestionScreenState();
@@ -34,6 +35,13 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
   void initState() {
     super.initState();
     _contentBloc = sl<ContentBloc>();
+    if (widget.questionToEdit != null) {
+      _questionController.text = widget.questionToEdit!.questionText;
+      _correctOptionIndex = widget.questionToEdit!.correctAnswerIndex;
+      for (int i = 0; i < widget.questionToEdit!.options.length && i < 4; i++) {
+        _optionsControllers[i].text = widget.questionToEdit!.options[i];
+      }
+    }
   }
 
   @override
@@ -51,14 +59,18 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       final options = _optionsControllers.map((c) => c.text.trim()).toList();
       
       final question = QuestionEntity(
-        id: '', // Supabase gen_random_uuid will handle this
+        id: widget.questionToEdit?.id ?? '', // Supabase gen_random_uuid will handle this if empty
         missionId: widget.mission.id,
         questionText: _questionController.text.trim(),
         options: options,
         correctAnswerIndex: _correctOptionIndex,
       );
       
-      _contentBloc.add(ContentEvent.addQuestion(question));
+      if (widget.questionToEdit != null) {
+        _contentBloc.add(ContentEvent.updateQuestion(question));
+      } else {
+        _contentBloc.add(ContentEvent.addQuestion(question));
+      }
     }
   }
 
@@ -68,7 +80,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
       value: _contentBloc,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('إضافة سؤال جديد'),
+          title: Text(widget.questionToEdit != null ? 'تعديل السؤال' : 'إضافة سؤال جديد'),
         ),
         body: BlocConsumer<ContentBloc, ContentState>(
           listener: (context, state) {
@@ -76,6 +88,12 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
               questionAdded: (_) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة السؤال بنجاح!')));
                 context.pop(true);
+              },
+              questionsLoaded: (_) {
+                if (widget.questionToEdit != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث السؤال بنجاح!')));
+                  context.pop(true);
+                }
               },
               error: (msg) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
@@ -134,7 +152,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: isLoading ? null : _submit,
-                        child: isLoading ? const CircularProgressIndicator() : const Text('حفظ السؤال'),
+                        child: isLoading ? const CircularProgressIndicator() : Text(widget.questionToEdit != null ? 'تحديث السؤال' : 'حفظ السؤال'),
                       ),
                     ),
                   ],

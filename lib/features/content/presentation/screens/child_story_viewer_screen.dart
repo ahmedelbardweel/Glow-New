@@ -385,8 +385,10 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                 child: RepaintBoundary(
                                   child: Flutter3DViewer(
                                     key: ValueKey(story.characterName),
-                                    src: story.characterName.trim().isNotEmpty 
-                                        ? 'assets/3d/${story.characterName.trim().toLowerCase().replaceAll('.glb', '')}.glb' 
+                                    src: story.characterName.trim().isNotEmpty
+                                        ? (story.characterName.startsWith('http')
+                                            ? story.characterName
+                                            : 'assets/3d/${story.characterName.trim().toLowerCase().replaceAll('.glb', '')}.glb')
                                         : 'assets/3d/fort_frontal.glb',
                                   ),
                                 ),

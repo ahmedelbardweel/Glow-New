@@ -163,7 +163,7 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   @override
-  Future<Either<Failure, StoryEntity>> addStory(StoryEntity story, {File? audioFile}) async {
+  Future<Either<Failure, StoryEntity>> addStory(StoryEntity story, {File? audioFile, File? characterFile}) async {
     if (await networkInfo.isConnected) {
       try {
         final model = StoryModel(
@@ -176,7 +176,7 @@ class ContentRepositoryImpl implements ContentRepository {
           orderIndex: story.orderIndex,
           audioUrl: story.audioUrl,
         );
-        final result = await remoteDataSource.addStory(model, audioFile: audioFile);
+        final result = await remoteDataSource.addStory(model, audioFile: audioFile, characterFile: characterFile);
         final current = await localDataSource.getCachedStories(story.missionId);
         current.add(result);
         await localDataSource.cacheStories(story.missionId, current);
@@ -288,6 +288,122 @@ class ContentRepositoryImpl implements ContentRepository {
       }
     } else {
       return Right(cachedProgress);
+    }
+  }
+
+  @override
+  Future<Either<Failure, WorldEntity>> updateWorld(WorldEntity world) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final result = await remoteDataSource.updateWorld(WorldModel.fromEntity(world));
+        return Right(result);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteWorld(String id) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.deleteWorld(id);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, MissionEntity>> updateMission(MissionEntity mission) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final result = await remoteDataSource.updateMission(MissionModel.fromEntity(mission));
+        return Right(result);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteMission(String id) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.deleteMission(id);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, StoryEntity>> updateStory(StoryEntity story, {File? audioFile, File? characterFile}) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final result = await remoteDataSource.updateStory(
+          StoryModel.fromEntity(story),
+          audioFile: audioFile,
+          characterFile: characterFile,
+        );
+        return Right(result);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteStory(String id) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.deleteStory(id);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, QuestionEntity>> updateQuestion(QuestionEntity question) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final result = await remoteDataSource.updateQuestion(QuestionModel.fromEntity(question));
+        return Right(result);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteQuestion(String id) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.deleteQuestion(id);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    } else {
+      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
     }
   }
 }

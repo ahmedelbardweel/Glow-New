@@ -38,7 +38,7 @@ BEGIN
         world_forest_id,
         'عالم غابة الشجعان',
         'غابة خضراء ساحرة مليئة بالأسرار والحيوانات اللطيفة التي تنتظر مساعدتك واستكشاف أسرارها الطبيعية.',
-        'https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&w=1200&q=80',
         NOW()
     ),
     (

@@ -10,6 +10,17 @@ class MissionModel extends MissionEntity {
     required super.orderIndex,
   });
 
+  factory MissionModel.fromEntity(MissionEntity entity) {
+    return MissionModel(
+      id: entity.id,
+      worldId: entity.worldId,
+      title: entity.title,
+      badgeName: entity.badgeName,
+      starsReward: entity.starsReward,
+      orderIndex: entity.orderIndex,
+    );
+  }
+
   factory MissionModel.fromJson(Map<String, dynamic> json) {
     return MissionModel(
       id: json['id'] as String,

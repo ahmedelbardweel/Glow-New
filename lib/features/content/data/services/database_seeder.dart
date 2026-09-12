@@ -10,7 +10,7 @@ class DatabaseSeeder {
     final worldForest = await supabaseClient.from('worlds').insert({
       'title': 'عالم غابة الشجعان',
       'description': 'غابة خضراء ساحرة مليئة بالأسرار والحيوانات اللطيفة التي تنتظر مساعدتك واستكشاف أسرارها الطبيعية.',
-      'image_url': 'https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=1200&q=80',
+      'image_url': 'https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?auto=format&fit=crop&w=1200&q=80',
     }).select().single();
 
     final worldSpace = await supabaseClient.from('worlds').insert({

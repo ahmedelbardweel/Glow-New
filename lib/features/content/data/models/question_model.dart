@@ -9,6 +9,16 @@ class QuestionModel extends QuestionEntity {
     required super.correctAnswerIndex,
   });
 
+  factory QuestionModel.fromEntity(QuestionEntity entity) {
+    return QuestionModel(
+      id: entity.id,
+      missionId: entity.missionId,
+      questionText: entity.questionText,
+      options: entity.options,
+      correctAnswerIndex: entity.correctAnswerIndex,
+    );
+  }
+
   factory QuestionModel.fromJson(Map<String, dynamic> json) {
     return QuestionModel(
       id: json['id'] as String,

@@ -27,6 +27,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
   final ValueNotifier<({int stars, int badges, int completedMissionsCount})> _statsNotifier =
       ValueNotifier<({int stars, int badges, int completedMissionsCount})>((stars: 0, badges: 0, completedMissionsCount: 0));
   String? _childId;
+  String? _childCode;
   late final SyncService _syncService;
 
   @override
@@ -43,6 +44,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
     if (mounted && childId != null) {
       setState(() {
         _childId = childId;
+        _childCode = cachedChild?.childCode;
       });
     }
 
@@ -112,13 +114,13 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                   color: Color(0xFF2C3E50),
                 ),
               ),
-              if (_childId != null) ...[
+              if (_childCode != null) ...[
                 const SizedBox(height: 2),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'ID: ${_childId!.substring(0, 8)}...',
+                      'كود الربط: $_childCode',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -128,10 +130,10 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                     const SizedBox(width: 6),
                     InkWell(
                       onTap: () {
-                        Clipboard.setData(ClipboardData(text: _childId!));
+                        Clipboard.setData(ClipboardData(text: _childCode!));
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text('تم نسخ المعرف بنجاح!', style: TextStyle(fontFamily: 'Cairo')),
+                            content: const Text('تم نسخ كود الربط بنجاح!', style: TextStyle(fontFamily: 'Cairo')),
                             backgroundColor: const Color(0xFF2ECC71),
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppColors.border_radius)),

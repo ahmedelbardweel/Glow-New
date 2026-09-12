@@ -12,6 +12,19 @@ class StoryModel extends StoryEntity {
     super.audioUrl,
   });
 
+  factory StoryModel.fromEntity(StoryEntity entity) {
+    return StoryModel(
+      id: entity.id,
+      missionId: entity.missionId,
+      title: entity.title,
+      characterName: entity.characterName,
+      content: entity.content,
+      imageUrl: entity.imageUrl,
+      orderIndex: entity.orderIndex,
+      audioUrl: entity.audioUrl,
+    );
+  }
+
   factory StoryModel.fromJson(Map<String, dynamic> json) {
     return StoryModel(
       id: json['id'] as String,

@@ -9,7 +9,9 @@ import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
 
 class AddWorldScreen extends StatefulWidget {
-  const AddWorldScreen({super.key});
+  final WorldEntity? worldToEdit;
+
+  const AddWorldScreen({super.key, this.worldToEdit});
 
   @override
   State<AddWorldScreen> createState() => _AddWorldScreenState();
@@ -35,7 +37,16 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
   void initState() {
     super.initState();
     _contentBloc = sl<ContentBloc>();
-    _selectedImage = _defaultImages.first;
+    if (widget.worldToEdit != null) {
+      _titleController.text = widget.worldToEdit!.title;
+      _descController.text = widget.worldToEdit!.description;
+      _selectedImage = widget.worldToEdit!.imageUrl;
+      if (!_defaultImages.contains(_selectedImage)) {
+        _defaultImages.add(_selectedImage);
+      }
+    } else {
+      _selectedImage = _defaultImages.first;
+    }
   }
 
   @override
@@ -49,12 +60,16 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
   void _submit() {
     if (_formKey.currentState!.validate()) {
       final world = WorldEntity(
-        id: '', // Supabase gen_random_uuid will handle this
+        id: widget.worldToEdit?.id ?? '', // Keeps existing id if editing
         title: _titleController.text.trim(),
         description: _descController.text.trim(),
         imageUrl: _selectedImage,
       );
-      _contentBloc.add(ContentEvent.addWorld(world));
+      if (widget.worldToEdit != null) {
+        _contentBloc.add(ContentEvent.updateWorld(world));
+      } else {
+        _contentBloc.add(ContentEvent.addWorld(world));
+      }
     }
   }
 
@@ -64,7 +79,7 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
       value: _contentBloc,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('إضافة عالم جديد'),
+          title: Text(widget.worldToEdit != null ? 'تعديل عالم' : 'إضافة عالم جديد'),
         ),
         body: BlocConsumer<ContentBloc, ContentState>(
           listener: (context, state) {
@@ -136,6 +151,10 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
                             child: Image.network(
                               imageUrl,
                               fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                child: const Icon(Icons.broken_image, color: Colors.white54),
+                              ),
                             ),
                           ),
                         );
@@ -146,7 +165,7 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: isLoading ? null : _submit,
-                        child: isLoading ? const CircularProgressIndicator() : const Text('حفظ العالم'),
+                        child: isLoading ? const CircularProgressIndicator() : Text(widget.worldToEdit != null ? 'تحديث العالم' : 'حفظ العالم'),
                       ),
                     ),
                   ],

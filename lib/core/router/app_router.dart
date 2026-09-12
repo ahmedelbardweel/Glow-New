@@ -30,6 +30,7 @@ import '../../features/content/presentation/screens/child_badges_screen.dart';
 import '../../features/content/domain/entities/world_entity.dart';
 import '../../features/content/domain/entities/mission_entity.dart';
 import '../../features/content/domain/entities/story_entity.dart';
+import '../../features/content/domain/entities/question_entity.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -108,7 +109,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/admin/add-world',
-        builder: (context, state) => const AddWorldScreen(),
+        builder: (context, state) {
+          final world = state.extra as WorldEntity?;
+          return AddWorldScreen(worldToEdit: world);
+        },
       ),
       GoRoute(
         path: '/admin/world-missions',
@@ -120,6 +124,13 @@ class AppRouter {
       GoRoute(
         path: '/admin/add-mission',
         builder: (context, state) {
+          if (state.extra is Map<String, dynamic>) {
+            final args = state.extra as Map<String, dynamic>;
+            return AddMissionScreen(
+              world: args['world'] as WorldEntity,
+              missionToEdit: args['missionToEdit'] as MissionEntity?,
+            );
+          }
           final world = state.extra as WorldEntity;
           return AddMissionScreen(world: world);
         },
@@ -141,6 +152,13 @@ class AppRouter {
       GoRoute(
         path: '/admin/add-story',
         builder: (context, state) {
+          if (state.extra is Map<String, dynamic>) {
+            final args = state.extra as Map<String, dynamic>;
+            return AddStoryScreen(
+              mission: args['mission'] as MissionEntity,
+              storyToEdit: args['storyToEdit'] as StoryEntity?,
+            );
+          }
           final mission = state.extra as MissionEntity;
           return AddStoryScreen(mission: mission);
         },
@@ -155,6 +173,13 @@ class AppRouter {
       GoRoute(
         path: '/admin/add-question',
         builder: (context, state) {
+          if (state.extra is Map<String, dynamic>) {
+            final args = state.extra as Map<String, dynamic>;
+            return AddQuestionScreen(
+              mission: args['mission'] as MissionEntity,
+              questionToEdit: args['questionToEdit'] as QuestionEntity?,
+            );
+          }
           final mission = state.extra as MissionEntity;
           return AddQuestionScreen(mission: mission);
         },

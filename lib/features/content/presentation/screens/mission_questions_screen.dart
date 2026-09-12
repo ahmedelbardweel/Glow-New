@@ -8,6 +8,7 @@ import '../../../content/domain/entities/mission_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
+import '../../../../core/utils/admin_actions_bottom_sheet.dart';
 
 class MissionQuestionsScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -64,9 +65,51 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              '${index + 1}. ${question.questionText}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${index + 1}. ${question.questionText}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.more_vert),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () {
+                                    showAdminActionsBottomSheet(
+                                      context: context,
+                                      onEdit: () async {
+                                        final result = await context.push('/admin/add-question', extra: {'mission': widget.mission, 'questionToEdit': question});
+                                        if (result == true) {
+                                          _contentBloc.add(ContentEvent.getQuestions(widget.mission.id));
+                                        }
+                                      },
+                                      onDelete: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text('تأكيد الحذف'),
+                                            content: const Text('هل أنت متأكد من حذف هذا السؤال؟'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                                              TextButton(
+                                                onPressed: () {
+                                                  Navigator.pop(ctx);
+                                                  _contentBloc.add(ContentEvent.deleteQuestion(question.id));
+                                                },
+                                                child: const Text('حذف', style: TextStyle(color: Colors.red)),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
                             ...List.generate(question.options.length, (optIndex) {

@@ -25,3 +25,25 @@ class AddQuestionUseCase implements UseCase<QuestionEntity, QuestionEntity> {
     return await repository.addQuestion(params);
   }
 }
+
+class UpdateQuestionUseCase implements UseCase<QuestionEntity, QuestionEntity> {
+  final ContentRepository repository;
+
+  UpdateQuestionUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, QuestionEntity>> call(QuestionEntity params) async {
+    return await repository.updateQuestion(params);
+  }
+}
+
+class DeleteQuestionUseCase implements UseCase<void, String> {
+  final ContentRepository repository;
+
+  DeleteQuestionUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, void>> call(String params) async {
+    return await repository.deleteQuestion(params);
+  }
+}

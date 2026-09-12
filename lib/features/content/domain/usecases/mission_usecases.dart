@@ -22,8 +22,30 @@ class AddMissionUseCase implements UseCase<MissionEntity, MissionEntity> {
   AddMissionUseCase(this.repository);
 
   @override
-  Future<Either<Failure, MissionEntity>> call(MissionEntity params) async {
-    return await repository.addMission(params);
+  Future<Either<Failure, MissionEntity>> call(MissionEntity params) {
+    return repository.addMission(params);
+  }
+}
+
+class UpdateMissionUseCase implements UseCase<MissionEntity, MissionEntity> {
+  final ContentRepository repository;
+
+  UpdateMissionUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, MissionEntity>> call(MissionEntity params) {
+    return repository.updateMission(params);
+  }
+}
+
+class DeleteMissionUseCase implements UseCase<void, String> {
+  final ContentRepository repository;
+
+  DeleteMissionUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, void>> call(String params) {
+    return repository.deleteMission(params);
   }
 }
 

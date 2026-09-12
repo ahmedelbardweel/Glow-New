@@ -21,7 +21,29 @@ class AddWorldUseCase implements UseCase<WorldEntity, WorldEntity> {
   AddWorldUseCase(this.repository);
 
   @override
-  Future<Either<Failure, WorldEntity>> call(WorldEntity params) async {
-    return await repository.addWorld(params);
+  Future<Either<Failure, WorldEntity>> call(WorldEntity params) {
+    return repository.addWorld(params);
+  }
+}
+
+class UpdateWorldUseCase implements UseCase<WorldEntity, WorldEntity> {
+  final ContentRepository repository;
+
+  UpdateWorldUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, WorldEntity>> call(WorldEntity params) {
+    return repository.updateWorld(params);
+  }
+}
+
+class DeleteWorldUseCase implements UseCase<void, String> {
+  final ContentRepository repository;
+
+  DeleteWorldUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, void>> call(String params) {
+    return repository.deleteWorld(params);
   }
 }

@@ -14,8 +14,9 @@ import '../../../content/presentation/bloc/content_state.dart';
 
 class AddStoryScreen extends StatefulWidget {
   final MissionEntity mission;
+  final StoryEntity? storyToEdit;
 
-  const AddStoryScreen({super.key, required this.mission});
+  const AddStoryScreen({super.key, required this.mission, this.storyToEdit});
 
   @override
   State<AddStoryScreen> createState() => _AddStoryScreenState();
@@ -35,6 +36,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     'qort_frontal.glb',
   ];
 
+  File? _characterFile;
   File? _audioFile;
   late ContentBloc _contentBloc;
 
@@ -42,6 +44,16 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   void initState() {
     super.initState();
     _contentBloc = sl<ContentBloc>();
+    if (widget.storyToEdit != null) {
+      _titleController.text = widget.storyToEdit!.title;
+      _contentController.text = widget.storyToEdit!.content;
+      final character = widget.storyToEdit!.characterName;
+      if (_avatars.contains(character)) {
+        _selectedCharacter = character;
+      } else {
+        _selectedCharacter = ''; // It's a custom uploaded character
+      }
+    }
   }
 
   @override
@@ -209,18 +221,48 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     );
   }
 
+  Future<void> _pickCharacter() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['glb', 'gltf'],
+      );
+      if (result != null && result.isNotEmpty) {
+        final pickedPath = result.first.path;
+        if (pickedPath != null) {
+          setState(() {
+            _characterFile = File(pickedPath);
+            _selectedCharacter = ''; // Clear selection since custom is picked
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ أثناء رفع الشخصية: $e')),
+        );
+      }
+    }
+  }
+
   void _submit() {
     if (_formKey.currentState!.validate()) {
       final story = StoryEntity(
-        id: '', // Supabase gen_random_uuid will handle this
+        id: widget.storyToEdit?.id ?? '', // Supabase gen_random_uuid will handle this if empty
         missionId: widget.mission.id,
         title: _titleController.text.trim(),
-        characterName: _selectedCharacter,
+        characterName: _characterFile != null ? _characterFile!.path.split('/').last : 
+                       (_selectedCharacter.isEmpty ? (widget.storyToEdit?.characterName ?? '') : _selectedCharacter),
         content: _contentController.text.trim(),
-        imageUrl: '',
-        orderIndex: 0, // Order can be dynamic later
+        imageUrl: widget.storyToEdit?.imageUrl ?? '',
+        audioUrl: widget.storyToEdit?.audioUrl,
+        orderIndex: widget.storyToEdit?.orderIndex ?? 0,
       );
-      _contentBloc.add(ContentEvent.addStory(story, audioFile: _audioFile));
+      if (widget.storyToEdit != null) {
+        _contentBloc.add(ContentEvent.updateStory(story, audioFile: _audioFile, characterFile: _characterFile));
+      } else {
+        _contentBloc.add(ContentEvent.addStory(story, audioFile: _audioFile, characterFile: _characterFile));
+      }
     }
   }
 
@@ -229,8 +271,11 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     return BlocProvider.value(
       value: _contentBloc,
       child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: const Text('إضافة قصة جديدة'),
+          title: Text(widget.storyToEdit != null ? 'تعديل القصة' : 'إضافة قصة لـ: ${widget.mission.title}'),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
         ),
         body: BlocConsumer<ContentBloc, ContentState>(
           listener: (context, state) {
@@ -238,6 +283,12 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
               storyAdded: (_) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة القصة بنجاح!')));
                 context.pop(true);
+              },
+              storiesLoaded: (_) {
+                if (widget.storyToEdit != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث القصة بنجاح!')));
+                  context.pop(true);
+                }
               },
               error: (msg) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
@@ -270,20 +321,45 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                     ),
                     const SizedBox(height: 12),
                     // Big 3D Viewer for the selected avatar
-                    Container(
-                      height: 250,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7), // Amber-100
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
-                        border: Border.all(color: const Color(0xFFF59E0B), width: 3), // Amber-500
+                    if (_characterFile == null)
+                      Container(
+                        height: 250,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7), // Amber-100
+                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                          border: Border.all(color: const Color(0xFFF59E0B), width: 3), // Amber-500
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Flutter3DViewer(
+                          key: ValueKey(_selectedCharacter), // Rebuild when character changes
+                          src: 'assets/3d/$_selectedCharacter',
+                        ),
+                      )
+                    else
+                      Container(
+                        height: 250,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                          border: Border.all(color: Theme.of(context).colorScheme.outline, width: 1),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.view_in_ar, size: 64, color: Colors.grey),
+                              const SizedBox(height: 16),
+                              Text(
+                                'تم اختيار شخصية مخصصة\n${_characterFile!.path.split('/').last}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Flutter3DViewer(
-                        key: ValueKey(_selectedCharacter), // Rebuild when character changes
-                        src: 'assets/3d/$_selectedCharacter',
-                      ),
-                    ),
                     const SizedBox(height: 16),
                     // Selection Grid
                     GridView.builder(
@@ -326,6 +402,54 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                         );
                       },
                     ),
+                    const SizedBox(height: 16),
+                    // Upload custom 3D character button
+                    InkWell(
+                      onTap: _pickCharacter,
+                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _characterFile != null ? Icons.check_circle : Icons.upload_file,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _characterFile != null ? 'تغيير الشخصية المخصصة' : 'أو ارفع شخصية مخصصة (3D)',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_characterFile != null) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _characterFile = null;
+                            _selectedCharacter = _avatars.first;
+                          });
+                        },
+                        icon: const Icon(Icons.close, size: 18),
+                        label: const Text('إلغاء الشخصية المخصصة'),
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     InkWell(
                       onTap: _pickAudio,
@@ -386,14 +510,29 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: isLoading ? null : _submit,
-                        child: isLoading ? const CircularProgressIndicator() : const Text('حفظ القصة'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(
+                                widget.storyToEdit != null ? 'تحديث القصة' : 'نشر القصة الآن',
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
                       ),
                     ),
                   ],
                 ),
               ),
-              ),
-            );
+            ),
+          );
           },
         ),
       ),

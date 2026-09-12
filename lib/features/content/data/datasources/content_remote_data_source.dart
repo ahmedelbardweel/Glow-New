@@ -10,18 +10,26 @@ abstract class ContentRemoteDataSource {
   // Worlds
   Future<List<WorldModel>> getWorlds();
   Future<WorldModel> addWorld(WorldModel world);
+  Future<WorldModel> updateWorld(WorldModel world);
+  Future<void> deleteWorld(String id);
   
   // Missions
   Future<List<MissionModel>> getMissions(String worldId);
   Future<MissionModel> addMission(MissionModel mission);
+  Future<MissionModel> updateMission(MissionModel mission);
+  Future<void> deleteMission(String id);
   
   // Stories
   Future<List<StoryModel>> getStories(String missionId);
-  Future<StoryModel> addStory(StoryModel story, {File? audioFile});
+  Future<StoryModel> addStory(StoryModel story, {File? audioFile, File? characterFile});
+  Future<StoryModel> updateStory(StoryModel story, {File? audioFile, File? characterFile});
+  Future<void> deleteStory(String id);
   
   // Questions
   Future<List<QuestionModel>> getQuestions(String missionId);
   Future<QuestionModel> addQuestion(QuestionModel question);
+  Future<QuestionModel> updateQuestion(QuestionModel question);
+  Future<void> deleteQuestion(String id);
 
   // Progress
   Future<void> completeMission(String missionId, String childId);
@@ -46,6 +54,17 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   }
 
   @override
+  Future<WorldModel> updateWorld(WorldModel world) async {
+    final response = await supabaseClient.from('worlds').update(world.toJson()).eq('id', world.id).select().single();
+    return WorldModel.fromJson(response);
+  }
+
+  @override
+  Future<void> deleteWorld(String id) async {
+    await supabaseClient.from('worlds').delete().eq('id', id);
+  }
+
+  @override
   Future<List<MissionModel>> getMissions(String worldId) async {
     final response = await supabaseClient
         .from('missions')
@@ -62,6 +81,17 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   }
 
   @override
+  Future<MissionModel> updateMission(MissionModel mission) async {
+    final response = await supabaseClient.from('missions').update(mission.toJson()).eq('id', mission.id).select().single();
+    return MissionModel.fromJson(response);
+  }
+
+  @override
+  Future<void> deleteMission(String id) async {
+    await supabaseClient.from('missions').delete().eq('id', id);
+  }
+
+  @override
   Future<List<StoryModel>> getStories(String missionId) async {
     final response = await supabaseClient
         .from('stories')
@@ -72,11 +102,12 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   }
 
   @override
-  Future<StoryModel> addStory(StoryModel story, {File? audioFile}) async {
+  Future<StoryModel> addStory(StoryModel story, {File? audioFile, File? characterFile}) async {
     String? audioUrl = story.audioUrl;
     
     if (audioFile != null) {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${audioFile.path.split('/').last}';
+      final ext = audioFile.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_audio.$ext';
       await supabaseClient.storage.from('story_audio').upload(
         fileName,
         audioFile,
@@ -84,12 +115,23 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
       audioUrl = supabaseClient.storage.from('story_audio').getPublicUrl(fileName);
     }
     
+    String characterName = story.characterName;
+    if (characterFile != null) {
+      final ext = characterFile.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_character.$ext';
+      await supabaseClient.storage.from('story_characters').upload(
+        fileName,
+        characterFile,
+      );
+      characterName = supabaseClient.storage.from('story_characters').getPublicUrl(fileName);
+    }
+
     final storyToSave = StoryModel(
       id: story.id,
       missionId: story.missionId,
       title: story.title,
       content: story.content,
-      characterName: story.characterName,
+      characterName: characterName,
       imageUrl: story.imageUrl,
       orderIndex: story.orderIndex,
       audioUrl: audioUrl,
@@ -97,6 +139,51 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
 
     final response = await supabaseClient.from('stories').insert(storyToSave.toJson()).select().single();
     return StoryModel.fromJson(response);
+  }
+
+  @override
+  Future<StoryModel> updateStory(StoryModel story, {File? audioFile, File? characterFile}) async {
+    String? audioUrl = story.audioUrl;
+    
+    if (audioFile != null) {
+      final ext = audioFile.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_audio.$ext';
+      await supabaseClient.storage.from('story_audio').upload(
+        fileName,
+        audioFile,
+      );
+      audioUrl = supabaseClient.storage.from('story_audio').getPublicUrl(fileName);
+    }
+    
+    String characterName = story.characterName;
+    if (characterFile != null) {
+      final ext = characterFile.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_character.$ext';
+      await supabaseClient.storage.from('story_characters').upload(
+        fileName,
+        characterFile,
+      );
+      characterName = supabaseClient.storage.from('story_characters').getPublicUrl(fileName);
+    }
+
+    final storyToSave = StoryModel(
+      id: story.id,
+      missionId: story.missionId,
+      title: story.title,
+      content: story.content,
+      characterName: characterName,
+      imageUrl: story.imageUrl,
+      orderIndex: story.orderIndex,
+      audioUrl: audioUrl,
+    );
+
+    final response = await supabaseClient.from('stories').update(storyToSave.toJson()).eq('id', storyToSave.id).select().single();
+    return StoryModel.fromJson(response);
+  }
+
+  @override
+  Future<void> deleteStory(String id) async {
+    await supabaseClient.from('stories').delete().eq('id', id);
   }
 
   @override
@@ -112,6 +199,17 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   Future<QuestionModel> addQuestion(QuestionModel question) async {
     final response = await supabaseClient.from('questions').insert(question.toJson()).select().single();
     return QuestionModel.fromJson(response);
+  }
+
+  @override
+  Future<QuestionModel> updateQuestion(QuestionModel question) async {
+    final response = await supabaseClient.from('questions').update(question.toJson()).eq('id', question.id).select().single();
+    return QuestionModel.fromJson(response);
+  }
+
+  @override
+  Future<void> deleteQuestion(String id) async {
+    await supabaseClient.from('questions').delete().eq('id', id);
   }
 
   @override

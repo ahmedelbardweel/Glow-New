@@ -9,6 +9,7 @@ import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
 import '../../../../core/utils/logout_helper.dart';
+import '../../../../core/utils/admin_actions_bottom_sheet.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -57,7 +58,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تمت تعبئة البيانات في Supabase بنجاح! 🎉'),
+              content: Text('تمت تعبئة البيانات في Supabase بنجاح!'),
               backgroundColor: Colors.green,
             ),
           );
@@ -90,13 +91,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       value: _contentBloc,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('إدارة العوالم (Worlds)'),
-          centerTitle: true,
+          title: const Text('إدارة العوالم'),
+          centerTitle: false,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.more_vert),
-              onPressed: () => showLogoutBottomSheet(context),
-            ),
             if (_isSeeding)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
@@ -112,6 +109,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 tooltip: 'تعبئة بيانات احترافية (Seeder)',
                 onPressed: _handleSeedDatabase,
               ),
+            IconButton(
+              icon: const Icon(Icons.more_vert),
+              onPressed: () => showLogoutBottomSheet(context),
+            ),
           ],
         ),
         body: BlocBuilder<ContentBloc, ContentState>(
@@ -150,6 +151,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               height: 180,
                               width: double.infinity,
                               fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                height: 180,
+                                width: double.infinity,
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                child: const Icon(Icons.broken_image, size: 64, color: Colors.white54),
+                              ),
                             )
                           else
                             Container(
@@ -254,6 +261,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   context.push('/admin/world-missions', extra: world);
                                 },
                               ),
+                            ),
+                          ),
+                          // Three dots for actions
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: IconButton(
+                              icon: const Icon(Icons.more_vert, color: Colors.white),
+                              onPressed: () {
+                                showAdminActionsBottomSheet(
+                                  context: context,
+                                  onEdit: () {
+                                    context.push('/admin/add-world', extra: world);
+                                  },
+                                  onDelete: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('تأكيد الحذف'),
+                                        content: const Text('هل أنت متأكد من حذف هذا العالم؟ سيتم حذف جميع المهام والقصص المرتبطة به.'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(ctx);
+                                              _contentBloc.add(ContentEvent.deleteWorld(world.id));
+                                            },
+                                            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                             ),
                           ),
                         ],

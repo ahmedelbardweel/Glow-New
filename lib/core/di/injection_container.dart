@@ -126,12 +126,24 @@ Future<void> init() async {
   // Use Cases
   sl.registerLazySingleton(() => GetWorldsUseCase(sl()));
   sl.registerLazySingleton(() => AddWorldUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateWorldUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteWorldUseCase(sl()));
+
   sl.registerLazySingleton(() => GetMissionsUseCase(sl()));
   sl.registerLazySingleton(() => AddMissionUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateMissionUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteMissionUseCase(sl()));
+
   sl.registerLazySingleton(() => GetStoriesUseCase(sl()));
   sl.registerLazySingleton(() => AddStoryUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateStoryUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteStoryUseCase(sl()));
+
   sl.registerLazySingleton(() => GetQuestionsUseCase(sl()));
   sl.registerLazySingleton(() => AddQuestionUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateQuestionUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteQuestionUseCase(sl()));
+
   sl.registerLazySingleton(() => CompleteMissionUseCase(sl()));
   sl.registerLazySingleton(() => GetCompletedMissionsUseCase(sl()));
 
@@ -148,6 +160,14 @@ Future<void> init() async {
       addQuestion: sl(),
       completeMission: sl(),
       getCompletedMissions: sl(),
+      updateWorld: sl(),
+      deleteWorld: sl(),
+      updateMission: sl(),
+      deleteMission: sl(),
+      updateStory: sl(),
+      deleteStory: sl(),
+      updateQuestion: sl(),
+      deleteQuestion: sl(),
     ),
   );
 }

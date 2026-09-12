@@ -19,6 +19,15 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
   final CompleteMissionUseCase completeMission;
   final GetCompletedMissionsUseCase getCompletedMissions;
 
+  final UpdateWorldUseCase updateWorld;
+  final DeleteWorldUseCase deleteWorld;
+  final UpdateMissionUseCase updateMission;
+  final DeleteMissionUseCase deleteMission;
+  final UpdateStoryUseCase updateStory;
+  final DeleteStoryUseCase deleteStory;
+  final UpdateQuestionUseCase updateQuestion;
+  final DeleteQuestionUseCase deleteQuestion;
+
   ContentBloc({
     required this.getWorlds,
     required this.addWorld,
@@ -30,6 +39,14 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
     required this.addQuestion,
     required this.completeMission,
     required this.getCompletedMissions,
+    required this.updateWorld,
+    required this.deleteWorld,
+    required this.updateMission,
+    required this.deleteMission,
+    required this.updateStory,
+    required this.deleteStory,
+    required this.updateQuestion,
+    required this.deleteQuestion,
   }) : super(const ContentState.initial()) {
     on<ContentEvent>((event, emit) async {
       await event.map(
@@ -49,6 +66,22 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
             (world) => emit(ContentState.worldAdded(world)),
           );
         },
+        updateWorld: (e) async {
+          emit(const ContentState.loading());
+          final result = await updateWorld(e.world);
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => add(const ContentEvent.getWorlds()),
+          );
+        },
+        deleteWorld: (e) async {
+          emit(const ContentState.loading());
+          final result = await deleteWorld(e.id);
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => add(const ContentEvent.getWorlds()),
+          );
+        },
         getMissions: (e) async {
           emit(const ContentState.loading());
           final result = await getMissions(e.worldId);
@@ -65,6 +98,25 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
             (mission) => emit(ContentState.missionAdded(mission)),
           );
         },
+        updateMission: (e) async {
+          emit(const ContentState.loading());
+          final result = await updateMission(e.mission);
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => add(ContentEvent.getMissions(e.mission.worldId)),
+          );
+        },
+        deleteMission: (e) async {
+          // Note: we can't easily refetch missions without worldId, so we just emit a success state or a generic loaded.
+          // Since we might be on a screen that needs refresh, we expect the UI to handle it or we can pass worldId in delete event.
+          // For now we'll just emit loading then error or nothing (UI can re-trigger getMissions).
+          emit(const ContentState.loading());
+          final result = await deleteMission(e.id);
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => emit(const ContentState.initial()), // UI should listen to this and refresh
+          );
+        },
         getStories: (e) async {
           emit(const ContentState.loading());
           final result = await getStories(e.missionId);
@@ -75,10 +127,26 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
         },
         addStory: (e) async {
           emit(const ContentState.loading());
-          final result = await addStory(AddStoryParams(e.story, audioFile: e.audioFile));
+          final result = await addStory(AddStoryParams(e.story, audioFile: e.audioFile, characterFile: e.characterFile));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
             (story) => emit(ContentState.storyAdded(story)),
+          );
+        },
+        updateStory: (e) async {
+          emit(const ContentState.loading());
+          final result = await updateStory(AddStoryParams(e.story, audioFile: e.audioFile, characterFile: e.characterFile));
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => add(ContentEvent.getStories(e.story.missionId)),
+          );
+        },
+        deleteStory: (e) async {
+          emit(const ContentState.loading());
+          final result = await deleteStory(e.id);
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => emit(const ContentState.initial()),
           );
         },
         getQuestions: (e) async {
@@ -95,6 +163,22 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
             (question) => emit(ContentState.questionAdded(question)),
+          );
+        },
+        updateQuestion: (e) async {
+          emit(const ContentState.loading());
+          final result = await updateQuestion(e.question);
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => add(ContentEvent.getQuestions(e.question.missionId)),
+          );
+        },
+        deleteQuestion: (e) async {
+          emit(const ContentState.loading());
+          final result = await deleteQuestion(e.id);
+          result.fold(
+            (failure) => emit(ContentState.error(failure.message)),
+            (_) => emit(const ContentState.initial()),
           );
         },
         completeMission: (e) async {

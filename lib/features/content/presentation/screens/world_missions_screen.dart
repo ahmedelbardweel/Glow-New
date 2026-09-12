@@ -7,6 +7,7 @@ import '../../../content/domain/entities/world_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
+import '../../../../core/utils/admin_actions_bottom_sheet.dart';
 
 class WorldMissionsScreen extends StatefulWidget {
   final WorldEntity world;
@@ -62,7 +63,39 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
                         leading: CircleAvatar(child: Text('${index + 1}')),
                         title: Text(mission.title, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('الوسم: ${mission.badgeName} | النجوم: ${mission.starsReward}'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.more_vert),
+                          onPressed: () {
+                            showAdminActionsBottomSheet(
+                              context: context,
+                              onEdit: () async {
+                                final result = await context.push('/admin/add-mission', extra: {'world': widget.world, 'missionToEdit': mission});
+                                if (result == true) {
+                                  _contentBloc.add(ContentEvent.getMissions(widget.world.id));
+                                }
+                              },
+                              onDelete: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('تأكيد الحذف'),
+                                    content: const Text('هل أنت متأكد من حذف هذه المهمة؟'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          _contentBloc.add(ContentEvent.deleteMission(mission.id));
+                                        },
+                                        child: const Text('حذف', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                         onTap: () {
                           HapticFeedback.lightImpact();
                           context.push('/admin/mission-stories', extra: mission);

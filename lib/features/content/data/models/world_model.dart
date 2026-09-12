@@ -8,6 +8,15 @@ class WorldModel extends WorldEntity {
     required super.imageUrl,
   });
 
+  factory WorldModel.fromEntity(WorldEntity entity) {
+    return WorldModel(
+      id: entity.id,
+      title: entity.title,
+      description: entity.description,
+      imageUrl: entity.imageUrl,
+    );
+  }
+
   factory WorldModel.fromJson(Map<String, dynamic> json) {
     return WorldModel(
       id: json['id'] as String,

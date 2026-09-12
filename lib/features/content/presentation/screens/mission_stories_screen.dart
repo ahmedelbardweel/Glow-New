@@ -7,6 +7,7 @@ import '../../../content/domain/entities/mission_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
+import '../../../../core/utils/admin_actions_bottom_sheet.dart';
 
 class MissionStoriesScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -72,7 +73,39 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
                         leading: CircleAvatar(child: Text('${index + 1}')),
                         title: Text(story.title, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('الشخصية الراوية: ${story.characterName}', maxLines: 1),
-                        trailing: const Icon(Icons.arrow_forward_ios),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.more_vert),
+                          onPressed: () {
+                            showAdminActionsBottomSheet(
+                              context: context,
+                              onEdit: () async {
+                                final result = await context.push('/admin/add-story', extra: {'mission': widget.mission, 'storyToEdit': story});
+                                if (result == true) {
+                                  _contentBloc.add(ContentEvent.getStories(widget.mission.id));
+                                }
+                              },
+                              onDelete: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('تأكيد الحذف'),
+                                    content: const Text('هل أنت متأكد من حذف هذه القصة؟'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          _contentBloc.add(ContentEvent.deleteStory(story.id));
+                                        },
+                                        child: const Text('حذف', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                         onTap: () {
                           HapticFeedback.lightImpact();
                           context.push('/admin/story-preview', extra: story);

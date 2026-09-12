@@ -11,18 +11,13 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+class _SplashScreenState extends State<SplashScreen> {
   bool _showButton = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 0),
-      vsync: this,
-    );
-    _controller.forward().then((_) {
+    Future.delayed(const Duration(seconds: 2), () {
       _checkAuthStatus();
     });
   }
@@ -50,12 +45,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         }
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 
   @override

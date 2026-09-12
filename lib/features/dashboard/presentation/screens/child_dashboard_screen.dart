@@ -13,6 +13,7 @@ import '../../../../core/widgets/offline_aware_image.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
 import '../../../content/data/services/sync_service.dart';
 import '../../../content/domain/repositories/content_repository.dart';
+import '../../../../core/utils/logout_helper.dart';
 
 class ChildDashboardScreen extends StatefulWidget {
   const ChildDashboardScreen({super.key});
@@ -242,6 +243,11 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                   ),
                 );
               },
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.more_vert, color: Colors.grey),
+              onPressed: () => showLogoutBottomSheet(context),
             ),
             const SizedBox(width: 8),
           ],

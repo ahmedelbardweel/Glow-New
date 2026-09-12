@@ -8,6 +8,7 @@ import '../../../content/data/services/database_seeder.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
+import '../../../../core/utils/logout_helper.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -92,6 +93,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           title: const Text('إدارة العوالم (Worlds)'),
           centerTitle: true,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.more_vert),
+              onPressed: () => showLogoutBottomSheet(context),
+            ),
             if (_isSeeding)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/logout_helper.dart';
 
 class ParentDashboardScreen extends StatelessWidget {
   const ParentDashboardScreen({super.key});
@@ -9,6 +10,12 @@ class ParentDashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('لوحة تحكم ولي الأمر'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () => showLogoutBottomSheet(context),
+          ),
+        ],
       ),
       body: const Center(
         child: Text(

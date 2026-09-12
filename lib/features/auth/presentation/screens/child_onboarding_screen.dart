@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_3d_controller/flutter_3d_controller.dart';
@@ -39,7 +39,7 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ù…ØºØ§Ù…Ø± Ø¬Ø¯ÙŠØ¯'),
+        title: const Text('مغامر جديد'),
         centerTitle: true,
       ),
       body: BlocConsumer<AuthBloc, AuthState>(
@@ -68,19 +68,19 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
             Text(
-              'Ù…Ø§ Ø§Ø³Ù…Ùƒ ÙŠØ§ Ø¨Ø·Ù„ØŸ',
+              'ما اسمك يا بطل؟',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
-                hintText: 'Ø§ÙƒØªØ¨ Ø§Ø³Ù…Ùƒ Ù‡Ù†Ø§...',
+                hintText: 'اكتب اسمك هنا...',
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              'ÙƒÙ… Ø¹Ù…Ø±ÙƒØŸ',
+              'كم عمرك؟',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -120,7 +120,7 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Ø§Ø®ØªØ± Ø´Ø®ØµÙŠØªÙƒ Ø§Ù„Ù…ÙØ¶Ù„Ø©',
+              'اختر شخصيتك المفضلة',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -189,7 +189,7 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
                 onPressed: isLoading ? null : () {
                   if (_nameController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ø³Ù…Ùƒ ÙŠØ§ Ø¨Ø·Ù„!')),
+                      const SnackBar(content: Text('الرجاء إدخال اسمك يا بطل!')),
                     );
                     return;
                   }
@@ -201,7 +201,7 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
                 },
                 child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Ø§Ù†Ø·Ù„Ù‚!'),
+                    : const Text('انطلق!'),
               ),
             ),
           ],

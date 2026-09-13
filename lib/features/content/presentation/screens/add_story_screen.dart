@@ -11,6 +11,7 @@ import '../../../content/domain/entities/story_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
+import '../../../../core/utils/character_helper.dart';
 
 class AddStoryScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -28,13 +29,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   final _contentController = TextEditingController();
   
   String _selectedCharacter = 'fort_frontal.glb';
-  final List<String> _avatars = [
-    'fort_frontal.glb',
-    'lort_frontal.glb',
-    'mort_frontal.glb',
-    'port_frontal.glb',
-    'qort_frontal.glb',
-  ];
+  final List<String> _avatars = CharacterHelper.characters.keys.toList();
 
   File? _characterFile;
   File? _audioFile;
@@ -48,7 +43,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       _titleController.text = widget.storyToEdit!.title;
       _contentController.text = widget.storyToEdit!.content;
       final character = widget.storyToEdit!.characterName;
-      if (_avatars.contains(character)) {
+      if (_avatars.any((a) => character.toLowerCase().contains(a))) {
         _selectedCharacter = character;
       } else {
         _selectedCharacter = ''; // It's a custom uploaded character
@@ -333,7 +328,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                         clipBehavior: Clip.antiAlias,
                         child: Flutter3DViewer(
                           key: ValueKey(_selectedCharacter), // Rebuild when character changes
-                          src: 'assets/3d/$_selectedCharacter',
+                          src: CharacterHelper.getModelPath(_selectedCharacter),
                         ),
                       )
                     else
@@ -373,9 +368,9 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       itemCount: _avatars.length,
                       itemBuilder: (context, index) {
                         final avatar = _avatars[index];
-                        final isSelected = avatar == _selectedCharacter;
-                        final name = avatar.split('_').first;
-                        final displayName = name[0].toUpperCase() + name.substring(1);
+                        final isSelected = _selectedCharacter.toLowerCase().contains(avatar);
+                        final displayName = CharacterHelper.getCleanName(avatar);
+                        final charColor = CharacterHelper.getColor(avatar);
                         
                         return GestureDetector(
                           onTap: () => setState(() => _selectedCharacter = avatar),
@@ -383,10 +378,10 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(AppColors.border_radius),
                               border: Border.all(
-                                color: isSelected ? const Color(0xFFF59E0B) : Colors.transparent,
+                                color: isSelected ? charColor : Colors.transparent,
                                 width: 3,
                               ),
-                              color: isSelected ? const Color(0xFFFEF3C7) : Theme.of(context).colorScheme.surface,
+                              color: isSelected ? charColor.withOpacity(0.15) : Theme.of(context).colorScheme.surface,
                             ),
                             child: Center(
                               child: Text(
@@ -394,7 +389,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: isSelected ? const Color(0xFFF59E0B) : Colors.grey,
+                                  color: isSelected ? charColor : Colors.grey,
                                 ),
                               ),
                             ),
@@ -408,29 +403,31 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       onTap: _pickCharacter,
                       borderRadius: BorderRadius.circular(AppColors.border_radius),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(AppColors.border_radius),
                           border: Border.all(
-                            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                            color: Colors.grey.shade400,
                             width: 1,
                           ),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            Expanded(
+                              child: Text(
+                                _characterFile != null ? 'الشخصية: ${_characterFile!.path.split('/').last}' : 'أو ارفع شخصية مخصصة (3D)',
+                                style: TextStyle(
+                                  color: _characterFile != null ? Colors.black87 : Colors.grey.shade600,
+                                  fontSize: 16,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             Icon(
                               _characterFile != null ? Icons.check_circle : Icons.upload_file,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _characterFile != null ? 'تغيير الشخصية المخصصة' : 'أو ارفع شخصية مخصصة (3D)',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              color: _characterFile != null ? Colors.green : Colors.grey.shade600,
                             ),
                           ],
                         ),
@@ -455,17 +452,16 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       onTap: _pickAudio,
                       borderRadius: BorderRadius.circular(AppColors.border_radius),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(AppColors.border_radius),
                           border: Border.all(
-                            color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                            color: Colors.grey.shade400,
                             width: 1,
                           ),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
                               child: Text(
@@ -473,10 +469,8 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                     ? 'ملف الصوت: ${_audioFile!.path.split('/').last}'
                                     : 'إرفاق ملف صوتي (اختياري)',
                                 style: TextStyle(
-                                  color: _audioFile != null
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  fontWeight: _audioFile != null ? FontWeight.bold : FontWeight.normal,
+                                  color: _audioFile != null ? Colors.black87 : Colors.grey.shade600,
+                                  fontSize: 16,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -484,9 +478,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                             ),
                             Icon(
                               _audioFile != null ? Icons.check_circle : Icons.audiotrack,
-                              color: _audioFile != null
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: _audioFile != null ? Colors.green : Colors.grey.shade600,
                             ),
                           ],
                         ),

@@ -12,6 +12,7 @@ import '../bloc/content_bloc.dart';
 import '../bloc/content_event.dart';
 import '../bloc/content_state.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/utils/character_helper.dart';
 
 class ChildStoryViewerScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -107,13 +108,16 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
           return;
         } catch (e) {
           _hasAudio = false;
+          _audioPlayer.stop(); // Explicitly stop if error
           _startFallbackTimer();
           return;
         }
       }
     }
 
+    // No audio to play for this scene
     _hasAudio = false;
+    _audioPlayer.stop(); // Explicitly stop any currently playing audio
     _startFallbackTimer();
   }
 
@@ -204,25 +208,6 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
     super.dispose();
   }
 
-  String _getCleanCharacterName(String rawName) {
-    if (rawName.trim().isEmpty) return 'شخصية';
-    String clean = rawName.toUpperCase().replaceAll('.GLB', '').split('_').first;
-    if (clean.length > 1) {
-      clean = clean[0] + clean.substring(1).toLowerCase();
-    }
-    return clean;
-  }
-
-  Color _getCharacterColor(String rawName) {
-    final lower = rawName.toLowerCase();
-    if (lower.startsWith('fort')) return const Color(0xFF2B8049); // Darker Green
-    if (lower.startsWith('lort')) return const Color(0xFFD4AC0D); // Golden/Yellow matching character
-    if (lower.startsWith('mort')) return const Color(0xFF9B59B6); // Purple
-    if (lower.startsWith('port')) return const Color(0xFF3498DB); // Blue
-    if (lower.startsWith('qort')) return const Color(0xFFE74C3C); // Red/Coral
-    return Colors.purple.shade300;
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -286,7 +271,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                 return Expanded(
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                                    child: _buildProgressBar(index, _getCharacterColor(story.characterName)),
+                                    child: _buildProgressBar(index, CharacterHelper.getColor(story.characterName)),
                                   ),
                                 );
                               }),
@@ -374,7 +359,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                 border: Border.all(color: Colors.white, width: 2),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.purple.withOpacity(0.1),
+                                    color: CharacterHelper.getColor(story.characterName).withOpacity(0.2),
                                     blurRadius: 10,
                                     offset: const Offset(0, 5),
                                   ),
@@ -385,11 +370,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                 child: RepaintBoundary(
                                   child: Flutter3DViewer(
                                     key: ValueKey(story.characterName),
-                                    src: story.characterName.trim().isNotEmpty
-                                        ? (story.characterName.startsWith('http')
-                                            ? story.characterName
-                                            : 'assets/3d/${story.characterName.trim().toLowerCase().replaceAll('.glb', '')}.glb')
-                                        : 'assets/3d/fort_frontal.glb',
+                                    src: CharacterHelper.getModelPath(story.characterName),
                                   ),
                                 ),
                               ),
@@ -455,11 +436,11 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: _getCharacterColor(story.characterName),
+                                    color: CharacterHelper.getColor(story.characterName),
                                     borderRadius: BorderRadius.circular(AppColors.border_radius),
                                   ),
                                   child: Text(
-                                    _getCleanCharacterName(story.characterName),
+                                    CharacterHelper.getCleanName(story.characterName),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -495,18 +476,18 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                   children: [
                                     if (_hasAudio) ...[
                                       IconButton(
-                                        icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: _getCharacterColor(story.characterName)),
+                                        icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: CharacterHelper.getColor(story.characterName)),
                                         onPressed: _toggleMute,
                                       ),
                                       const SizedBox(width: 8),
                                     ],
                                     IconButton(
-                                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: _getCharacterColor(story.characterName)),
+                                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: CharacterHelper.getColor(story.characterName)),
                                       onPressed: _togglePlayPause,
                                     ),
                                     const SizedBox(width: 8),
                                     IconButton(
-                                      icon: Icon(Icons.replay, color: _getCharacterColor(story.characterName)),
+                                      icon: Icon(Icons.replay, color: CharacterHelper.getColor(story.characterName)),
                                       onPressed: _restartMission,
                                     ),
                                   ],
@@ -535,7 +516,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                               }
                             },
                             style: FilledButton.styleFrom(
-                              backgroundColor: _getCharacterColor(story.characterName),
+                              backgroundColor: CharacterHelper.getColor(story.characterName),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(AppColors.border_radius),
                               ),

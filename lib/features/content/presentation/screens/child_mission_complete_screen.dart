@@ -11,91 +11,60 @@ class ChildMissionCompleteScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      // Calm, flat off-white background
       body: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFE0F7FA), // Light Blue
-              Color(0xFFF3E5F5), // Light Purple
-              Color(0xFFFFF3E0), // Light Orange
-            ],
-          ),
-        ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 40.0,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(),
-                
-                // Icon / Illustration
-                Container(
-                  padding: const EdgeInsets.all(40),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.amber.withOpacity(0.4),
-                        blurRadius: 30,
-                        offset: const Offset(0, 15),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.star_rounded,
-                    size: 120,
-                    color: Colors.amber,
-                  ),
-                ),
-                
-                const SizedBox(height: 48),
-                
+
                 // Title
                 const Text(
-                  'أحسنت يا بطل! 🌟',
+                  'أحسنت يا بطل !',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF2ECC71),
+                    color: Color(0xFF10B981), // Calmer green
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Subtitle
                 const Text(
                   'لقد أتممت المهمة بالكامل وأجبت على جميع التحديات بنجاح. لقد ربحت أوسمة ونقاطاً جديدة!',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
+                    color: Color(0xFF475569), // Calmer slate text
                     height: 1.5,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 32),
-                
-                // Earned Badge Card
+
+                // Earned Badge Card (Flat with simple border)
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppColors.border_radius),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                    border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3), width: 2),
+                    borderRadius: BorderRadius.circular(
+                      AppColors.border_radius,
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                      width: 2,
+                    ), // Unified simple border
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -106,14 +75,19 @@ class ChildMissionCompleteScreen extends StatelessWidget {
                           children: [
                             const Text(
                               'الوسام المكتسب',
-                              style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF94A3B8),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
+                            const SizedBox(height: 4),
                             Text(
                               mission.badgeName,
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF2C3E50),
+                                color: Color(0xFF334155),
                               ),
                               textAlign: TextAlign.center,
                               maxLines: 1,
@@ -124,26 +98,34 @@ class ChildMissionCompleteScreen extends StatelessWidget {
                       ),
                       // Divider
                       Container(
-                        height: 60,
+                        height: 50,
                         width: 2,
-                        color: Colors.grey.withOpacity(0.2),
+                        color: const Color(0xFFF1F5F9), // Very soft divider
                       ),
                       // Points
                       Expanded(
                         child: Column(
                           children: [
-                            const Icon(Icons.star_rounded, color: Colors.amber, size: 48),
-                            const SizedBox(height: 8),
+                            const Icon(
+                              Icons.star_rounded,
+                              color: Color(0xFFFBBF24),
+                              size: 36,
+                            ),
+                            const SizedBox(height: 4),
                             const Text(
                               'النقاط',
-                              style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF94A3B8),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Text(
                               '+${mission.starsReward}',
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFFE67E22),
+                                color: Color(0xFFF59E0B),
                               ),
                             ),
                           ],
@@ -152,10 +134,10 @@ class ChildMissionCompleteScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const Spacer(),
-                
-                // See Badges Button
+
+                // See Badges Button (Flat)
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -163,28 +145,36 @@ class ChildMissionCompleteScreen extends StatelessWidget {
                     onPressed: () {
                       context.push('/child/badges');
                     },
-                    icon: const Icon(Icons.workspace_premium_rounded, size: 28),
+                    icon: const Icon(
+                      Icons.workspace_premium_rounded,
+                      size: 28,
+                      color: Colors.white,
+                    ),
                     label: const Text(
                       'رؤية أوسمتي',
                       style: TextStyle(
                         fontSize: 18,
+                        color: Colors.white,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF9B59B6),
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      // Flat calm purple
+                      elevation: 0,
+                      // No shadow
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        borderRadius: BorderRadius.circular(
+                          AppColors.border_radius,
+                        ),
                       ),
-                      elevation: 8,
-                      shadowColor: const Color(0xFF9B59B6).withOpacity(0.5),
                     ),
                   ),
                 ),
-                
-                const SizedBox(height: 16),
-                
-                // Go to Dashboard Button
+
+                const SizedBox(height: 12),
+
+                // Go to Dashboard Button (Flat Outline)
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -193,9 +183,17 @@ class ChildMissionCompleteScreen extends StatelessWidget {
                       context.go('/child-dashboard');
                     },
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF3498DB), width: 2),
+                      side: const BorderSide(
+                        color: Color(0xFFCBD5E1),
+                        width: 2,
+                      ),
+                      // Unified soft border
+                      backgroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        borderRadius: BorderRadius.circular(
+                          AppColors.border_radius,
+                        ),
                       ),
                     ),
                     child: const Text(
@@ -203,7 +201,7 @@ class ChildMissionCompleteScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF3498DB),
+                        color: Color(0xFF64748B), // Soft text
                       ),
                     ),
                   ),

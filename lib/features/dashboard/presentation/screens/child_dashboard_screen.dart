@@ -10,10 +10,12 @@ import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
 
 import '../../../../core/widgets/offline_aware_image.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
 import '../../../content/data/services/sync_service.dart';
 import '../../../content/domain/repositories/content_repository.dart';
 import '../../../../core/utils/logout_helper.dart';
+import '../../../../core/widgets/custom_loader.dart';
 
 class ChildDashboardScreen extends StatefulWidget {
   const ChildDashboardScreen({super.key});
@@ -56,6 +58,8 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
 
     _contentBloc.add(const ContentEvent.getWorlds());
     await _fetchProgress();
+    
+    _syncService.syncState.addListener(_onSyncStateChanged);
 
     // Start background sync & network listener
     _syncService.startAutoSyncListener(childId: childId);
@@ -65,6 +69,21 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
         _fetchProgress();
       }
     });
+  }
+
+  void _onSyncStateChanged() {
+    final state = _syncService.syncState.value;
+    if (state.status == SyncStatus.error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message, style: const TextStyle(fontFamily: 'Cairo')),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _fetchProgress() async {
@@ -99,6 +118,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
 
   @override
   void dispose() {
+    _syncService.syncState.removeListener(_onSyncStateChanged);
     _statsNotifier.dispose();
     _contentBloc.close();
     super.dispose();
@@ -310,8 +330,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                   child: BlocBuilder<ContentBloc, ContentState>(
                     builder: (context, state) {
                       return state.maybeWhen(
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
+                        loading: () => const ShimmerLoading(),
                         error: (msg) => Center(
                           child: Text(
                             'خطأ: $msg',

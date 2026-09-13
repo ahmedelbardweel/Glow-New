@@ -51,7 +51,13 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
     on<ContentEvent>((event, emit) async {
       await event.map(
         getWorlds: (e) async {
-          emit(const ContentState.loading());
+          final isAlreadyLoaded = state.maybeWhen(
+            worldsLoaded: (_) => true,
+            orElse: () => false,
+          );
+          if (!isAlreadyLoaded) {
+            emit(const ContentState.loading());
+          }
           final result = await getWorlds(NoParams());
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),

@@ -105,8 +105,13 @@ class SyncService {
           try {
             await remoteDataSource.completeMission(mId, cId);
             await localDataSource.removePendingCompletion(cId, mId);
-          } catch (_) {
-            // Keep in queue if failed
+          } catch (e) {
+            syncState.value = SyncStatusState(
+              status: SyncStatus.error,
+              message: 'تعذر رفع الإنجازات لسوبابيز. تأكد من إعدادات الأمان (RLS):\n$e',
+            );
+            _isSyncRunning = false;
+            return;
           }
         }
       }

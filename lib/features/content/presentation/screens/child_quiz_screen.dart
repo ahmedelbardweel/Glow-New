@@ -9,6 +9,7 @@ import '../bloc/content_bloc.dart';
 import '../bloc/content_event.dart';
 import '../bloc/content_state.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 
 class ChildQuizScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -124,7 +125,7 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
             child: BlocBuilder<ContentBloc, ContentState>(
               builder: (context, state) {
                 return state.maybeWhen(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () => const ShimmerLoading(type: ShimmerType.card),
                   error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
                   questionsLoaded: (questions) {
                     if (questions.isEmpty) {

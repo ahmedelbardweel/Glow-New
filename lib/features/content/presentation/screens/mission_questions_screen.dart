@@ -9,6 +9,7 @@ import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
 import '../../../../core/utils/admin_actions_bottom_sheet.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 
 class MissionQuestionsScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -47,7 +48,7 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
         body: BlocBuilder<ContentBloc, ContentState>(
           builder: (context, state) {
             return state.maybeWhen(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ShimmerLoading(),
               error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
               questionsLoaded: (questions) {
                 if (questions.isEmpty) {

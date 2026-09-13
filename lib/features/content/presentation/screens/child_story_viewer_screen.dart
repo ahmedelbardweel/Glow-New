@@ -13,6 +13,7 @@ import '../bloc/content_event.dart';
 import '../bloc/content_state.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/utils/character_helper.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 
 class ChildStoryViewerScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -244,7 +245,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
             },
             builder: (context, state) {
               return state.maybeWhen(
-                loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                loading: () => const ShimmerLoading(type: ShimmerType.card),
                 error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
                 storiesLoaded: (stories) {
                   if (stories.isEmpty) {

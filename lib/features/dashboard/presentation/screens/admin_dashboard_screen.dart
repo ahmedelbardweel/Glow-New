@@ -10,6 +10,7 @@ import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
 import '../../../../core/utils/logout_helper.dart';
 import '../../../../core/utils/admin_actions_bottom_sheet.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -118,7 +119,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         body: BlocBuilder<ContentBloc, ContentState>(
           builder: (context, state) {
             return state.maybeWhen(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ShimmerLoading(),
               error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
               worldsLoaded: (worlds) {
                 if (worlds.isEmpty) {

@@ -11,6 +11,7 @@ import '../bloc/content_event.dart';
 import '../bloc/content_state.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
 import '../../domain/repositories/content_repository.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 
 class ChildWorldMissionsScreen extends StatefulWidget {
   final WorldEntity world;
@@ -106,11 +107,11 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
             child: BlocBuilder<ContentBloc, ContentState>(
               builder: (context, state) {
                 return state.maybeWhen(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () => const ShimmerLoading(),
                   error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
                   missionsLoaded: (missions) {
                     if (_isLoadingProgress) {
-                      return const Center(child: CircularProgressIndicator());
+                      return const ShimmerLoading();
                     }
                     if (missions.isEmpty) {
                       return const Center(child: Text('لا توجد مهام في هذا العالم بعد.', style: TextStyle(fontSize: 14, color: Colors.grey)));

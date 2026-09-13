@@ -8,6 +8,7 @@ import '../bloc/content_bloc.dart';
 import '../bloc/content_event.dart';
 import '../bloc/content_state.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 
 class ChildBadgesScreen extends StatefulWidget {
   const ChildBadgesScreen({super.key});
@@ -79,7 +80,7 @@ class _ChildBadgesScreenState extends State<ChildBadgesScreen> {
             child: BlocBuilder<ContentBloc, ContentState>(
               builder: (context, state) {
                 return state.maybeWhen(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () => const ShimmerLoading(type: ShimmerType.grid),
                   error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
                   completedMissionsLoaded: (progressList) {
                     if (progressList.isEmpty) {

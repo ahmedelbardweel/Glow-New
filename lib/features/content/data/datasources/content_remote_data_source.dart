@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/world_model.dart';
 import '../models/mission_model.dart';
@@ -12,19 +13,27 @@ abstract class ContentRemoteDataSource {
   Future<WorldModel> addWorld(WorldModel world);
   Future<WorldModel> updateWorld(WorldModel world);
   Future<void> deleteWorld(String id);
-  
+
   // Missions
   Future<List<MissionModel>> getMissions(String worldId);
   Future<MissionModel> addMission(MissionModel mission);
   Future<MissionModel> updateMission(MissionModel mission);
   Future<void> deleteMission(String id);
-  
+
   // Stories
   Future<List<StoryModel>> getStories(String missionId);
-  Future<StoryModel> addStory(StoryModel story, {File? audioFile, File? characterFile});
-  Future<StoryModel> updateStory(StoryModel story, {File? audioFile, File? characterFile});
+  Future<StoryModel> addStory(
+    StoryModel story, {
+    File? audioFile,
+    File? characterFile,
+  });
+  Future<StoryModel> updateStory(
+    StoryModel story, {
+    File? audioFile,
+    File? characterFile,
+  });
   Future<void> deleteStory(String id);
-  
+
   // Questions
   Future<List<QuestionModel>> getQuestions(String missionId);
   Future<QuestionModel> addQuestion(QuestionModel question);
@@ -43,19 +52,31 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
 
   @override
   Future<List<WorldModel>> getWorlds() async {
-    final response = await supabaseClient.from('worlds').select().order('created_at', ascending: true);
+    final response = await supabaseClient
+        .from('worlds')
+        .select()
+        .order('created_at', ascending: true);
     return response.map((json) => WorldModel.fromJson(json)).toList();
   }
 
   @override
   Future<WorldModel> addWorld(WorldModel world) async {
-    final response = await supabaseClient.from('worlds').insert(world.toJson()).select().single();
+    final response = await supabaseClient
+        .from('worlds')
+        .insert(world.toJson())
+        .select()
+        .single();
     return WorldModel.fromJson(response);
   }
 
   @override
   Future<WorldModel> updateWorld(WorldModel world) async {
-    final response = await supabaseClient.from('worlds').update(world.toJson()).eq('id', world.id).select().single();
+    final response = await supabaseClient
+        .from('worlds')
+        .update(world.toJson())
+        .eq('id', world.id)
+        .select()
+        .single();
     return WorldModel.fromJson(response);
   }
 
@@ -76,13 +97,22 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
 
   @override
   Future<MissionModel> addMission(MissionModel mission) async {
-    final response = await supabaseClient.from('missions').insert(mission.toJson()).select().single();
+    final response = await supabaseClient
+        .from('missions')
+        .insert(mission.toJson())
+        .select()
+        .single();
     return MissionModel.fromJson(response);
   }
 
   @override
   Future<MissionModel> updateMission(MissionModel mission) async {
-    final response = await supabaseClient.from('missions').update(mission.toJson()).eq('id', mission.id).select().single();
+    final response = await supabaseClient
+        .from('missions')
+        .update(mission.toJson())
+        .eq('id', mission.id)
+        .select()
+        .single();
     return MissionModel.fromJson(response);
   }
 
@@ -102,28 +132,35 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   }
 
   @override
-  Future<StoryModel> addStory(StoryModel story, {File? audioFile, File? characterFile}) async {
+  Future<StoryModel> addStory(
+    StoryModel story, {
+    File? audioFile,
+    File? characterFile,
+  }) async {
     String? audioUrl = story.audioUrl;
-    
+
     if (audioFile != null) {
       final ext = audioFile.path.split('.').last;
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_audio.$ext';
-      await supabaseClient.storage.from('story_audio').upload(
-        fileName,
-        audioFile,
-      );
-      audioUrl = supabaseClient.storage.from('story_audio').getPublicUrl(fileName);
+      await supabaseClient.storage
+          .from('story_audio')
+          .upload(fileName, audioFile);
+      audioUrl = supabaseClient.storage
+          .from('story_audio')
+          .getPublicUrl(fileName);
     }
-    
+
     String characterName = story.characterName;
     if (characterFile != null) {
       final ext = characterFile.path.split('.').last;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_character.$ext';
-      await supabaseClient.storage.from('story_characters').upload(
-        fileName,
-        characterFile,
-      );
-      characterName = supabaseClient.storage.from('story_characters').getPublicUrl(fileName);
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_character.$ext';
+      await supabaseClient.storage
+          .from('story_characters')
+          .upload(fileName, characterFile);
+      characterName = supabaseClient.storage
+          .from('story_characters')
+          .getPublicUrl(fileName);
     }
 
     final storyToSave = StoryModel(
@@ -137,33 +174,44 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
       audioUrl: audioUrl,
     );
 
-    final response = await supabaseClient.from('stories').insert(storyToSave.toJson()).select().single();
+    final response = await supabaseClient
+        .from('stories')
+        .insert(storyToSave.toJson())
+        .select()
+        .single();
     return StoryModel.fromJson(response);
   }
 
   @override
-  Future<StoryModel> updateStory(StoryModel story, {File? audioFile, File? characterFile}) async {
+  Future<StoryModel> updateStory(
+    StoryModel story, {
+    File? audioFile,
+    File? characterFile,
+  }) async {
     String? audioUrl = story.audioUrl;
-    
+
     if (audioFile != null) {
       final ext = audioFile.path.split('.').last;
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_audio.$ext';
-      await supabaseClient.storage.from('story_audio').upload(
-        fileName,
-        audioFile,
-      );
-      audioUrl = supabaseClient.storage.from('story_audio').getPublicUrl(fileName);
+      await supabaseClient.storage
+          .from('story_audio')
+          .upload(fileName, audioFile);
+      audioUrl = supabaseClient.storage
+          .from('story_audio')
+          .getPublicUrl(fileName);
     }
-    
+
     String characterName = story.characterName;
     if (characterFile != null) {
       final ext = characterFile.path.split('.').last;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_character.$ext';
-      await supabaseClient.storage.from('story_characters').upload(
-        fileName,
-        characterFile,
-      );
-      characterName = supabaseClient.storage.from('story_characters').getPublicUrl(fileName);
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_character.$ext';
+      await supabaseClient.storage
+          .from('story_characters')
+          .upload(fileName, characterFile);
+      characterName = supabaseClient.storage
+          .from('story_characters')
+          .getPublicUrl(fileName);
     }
 
     final storyToSave = StoryModel(
@@ -177,7 +225,12 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
       audioUrl: audioUrl,
     );
 
-    final response = await supabaseClient.from('stories').update(storyToSave.toJson()).eq('id', storyToSave.id).select().single();
+    final response = await supabaseClient
+        .from('stories')
+        .update(storyToSave.toJson())
+        .eq('id', storyToSave.id)
+        .select()
+        .single();
     return StoryModel.fromJson(response);
   }
 
@@ -197,13 +250,22 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
 
   @override
   Future<QuestionModel> addQuestion(QuestionModel question) async {
-    final response = await supabaseClient.from('questions').insert(question.toJson()).select().single();
+    final response = await supabaseClient
+        .from('questions')
+        .insert(question.toJson())
+        .select()
+        .single();
     return QuestionModel.fromJson(response);
   }
 
   @override
   Future<QuestionModel> updateQuestion(QuestionModel question) async {
-    final response = await supabaseClient.from('questions').update(question.toJson()).eq('id', question.id).select().single();
+    final response = await supabaseClient
+        .from('questions')
+        .update(question.toJson())
+        .eq('id', question.id)
+        .select()
+        .single();
     return QuestionModel.fromJson(response);
   }
 
@@ -214,14 +276,54 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
 
   @override
   Future<void> completeMission(String missionId, String childId) async {
-    // Insert progress, handling unique constraint violations silently if already completed
-    await supabaseClient.from('child_progress').upsert(
-      {
+    // Check if already completed to avoid infinite star farming
+    final existing = await supabaseClient
+        .from('child_progress')
+        .select()
+        .eq('child_id', childId)
+        .eq('mission_id', missionId)
+        .maybeSingle();
+
+    if (existing == null) {
+      // First time completion! Let's award stars and badges to the profile.
+      final mission = await supabaseClient
+          .from('missions')
+          .select('stars_reward, badge_name')
+          .eq('id', missionId)
+          .single();
+
+      int starsReward = mission['stars_reward'] ?? 0;
+      int badgeCount =
+          (mission['badge_name'] != null &&
+              mission['badge_name'].toString().trim().isNotEmpty)
+          ? 1
+          : 0;
+
+      // Fetch current profile stats safely
+      final childProfile = await supabaseClient
+          .from('children_profiles')
+          .select('*')
+          .eq('id', childId)
+          .single();
+
+      int currentStars = childProfile['total_stars'] ?? 0;
+      int currentBadges = childProfile['total_badges'] ?? 0;
+
+      // Update profile
+      await supabaseClient
+          .from('children_profiles')
+          .update({
+            'total_stars': currentStars + starsReward,
+            'total_badges': currentBadges + badgeCount,
+          })
+          .eq('id', childId);
+          
+      // Record progress
+      await supabaseClient.from('child_progress').insert({
         'child_id': childId,
         'mission_id': missionId,
-      },
-      onConflict: 'child_id, mission_id',
-    );
+      });
+    }
   }
 
   @override
@@ -231,7 +333,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
         .select('*, missions(title, badge_name, stars_reward)')
         .eq('child_id', childId)
         .order('completed_at', ascending: false);
-    
+
     return response.map((json) => ChildProgressModel.fromJson(json)).toList();
   }
 }

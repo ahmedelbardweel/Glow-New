@@ -42,7 +42,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
         title: const Text('معاينة القصة (شكلها للطفل)'),
         centerTitle: true,
       ),
-      body: SafeArea(
+      body: SafeArea(top: false, bottom: true, 
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(

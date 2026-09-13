@@ -227,7 +227,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
               ],
             ),
           ),
-          child: SafeArea(
+          child: SafeArea(top: false, bottom: true, 
           child: BlocConsumer<ContentBloc, ContentState>(
             listener: (context, state) {
               state.maybeWhen(

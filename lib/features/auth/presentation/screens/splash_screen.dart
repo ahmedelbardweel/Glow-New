@@ -88,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          SafeArea(
+          SafeArea(top: false, bottom: false, 
             child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

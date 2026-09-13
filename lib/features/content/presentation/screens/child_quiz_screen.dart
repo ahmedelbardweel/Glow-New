@@ -121,7 +121,7 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
         ),
         body: Container(
           color: Colors.white,
-          child: SafeArea(
+          child: SafeArea(top: false, bottom: true, 
             child: BlocBuilder<ContentBloc, ContentState>(
               builder: (context, state) {
                 return state.maybeWhen(

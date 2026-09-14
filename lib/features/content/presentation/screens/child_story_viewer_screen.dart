@@ -26,18 +26,20 @@ class ChildStoryViewerScreen extends StatefulWidget {
 
 class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
   late ContentBloc _contentBloc;
-  
+
   List<StoryEntity> _stories = [];
   int _currentIndex = 0;
-  
+
   // Audio Player and Progress
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final ValueNotifier<Duration> _positionNotifier = ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<Duration> _positionNotifier = ValueNotifier<Duration>(
+    Duration.zero,
+  );
   bool _isPlaying = false;
   Duration _totalDuration = const Duration(seconds: 10); // default if no audio
   bool _hasAudio = false;
   bool _isMuted = false;
-  
+
   Timer? _fallbackTimer;
 
   @override
@@ -49,11 +51,11 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
     _audioPlayer.onDurationChanged.listen((duration) {
       if (mounted && _hasAudio) setState(() => _totalDuration = duration);
     });
-    
+
     _audioPlayer.onPositionChanged.listen((position) {
       if (_hasAudio) _positionNotifier.value = position;
     });
-    
+
     _audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted && _hasAudio) {
         setState(() {
@@ -74,7 +76,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
 
     final currentStory = _stories[_currentIndex];
     final audioUrl = currentStory.audioUrl?.trim() ?? '';
-    
+
     // Pre-cache next scene's audio in the background for instant transition
     if (_currentIndex + 1 < _stories.length) {
       final nextStory = _stories[_currentIndex + 1];
@@ -123,7 +125,9 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
   }
 
   void _startFallbackTimer() {
-    _totalDuration = const Duration(seconds: 10); // 10 seconds default viewing time
+    _totalDuration = const Duration(
+      seconds: 10,
+    ); // 10 seconds default viewing time
     _isPlaying = true;
     _positionNotifier.value = Duration.zero;
     _fallbackTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
@@ -227,321 +231,436 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
               ],
             ),
           ),
-          child: SafeArea(top: false, bottom: true, 
-          child: BlocConsumer<ContentBloc, ContentState>(
-            listener: (context, state) {
-              state.maybeWhen(
-                storiesLoaded: (stories) {
-                  if (stories.isNotEmpty) {
-                    setState(() {
-                      _stories = stories;
-                      _currentIndex = 0;
-                    });
-                    _startStory();
-                  }
-                },
-                orElse: () {},
-              );
-            },
-            builder: (context, state) {
-              return state.maybeWhen(
-                loading: () => const ShimmerLoading(type: ShimmerType.card),
-                error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
-                storiesLoaded: (stories) {
-                  if (stories.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'لا توجد قصص في هذه المهمة بعد.',
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                    );
-                  }
+          child: SafeArea(
+            top: true,
+            bottom: true,
+            child: BlocConsumer<ContentBloc, ContentState>(
+              listener: (context, state) {
+                state.maybeWhen(
+                  storiesLoaded: (stories) {
+                    if (stories.isNotEmpty) {
+                      setState(() {
+                        _stories = stories;
+                        _currentIndex = 0;
+                      });
+                      _startStory();
+                    }
+                  },
+                  orElse: () {},
+                );
+              },
+              builder: (context, state) {
+                return state.maybeWhen(
+                  loading: () => const ShimmerLoading(type: ShimmerType.card),
+                  error: (msg) => Center(
+                    child: Text(
+                      'خطأ: $msg',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                  storiesLoaded: (stories) {
+                    if (stories.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'لا توجد قصص في هذه المهمة بعد.',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      );
+                    }
 
-                  final story = _stories[_currentIndex];
+                    final story = _stories[_currentIndex];
 
-                  return Column(
-                    children: [
-                      // Top Bar (Segmented Progress + Title + Back Button)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        child: Column(
-                          children: [
-                            // Progress Bars
-                            Row(
-                              children: List.generate(_stories.length, (index) {
-                                return Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                                    child: _buildProgressBar(index, CharacterHelper.getColor(story.characterName)),
-                                  ),
-                                );
-                              }),
-                            ),
-                            const SizedBox(height: 16),
-                            // Header
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Action Buttons (Left)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                    boxShadow: [
-                                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
-                                    ],
-                                  ),
-                                  child: const Text(
-                                    'مغامرة',
-                                    style: TextStyle(color: Color(0xFF2C3E50), fontSize: 12, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                // Title & Scene Text
-                                Column(
-                                  children: [
-                                    Text(
-                                      widget.mission.title,
-                                      style: const TextStyle(
-                                        color: Color(0xFF2C3E50),
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
+                    return Column(
+                      children: [
+                        // Top Bar (Segmented Progress + Title + Back Button)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
+                          child: Column(
+                            children: [
+                              // Progress Bars
+                              Row(
+                                children: List.generate(_stories.length, (
+                                  index,
+                                ) {
+                                  return Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 2.0,
+                                      ),
+                                      child: _buildProgressBar(
+                                        index,
+                                        CharacterHelper.getColor(
+                                          story.characterName,
+                                        ),
                                       ),
                                     ),
-                                    Text(
-                                      'مشهد ${_currentIndex + 1} من ${_stories.length}',
-                                      style: const TextStyle(
-                                        color: Colors.black54,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  );
+                                }),
+                              ),
+                              const SizedBox(height: 16),
+                              // Header
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // Action Buttons (Left)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
                                     ),
-                                  ],
-                                ),
-                                // Back Button (Right)
-                                GestureDetector(
-                                  onTap: () {
-                                    _audioPlayer.stop();
-                                    context.pop();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      borderRadius: BorderRadius.circular(
+                                        AppColors.border_radius,
+                                      ),
                                       boxShadow: [
-                                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
                                       ],
                                     ),
                                     child: const Text(
-                                      'رجوع',
-                                      style: TextStyle(color: Color(0xFF2C3E50), fontSize: 14, fontWeight: FontWeight.bold),
+                                      'مغامرة',
+                                      style: TextStyle(
+                                        color: Color(0xFF2C3E50),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 8),
-
-                      // Interactive Tap Areas & 3D Character
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            // 3D Character Viewer
-                            Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                border: Border.all(color: Colors.white, width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: CharacterHelper.getColor(story.characterName).withOpacity(0.2),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 5),
+                                  // Title & Scene Text
+                                  Column(
+                                    children: [
+                                      Text(
+                                        widget.mission.title,
+                                        style: const TextStyle(
+                                          color: Color(0xFF2C3E50),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      Text(
+                                        'مشهد ${_currentIndex + 1} من ${_stories.length}',
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  // Back Button (Right)
+                                  GestureDetector(
+                                    onTap: () {
+                                      _audioPlayer.stop();
+                                      context.pop();
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(
+                                          AppColors.border_radius,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.05,
+                                            ),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Text(
+                                        'رجوع',
+                                        style: TextStyle(
+                                          color: Color(0xFF2C3E50),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                child: RepaintBoundary(
-                                  child: Flutter3DViewer(
-                                    key: ValueKey(story.characterName),
-                                    src: CharacterHelper.getModelPath(story.characterName),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Tap Gestures
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: _previousStory,
-                                    behavior: HitTestBehavior.translucent,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: _togglePlayPause,
-                                    behavior: HitTestBehavior.translucent,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: _currentIndex < _stories.length - 1 ? _nextStory : null,
-                                    behavior: HitTestBehavior.translucent,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
 
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 8),
 
-                      // Text and Controls Area
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(AppColors.border_radius),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _isPlaying ? 'جارٍ القراءة...' : 'متوقف مؤقتاً',
-                                  style: TextStyle(
-                                    color: _isPlaying ? Colors.green : Colors.orange, 
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        // Interactive Tap Areas & 3D Character
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              // 3D Character Viewer
+                              Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: CharacterHelper.getColor(story.characterName),
-                                    borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                  ),
-                                  child: Text(
-                                    CharacterHelper.getCleanName(story.characterName),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              story.content,
-                              style: const TextStyle(
-                                color: Color(0xFF2C3E50),
-                                fontSize: 14,
-                                height: 1.6,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.right,
-                              textDirection: TextDirection.rtl,
-                            ),
-                            const SizedBox(height: 24),
-                            // Media Controls
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (_hasAudio) ...[
-                                      IconButton(
-                                        icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: CharacterHelper.getColor(story.characterName)),
-                                        onPressed: _toggleMute,
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    IconButton(
-                                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: CharacterHelper.getColor(story.characterName)),
-                                      onPressed: _togglePlayPause,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: Icon(Icons.replay, color: CharacterHelper.getColor(story.characterName)),
-                                      onPressed: _restartMission,
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(
+                                    AppColors.border_radius,
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: CharacterHelper.getColor(
+                                        story.characterName,
+                                      ).withOpacity(0.2),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 5),
                                     ),
                                   ],
                                 ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    AppColors.border_radius,
+                                  ),
+                                  child: RepaintBoundary(
+                                    child: Flutter3DViewer(
+                                      key: ValueKey(story.characterName),
+                                      src: CharacterHelper.getModelPath(
+                                        story.characterName,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                              // Tap Gestures
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: _previousStory,
+                                      behavior: HitTestBehavior.translucent,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: _togglePlayPause,
+                                      behavior: HitTestBehavior.translucent,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: _currentIndex < _stories.length - 1
+                                          ? _nextStory
+                                          : null,
+                                      behavior: HitTestBehavior.translucent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
 
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                      // Bottom Action Button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: FilledButton(
-                            onPressed: () {
-                              if (_currentIndex < _stories.length - 1) {
-                                _nextStory();
-                              } else {
-                                _audioPlayer.stop();
-                                context.pushReplacement('/child/quiz-intro', extra: widget.mission);
-                              }
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: CharacterHelper.getColor(story.characterName),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppColors.border_radius),
-                              ),
+                        // Text and Controls Area
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(
+                              AppColors.border_radius,
                             ),
-                            child: Text(
-                              _currentIndex < _stories.length - 1 ? 'متابعة المشهد' : 'إنهاء القصة والتحدي',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _isPlaying
+                                        ? 'جارٍ القراءة...'
+                                        : 'متوقف مؤقتاً',
+                                    style: TextStyle(
+                                      color: _isPlaying
+                                          ? Colors.green
+                                          : Colors.orange,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: CharacterHelper.getColor(
+                                        story.characterName,
+                                      ),
+                                      borderRadius: BorderRadius.circular(
+                                        AppColors.border_radius,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      CharacterHelper.getCleanName(
+                                        story.characterName,
+                                      ),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                story.content,
+                                style: const TextStyle(
+                                  color: Color(0xFF2C3E50),
+                                  fontSize: 14,
+                                  height: 1.6,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.right,
+                                textDirection: TextDirection.rtl,
+                              ),
+                              const SizedBox(height: 24),
+                              // Media Controls
+                              Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(
+                                      AppColors.border_radius,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (_hasAudio) ...[
+                                        IconButton(
+                                          icon: Icon(
+                                            _isMuted
+                                                ? Icons.volume_off
+                                                : Icons.volume_up,
+                                            color: CharacterHelper.getColor(
+                                              story.characterName,
+                                            ),
+                                          ),
+                                          onPressed: _toggleMute,
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      IconButton(
+                                        icon: Icon(
+                                          _isPlaying
+                                              ? Icons.pause
+                                              : Icons.play_arrow,
+                                          color: CharacterHelper.getColor(
+                                            story.characterName,
+                                          ),
+                                        ),
+                                        onPressed: _togglePlayPause,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.replay,
+                                          color: CharacterHelper.getColor(
+                                            story.characterName,
+                                          ),
+                                        ),
+                                        onPressed: _restartMission,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Bottom Action Button
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: FilledButton(
+                              onPressed: () {
+                                if (_currentIndex < _stories.length - 1) {
+                                  _nextStory();
+                                } else {
+                                  _audioPlayer.stop();
+                                  context.pushReplacement(
+                                    '/child/quiz-intro',
+                                    extra: widget.mission,
+                                  );
+                                }
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: CharacterHelper.getColor(
+                                  story.characterName,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppColors.border_radius,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                _currentIndex < _stories.length - 1
+                                    ? 'متابعة المشهد'
+                                    : 'إنهاء القصة والتحدي',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-                orElse: () => const SizedBox(),
-              );
-            },
+                      ],
+                    );
+                  },
+                  orElse: () => const SizedBox(),
+                );
+              },
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -570,7 +689,10 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
       builder: (context, pos, _) {
         double percent = 0.0;
         if (_totalDuration.inMilliseconds > 0) {
-          percent = (pos.inMilliseconds / _totalDuration.inMilliseconds).clamp(0.0, 1.0);
+          percent = (pos.inMilliseconds / _totalDuration.inMilliseconds).clamp(
+            0.0,
+            1.0,
+          );
         }
 
         return Container(
@@ -592,4 +714,3 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
     );
   }
 }
-

@@ -11,7 +11,7 @@ void showLogoutBottomSheet(BuildContext context) {
       borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
     ),
     builder: (context) {
-      return SafeArea(top: false, bottom: true, 
+      return SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 10.0),
           child: Column(

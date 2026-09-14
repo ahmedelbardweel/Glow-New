@@ -21,7 +21,7 @@ class RoleSelectionScreen extends StatelessWidget {
         ),
         elevation: 0,
       ),
-      body: SafeArea(top: false, bottom: false, 
+      body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(10.0),
           child: Column(

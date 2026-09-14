@@ -207,12 +207,12 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
         ),
         child: RefreshIndicator(
           onRefresh: _fetchData,
-          color: Colors.amber,
+          color: const Color(0xFF9B59B6),
           child: _isLoading
               ? const Center(
-                  child: CircularProgressIndicator(color: Colors.amber),
+                  child: CircularProgressIndicator(color: Color(0xFF9B59B6)),
                 )
-              : SafeArea(top: false, bottom: false, 
+              : SafeArea(
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(20),

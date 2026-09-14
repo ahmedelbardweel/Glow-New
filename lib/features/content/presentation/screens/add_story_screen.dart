@@ -294,7 +294,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
           builder: (context, state) {
             final isLoading = state.maybeWhen(loading: () => true, orElse: () => false);
 
-            return SafeArea(top: false, bottom: true, 
+            return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Form(

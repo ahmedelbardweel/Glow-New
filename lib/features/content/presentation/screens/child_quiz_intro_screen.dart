@@ -24,7 +24,7 @@ class ChildQuizIntroScreen extends StatelessWidget {
             ],
           ),
         ),
-        child: SafeArea(top: false, bottom: true, 
+        child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
             child: Column(

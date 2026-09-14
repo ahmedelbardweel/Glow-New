@@ -126,12 +126,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   return const Center(child: Text('لا توجد عوالم مضافة حتى الآن. أضف عالمك الأول!'));
                 }
                 return ListView.builder(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(16),
                   itemCount: worlds.length,
                   itemBuilder: (context, index) {
                     final world = worlds[index];
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
+                      margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(AppColors.border_radius),
                         boxShadow: [

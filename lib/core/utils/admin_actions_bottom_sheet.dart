@@ -15,7 +15,7 @@ void showAdminActionsBottomSheet({
           borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
           border: Border.all(color: Colors.grey.shade300, width: 1),
         ),
-        child: SafeArea(top: false, bottom: true, 
+        child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

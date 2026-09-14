@@ -15,7 +15,7 @@ class ChildMissionCompleteScreen extends StatelessWidget {
       // Calm, flat off-white background
       body: Container(
         width: double.infinity,
-        child: SafeArea(top: false, bottom: true, 
+        child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 24.0,

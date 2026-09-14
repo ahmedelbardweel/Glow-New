@@ -76,7 +76,7 @@ class _ChildBadgesScreenState extends State<ChildBadgesScreen> {
               ],
             ),
           ),
-          child: SafeArea(top: false, bottom: false, 
+          child: SafeArea(
             child: BlocBuilder<ContentBloc, ContentState>(
               builder: (context, state) {
                 return state.maybeWhen(

@@ -103,7 +103,7 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
               ],
             ),
           ),
-          child: SafeArea(top: false, bottom: false, 
+          child: SafeArea(
             child: BlocBuilder<ContentBloc, ContentState>(
               builder: (context, state) {
                 return state.maybeWhen(

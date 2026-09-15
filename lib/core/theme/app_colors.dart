@@ -4,6 +4,7 @@ class AppColors {
   AppColors._();
 
    static double border_radius = 5.0;
+   static const Color inputBorder = Color(0xFFE2E8F0);
 
   // Primary Colors (Joyful Yellow from Logo)
   static const Color primary = Color(0xFFFFB300); // Deep Amber/Yellow

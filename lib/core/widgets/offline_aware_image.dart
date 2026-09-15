@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/di/injection_container.dart';
 import '../services/resource_manager.dart';
+import 'package:shimmer/shimmer.dart';
 
 class OfflineAwareImage extends StatefulWidget {
   final String? imageUrl;
@@ -59,12 +60,10 @@ class _OfflineAwareImageState extends State<OfflineAwareImage> {
           setState(() => _localPath = local);
         }
       } else if (url.startsWith('http')) {
-        // Trigger background download and caching
-        resourceManager.downloadAndCacheFile(url, folder: 'images').then((downloadedPath) {
-          if (mounted && downloadedPath != null && _localPath != downloadedPath) {
-            setState(() => _localPath = downloadedPath);
-          }
-        });
+        // Trigger background download and caching WITHOUT updating state.
+        // We will just show the network image for this session, and it will be 
+        // loaded from cache next time we open this URL. This prevents UI flashing.
+        resourceManager.downloadAndCacheInBackground(url, folder: 'images');
       }
     } catch (_) {
       // ResourceManager may not be registered in tests
@@ -75,10 +74,14 @@ class _OfflineAwareImageState extends State<OfflineAwareImage> {
   Widget build(BuildContext context) {
     Widget imageWidget;
 
-    // Safely calculate raster cache width avoiding infinity/NaN crashes
-    final int? memWidth = (widget.width != null && widget.width!.isFinite)
-        ? (widget.width! * 2).round()
-        : 800;
+    // Safely calculate raster cache width using MediaQuery as fallback for infinite/null width
+    double effectiveWidth = widget.width ?? MediaQuery.of(context).size.width;
+    if (effectiveWidth.isInfinite || effectiveWidth.isNaN) {
+      effectiveWidth = MediaQuery.of(context).size.width;
+    }
+    // Constrain to a reasonable maximum (e.g., 800) to prevent excessive memory usage
+    int memWidth = (effectiveWidth * MediaQuery.of(context).devicePixelRatio).round();
+    if (memWidth > 800) memWidth = 800;
 
     if (_localPath != null) {
       imageWidget = Image.file(
@@ -88,7 +91,7 @@ class _OfflineAwareImageState extends State<OfflineAwareImage> {
         fit: widget.fit,
         cacheWidth: memWidth,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
+        filterQuality: FilterQuality.low,
         errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
       );
     } else if (widget.imageUrl != null && widget.imageUrl!.trim().startsWith('http')) {
@@ -99,7 +102,7 @@ class _OfflineAwareImageState extends State<OfflineAwareImage> {
         fit: widget.fit,
         cacheWidth: memWidth,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
+        filterQuality: FilterQuality.low,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return widget.placeholder ?? _buildPlaceholder();
@@ -121,16 +124,13 @@ class _OfflineAwareImageState extends State<OfflineAwareImage> {
   }
 
   Widget _buildPlaceholder() {
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: Colors.grey.shade200,
-      child: const Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(
+        width: widget.width ?? double.infinity,
+        height: widget.height ?? double.infinity,
+        color: Colors.white,
       ),
     );
   }

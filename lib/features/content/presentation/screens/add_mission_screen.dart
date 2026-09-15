@@ -101,20 +101,20 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
                   children: [
                     TextFormField(
                       controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'اسم المهمة (مثال: المهمة الأولى)'),
+                      decoration: const InputDecoration(hintText: 'اسم المهمة (مثال: المهمة الأولى)'),
                       validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _badgeController,
-                      decoration: const InputDecoration(labelText: 'اسم الوسم (مثال: وسام الثقة)'),
+                      decoration: const InputDecoration(hintText: 'اسم الوسم (مثال: وسام الثقة)'),
                       validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _starsController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'عدد النجوم (مثال: 50)'),
+                      decoration: const InputDecoration(hintText: 'عدد النجوم (مثال: 50)'),
                       validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
                     ),
                     const SizedBox(height: 32),

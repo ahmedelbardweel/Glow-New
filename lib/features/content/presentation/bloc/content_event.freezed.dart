@@ -19,15 +19,15 @@ final _privateConstructorUsedError = UnsupportedError(
 mixin _$ContentEvent {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -41,7 +41,7 @@ mixin _$ContentEvent {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -50,21 +50,21 @@ mixin _$ContentEvent {
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -73,21 +73,21 @@ mixin _$ContentEvent {
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -189,6 +189,8 @@ abstract class _$$GetWorldsImplCopyWith<$Res> {
     _$GetWorldsImpl value,
     $Res Function(_$GetWorldsImpl) then,
   ) = __$$GetWorldsImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({bool forceRefresh});
 }
 
 /// @nodoc
@@ -202,39 +204,66 @@ class __$$GetWorldsImplCopyWithImpl<$Res>
 
   /// Create a copy of ContentEvent
   /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? forceRefresh = null}) {
+    return _then(
+      _$GetWorldsImpl(
+        forceRefresh: null == forceRefresh
+            ? _value.forceRefresh
+            : forceRefresh // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
 }
 
 /// @nodoc
 
 class _$GetWorldsImpl implements _GetWorlds {
-  const _$GetWorldsImpl();
+  const _$GetWorldsImpl({this.forceRefresh = false});
+
+  @override
+  @JsonKey()
+  final bool forceRefresh;
 
   @override
   String toString() {
-    return 'ContentEvent.getWorlds()';
+    return 'ContentEvent.getWorlds(forceRefresh: $forceRefresh)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        (other.runtimeType == runtimeType && other is _$GetWorldsImpl);
+        (other.runtimeType == runtimeType &&
+            other is _$GetWorldsImpl &&
+            (identical(other.forceRefresh, forceRefresh) ||
+                other.forceRefresh == forceRefresh));
   }
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => Object.hash(runtimeType, forceRefresh);
+
+  /// Create a copy of ContentEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$GetWorldsImplCopyWith<_$GetWorldsImpl> get copyWith =>
+      __$$GetWorldsImplCopyWithImpl<_$GetWorldsImpl>(this, _$identity);
 
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -248,61 +277,61 @@ class _$GetWorldsImpl implements _GetWorlds {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
     required TResult Function(String missionId, String childId) completeMission,
     required TResult Function(String childId) getCompletedMissions,
   }) {
-    return getWorlds();
+    return getWorlds(forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
     TResult? Function(String missionId, String childId)? completeMission,
     TResult? Function(String childId)? getCompletedMissions,
   }) {
-    return getWorlds?.call();
+    return getWorlds?.call(forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -311,7 +340,7 @@ class _$GetWorldsImpl implements _GetWorlds {
     required TResult orElse(),
   }) {
     if (getWorlds != null) {
-      return getWorlds();
+      return getWorlds(forceRefresh);
     }
     return orElse();
   }
@@ -397,7 +426,15 @@ class _$GetWorldsImpl implements _GetWorlds {
 }
 
 abstract class _GetWorlds implements ContentEvent {
-  const factory _GetWorlds() = _$GetWorldsImpl;
+  const factory _GetWorlds({final bool forceRefresh}) = _$GetWorldsImpl;
+
+  bool get forceRefresh;
+
+  /// Create a copy of ContentEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$GetWorldsImplCopyWith<_$GetWorldsImpl> get copyWith =>
+      throw _privateConstructorUsedError;
 }
 
 /// @nodoc
@@ -470,15 +507,15 @@ class _$AddWorldImpl implements _AddWorld {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -492,7 +529,7 @@ class _$AddWorldImpl implements _AddWorld {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -505,21 +542,21 @@ class _$AddWorldImpl implements _AddWorld {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -532,21 +569,21 @@ class _$AddWorldImpl implements _AddWorld {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -722,15 +759,15 @@ class _$UpdateWorldImpl implements _UpdateWorld {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -744,7 +781,7 @@ class _$UpdateWorldImpl implements _UpdateWorld {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -757,21 +794,21 @@ class _$UpdateWorldImpl implements _UpdateWorld {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -784,21 +821,21 @@ class _$UpdateWorldImpl implements _UpdateWorld {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -974,15 +1011,15 @@ class _$DeleteWorldImpl implements _DeleteWorld {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -996,7 +1033,7 @@ class _$DeleteWorldImpl implements _DeleteWorld {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -1009,21 +1046,21 @@ class _$DeleteWorldImpl implements _DeleteWorld {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -1036,21 +1073,21 @@ class _$DeleteWorldImpl implements _DeleteWorld {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -1163,7 +1200,7 @@ abstract class _$$GetMissionsImplCopyWith<$Res> {
     $Res Function(_$GetMissionsImpl) then,
   ) = __$$GetMissionsImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({String worldId});
+  $Res call({String worldId, bool forceRefresh});
 }
 
 /// @nodoc
@@ -1179,13 +1216,17 @@ class __$$GetMissionsImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? worldId = null}) {
+  $Res call({Object? worldId = null, Object? forceRefresh = null}) {
     return _then(
       _$GetMissionsImpl(
         null == worldId
             ? _value.worldId
             : worldId // ignore: cast_nullable_to_non_nullable
                   as String,
+        forceRefresh: null == forceRefresh
+            ? _value.forceRefresh
+            : forceRefresh // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -1194,14 +1235,17 @@ class __$$GetMissionsImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$GetMissionsImpl implements _GetMissions {
-  const _$GetMissionsImpl(this.worldId);
+  const _$GetMissionsImpl(this.worldId, {this.forceRefresh = false});
 
   @override
   final String worldId;
+  @override
+  @JsonKey()
+  final bool forceRefresh;
 
   @override
   String toString() {
-    return 'ContentEvent.getMissions(worldId: $worldId)';
+    return 'ContentEvent.getMissions(worldId: $worldId, forceRefresh: $forceRefresh)';
   }
 
   @override
@@ -1209,11 +1253,13 @@ class _$GetMissionsImpl implements _GetMissions {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$GetMissionsImpl &&
-            (identical(other.worldId, worldId) || other.worldId == worldId));
+            (identical(other.worldId, worldId) || other.worldId == worldId) &&
+            (identical(other.forceRefresh, forceRefresh) ||
+                other.forceRefresh == forceRefresh));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, worldId);
+  int get hashCode => Object.hash(runtimeType, worldId, forceRefresh);
 
   /// Create a copy of ContentEvent
   /// with the given fields replaced by the non-null parameter values.
@@ -1226,15 +1272,15 @@ class _$GetMissionsImpl implements _GetMissions {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -1248,61 +1294,61 @@ class _$GetMissionsImpl implements _GetMissions {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
     required TResult Function(String missionId, String childId) completeMission,
     required TResult Function(String childId) getCompletedMissions,
   }) {
-    return getMissions(worldId);
+    return getMissions(worldId, forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
     TResult? Function(String missionId, String childId)? completeMission,
     TResult? Function(String childId)? getCompletedMissions,
   }) {
-    return getMissions?.call(worldId);
+    return getMissions?.call(worldId, forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -1311,7 +1357,7 @@ class _$GetMissionsImpl implements _GetMissions {
     required TResult orElse(),
   }) {
     if (getMissions != null) {
-      return getMissions(worldId);
+      return getMissions(worldId, forceRefresh);
     }
     return orElse();
   }
@@ -1397,9 +1443,11 @@ class _$GetMissionsImpl implements _GetMissions {
 }
 
 abstract class _GetMissions implements ContentEvent {
-  const factory _GetMissions(final String worldId) = _$GetMissionsImpl;
+  const factory _GetMissions(final String worldId, {final bool forceRefresh}) =
+      _$GetMissionsImpl;
 
   String get worldId;
+  bool get forceRefresh;
 
   /// Create a copy of ContentEvent
   /// with the given fields replaced by the non-null parameter values.
@@ -1478,15 +1526,15 @@ class _$AddMissionImpl implements _AddMission {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -1500,7 +1548,7 @@ class _$AddMissionImpl implements _AddMission {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -1513,21 +1561,21 @@ class _$AddMissionImpl implements _AddMission {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -1540,21 +1588,21 @@ class _$AddMissionImpl implements _AddMission {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -1730,15 +1778,15 @@ class _$UpdateMissionImpl implements _UpdateMission {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -1752,7 +1800,7 @@ class _$UpdateMissionImpl implements _UpdateMission {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -1765,21 +1813,21 @@ class _$UpdateMissionImpl implements _UpdateMission {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -1792,21 +1840,21 @@ class _$UpdateMissionImpl implements _UpdateMission {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -1983,15 +2031,15 @@ class _$DeleteMissionImpl implements _DeleteMission {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -2005,7 +2053,7 @@ class _$DeleteMissionImpl implements _DeleteMission {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -2018,21 +2066,21 @@ class _$DeleteMissionImpl implements _DeleteMission {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -2045,21 +2093,21 @@ class _$DeleteMissionImpl implements _DeleteMission {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -2172,7 +2220,7 @@ abstract class _$$GetStoriesImplCopyWith<$Res> {
     $Res Function(_$GetStoriesImpl) then,
   ) = __$$GetStoriesImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({String missionId});
+  $Res call({String missionId, bool forceRefresh});
 }
 
 /// @nodoc
@@ -2188,13 +2236,17 @@ class __$$GetStoriesImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? missionId = null}) {
+  $Res call({Object? missionId = null, Object? forceRefresh = null}) {
     return _then(
       _$GetStoriesImpl(
         null == missionId
             ? _value.missionId
             : missionId // ignore: cast_nullable_to_non_nullable
                   as String,
+        forceRefresh: null == forceRefresh
+            ? _value.forceRefresh
+            : forceRefresh // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -2203,14 +2255,17 @@ class __$$GetStoriesImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$GetStoriesImpl implements _GetStories {
-  const _$GetStoriesImpl(this.missionId);
+  const _$GetStoriesImpl(this.missionId, {this.forceRefresh = false});
 
   @override
   final String missionId;
+  @override
+  @JsonKey()
+  final bool forceRefresh;
 
   @override
   String toString() {
-    return 'ContentEvent.getStories(missionId: $missionId)';
+    return 'ContentEvent.getStories(missionId: $missionId, forceRefresh: $forceRefresh)';
   }
 
   @override
@@ -2219,11 +2274,13 @@ class _$GetStoriesImpl implements _GetStories {
         (other.runtimeType == runtimeType &&
             other is _$GetStoriesImpl &&
             (identical(other.missionId, missionId) ||
-                other.missionId == missionId));
+                other.missionId == missionId) &&
+            (identical(other.forceRefresh, forceRefresh) ||
+                other.forceRefresh == forceRefresh));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, missionId);
+  int get hashCode => Object.hash(runtimeType, missionId, forceRefresh);
 
   /// Create a copy of ContentEvent
   /// with the given fields replaced by the non-null parameter values.
@@ -2236,15 +2293,15 @@ class _$GetStoriesImpl implements _GetStories {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -2258,61 +2315,61 @@ class _$GetStoriesImpl implements _GetStories {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
     required TResult Function(String missionId, String childId) completeMission,
     required TResult Function(String childId) getCompletedMissions,
   }) {
-    return getStories(missionId);
+    return getStories(missionId, forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
     TResult? Function(String missionId, String childId)? completeMission,
     TResult? Function(String childId)? getCompletedMissions,
   }) {
-    return getStories?.call(missionId);
+    return getStories?.call(missionId, forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -2321,7 +2378,7 @@ class _$GetStoriesImpl implements _GetStories {
     required TResult orElse(),
   }) {
     if (getStories != null) {
-      return getStories(missionId);
+      return getStories(missionId, forceRefresh);
     }
     return orElse();
   }
@@ -2407,9 +2464,11 @@ class _$GetStoriesImpl implements _GetStories {
 }
 
 abstract class _GetStories implements ContentEvent {
-  const factory _GetStories(final String missionId) = _$GetStoriesImpl;
+  const factory _GetStories(final String missionId, {final bool forceRefresh}) =
+      _$GetStoriesImpl;
 
   String get missionId;
+  bool get forceRefresh;
 
   /// Create a copy of ContentEvent
   /// with the given fields replaced by the non-null parameter values.
@@ -2508,15 +2567,15 @@ class _$AddStoryImpl implements _AddStory {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -2530,7 +2589,7 @@ class _$AddStoryImpl implements _AddStory {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -2543,21 +2602,21 @@ class _$AddStoryImpl implements _AddStory {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -2570,21 +2629,21 @@ class _$AddStoryImpl implements _AddStory {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -2786,15 +2845,15 @@ class _$UpdateStoryImpl implements _UpdateStory {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -2808,7 +2867,7 @@ class _$UpdateStoryImpl implements _UpdateStory {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -2821,21 +2880,21 @@ class _$UpdateStoryImpl implements _UpdateStory {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -2848,21 +2907,21 @@ class _$UpdateStoryImpl implements _UpdateStory {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -3044,15 +3103,15 @@ class _$DeleteStoryImpl implements _DeleteStory {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -3066,7 +3125,7 @@ class _$DeleteStoryImpl implements _DeleteStory {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -3079,21 +3138,21 @@ class _$DeleteStoryImpl implements _DeleteStory {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -3106,21 +3165,21 @@ class _$DeleteStoryImpl implements _DeleteStory {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -3233,7 +3292,7 @@ abstract class _$$GetQuestionsImplCopyWith<$Res> {
     $Res Function(_$GetQuestionsImpl) then,
   ) = __$$GetQuestionsImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({String missionId});
+  $Res call({String missionId, bool forceRefresh});
 }
 
 /// @nodoc
@@ -3249,13 +3308,17 @@ class __$$GetQuestionsImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? missionId = null}) {
+  $Res call({Object? missionId = null, Object? forceRefresh = null}) {
     return _then(
       _$GetQuestionsImpl(
         null == missionId
             ? _value.missionId
             : missionId // ignore: cast_nullable_to_non_nullable
                   as String,
+        forceRefresh: null == forceRefresh
+            ? _value.forceRefresh
+            : forceRefresh // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -3264,14 +3327,17 @@ class __$$GetQuestionsImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$GetQuestionsImpl implements _GetQuestions {
-  const _$GetQuestionsImpl(this.missionId);
+  const _$GetQuestionsImpl(this.missionId, {this.forceRefresh = false});
 
   @override
   final String missionId;
+  @override
+  @JsonKey()
+  final bool forceRefresh;
 
   @override
   String toString() {
-    return 'ContentEvent.getQuestions(missionId: $missionId)';
+    return 'ContentEvent.getQuestions(missionId: $missionId, forceRefresh: $forceRefresh)';
   }
 
   @override
@@ -3280,11 +3346,13 @@ class _$GetQuestionsImpl implements _GetQuestions {
         (other.runtimeType == runtimeType &&
             other is _$GetQuestionsImpl &&
             (identical(other.missionId, missionId) ||
-                other.missionId == missionId));
+                other.missionId == missionId) &&
+            (identical(other.forceRefresh, forceRefresh) ||
+                other.forceRefresh == forceRefresh));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, missionId);
+  int get hashCode => Object.hash(runtimeType, missionId, forceRefresh);
 
   /// Create a copy of ContentEvent
   /// with the given fields replaced by the non-null parameter values.
@@ -3297,15 +3365,15 @@ class _$GetQuestionsImpl implements _GetQuestions {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -3319,61 +3387,61 @@ class _$GetQuestionsImpl implements _GetQuestions {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
     required TResult Function(String missionId, String childId) completeMission,
     required TResult Function(String childId) getCompletedMissions,
   }) {
-    return getQuestions(missionId);
+    return getQuestions(missionId, forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
     TResult? Function(String missionId, String childId)? completeMission,
     TResult? Function(String childId)? getCompletedMissions,
   }) {
-    return getQuestions?.call(missionId);
+    return getQuestions?.call(missionId, forceRefresh);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -3382,7 +3450,7 @@ class _$GetQuestionsImpl implements _GetQuestions {
     required TResult orElse(),
   }) {
     if (getQuestions != null) {
-      return getQuestions(missionId);
+      return getQuestions(missionId, forceRefresh);
     }
     return orElse();
   }
@@ -3468,9 +3536,13 @@ class _$GetQuestionsImpl implements _GetQuestions {
 }
 
 abstract class _GetQuestions implements ContentEvent {
-  const factory _GetQuestions(final String missionId) = _$GetQuestionsImpl;
+  const factory _GetQuestions(
+    final String missionId, {
+    final bool forceRefresh,
+  }) = _$GetQuestionsImpl;
 
   String get missionId;
+  bool get forceRefresh;
 
   /// Create a copy of ContentEvent
   /// with the given fields replaced by the non-null parameter values.
@@ -3550,15 +3622,15 @@ class _$AddQuestionImpl implements _AddQuestion {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -3572,7 +3644,7 @@ class _$AddQuestionImpl implements _AddQuestion {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -3585,21 +3657,21 @@ class _$AddQuestionImpl implements _AddQuestion {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -3612,21 +3684,21 @@ class _$AddQuestionImpl implements _AddQuestion {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -3806,15 +3878,15 @@ class _$UpdateQuestionImpl implements _UpdateQuestion {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -3828,7 +3900,7 @@ class _$UpdateQuestionImpl implements _UpdateQuestion {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -3841,21 +3913,21 @@ class _$UpdateQuestionImpl implements _UpdateQuestion {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -3868,21 +3940,21 @@ class _$UpdateQuestionImpl implements _UpdateQuestion {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -4062,15 +4134,15 @@ class _$DeleteQuestionImpl implements _DeleteQuestion {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -4084,7 +4156,7 @@ class _$DeleteQuestionImpl implements _DeleteQuestion {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -4097,21 +4169,21 @@ class _$DeleteQuestionImpl implements _DeleteQuestion {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -4124,21 +4196,21 @@ class _$DeleteQuestionImpl implements _DeleteQuestion {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -4325,15 +4397,15 @@ class _$CompleteMissionImpl implements _CompleteMission {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -4347,7 +4419,7 @@ class _$CompleteMissionImpl implements _CompleteMission {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -4360,21 +4432,21 @@ class _$CompleteMissionImpl implements _CompleteMission {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -4387,21 +4459,21 @@ class _$CompleteMissionImpl implements _CompleteMission {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,
@@ -4583,15 +4655,15 @@ class _$GetCompletedMissionsImpl implements _GetCompletedMissions {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
-    required TResult Function() getWorlds,
+    required TResult Function(bool forceRefresh) getWorlds,
     required TResult Function(WorldEntity world) addWorld,
     required TResult Function(WorldEntity world) updateWorld,
     required TResult Function(String id) deleteWorld,
-    required TResult Function(String worldId) getMissions,
+    required TResult Function(String worldId, bool forceRefresh) getMissions,
     required TResult Function(MissionEntity mission) addMission,
     required TResult Function(MissionEntity mission) updateMission,
     required TResult Function(String id) deleteMission,
-    required TResult Function(String missionId) getStories,
+    required TResult Function(String missionId, bool forceRefresh) getStories,
     required TResult Function(
       StoryEntity story,
       File? audioFile,
@@ -4605,7 +4677,7 @@ class _$GetCompletedMissionsImpl implements _GetCompletedMissions {
     )
     updateStory,
     required TResult Function(String id) deleteStory,
-    required TResult Function(String missionId) getQuestions,
+    required TResult Function(String missionId, bool forceRefresh) getQuestions,
     required TResult Function(QuestionEntity question) addQuestion,
     required TResult Function(QuestionEntity question) updateQuestion,
     required TResult Function(String id) deleteQuestion,
@@ -4618,21 +4690,21 @@ class _$GetCompletedMissionsImpl implements _GetCompletedMissions {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? getWorlds,
+    TResult? Function(bool forceRefresh)? getWorlds,
     TResult? Function(WorldEntity world)? addWorld,
     TResult? Function(WorldEntity world)? updateWorld,
     TResult? Function(String id)? deleteWorld,
-    TResult? Function(String worldId)? getMissions,
+    TResult? Function(String worldId, bool forceRefresh)? getMissions,
     TResult? Function(MissionEntity mission)? addMission,
     TResult? Function(MissionEntity mission)? updateMission,
     TResult? Function(String id)? deleteMission,
-    TResult? Function(String missionId)? getStories,
+    TResult? Function(String missionId, bool forceRefresh)? getStories,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult? Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult? Function(String id)? deleteStory,
-    TResult? Function(String missionId)? getQuestions,
+    TResult? Function(String missionId, bool forceRefresh)? getQuestions,
     TResult? Function(QuestionEntity question)? addQuestion,
     TResult? Function(QuestionEntity question)? updateQuestion,
     TResult? Function(String id)? deleteQuestion,
@@ -4645,21 +4717,21 @@ class _$GetCompletedMissionsImpl implements _GetCompletedMissions {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? getWorlds,
+    TResult Function(bool forceRefresh)? getWorlds,
     TResult Function(WorldEntity world)? addWorld,
     TResult Function(WorldEntity world)? updateWorld,
     TResult Function(String id)? deleteWorld,
-    TResult Function(String worldId)? getMissions,
+    TResult Function(String worldId, bool forceRefresh)? getMissions,
     TResult Function(MissionEntity mission)? addMission,
     TResult Function(MissionEntity mission)? updateMission,
     TResult Function(String id)? deleteMission,
-    TResult Function(String missionId)? getStories,
+    TResult Function(String missionId, bool forceRefresh)? getStories,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     addStory,
     TResult Function(StoryEntity story, File? audioFile, File? characterFile)?
     updateStory,
     TResult Function(String id)? deleteStory,
-    TResult Function(String missionId)? getQuestions,
+    TResult Function(String missionId, bool forceRefresh)? getQuestions,
     TResult Function(QuestionEntity question)? addQuestion,
     TResult Function(QuestionEntity question)? updateQuestion,
     TResult Function(String id)? deleteQuestion,

@@ -8,23 +8,23 @@ import '../entities/question_entity.dart';
 import '../entities/child_progress_entity.dart';
 
 abstract class ContentRepository {
-  Future<Either<Failure, List<WorldEntity>>> getWorlds();
+  Future<Either<Failure, List<WorldEntity>>> getWorlds({bool forceRefresh = false});
   Future<Either<Failure, WorldEntity>> addWorld(WorldEntity world);
   Future<Either<Failure, WorldEntity>> updateWorld(WorldEntity world);
   Future<Either<Failure, void>> deleteWorld(String id);
   
-  Future<Either<Failure, List<MissionEntity>>> getMissions(String worldId);
+  Future<Either<Failure, List<MissionEntity>>> getMissions(String worldId, {bool forceRefresh = false});
   Future<Either<Failure, MissionEntity>> addMission(MissionEntity mission);
   Future<Either<Failure, MissionEntity>> updateMission(MissionEntity mission);
   Future<Either<Failure, void>> deleteMission(String id);
   
-  Future<Either<Failure, List<StoryEntity>>> getStories(String missionId);
+  Future<Either<Failure, List<StoryEntity>>> getStories(String missionId, {bool forceRefresh = false});
   Future<Either<Failure, StoryEntity>> addStory(StoryEntity story, {File? audioFile, File? characterFile});
   Future<Either<Failure, StoryEntity>> updateStory(StoryEntity story, {File? audioFile, File? characterFile});
   Future<Either<Failure, void>> deleteStory(String id);
   
   // Questions
-  Future<Either<Failure, List<QuestionEntity>>> getQuestions(String missionId);
+  Future<Either<Failure, List<QuestionEntity>>> getQuestions(String missionId, {bool forceRefresh = false});
   Future<Either<Failure, QuestionEntity>> addQuestion(QuestionEntity question);
   Future<Either<Failure, QuestionEntity>> updateQuestion(QuestionEntity question);
   Future<Either<Failure, void>> deleteQuestion(String id);

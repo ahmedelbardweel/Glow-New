@@ -112,4 +112,17 @@ class ResourceManager {
     }
     return null;
   }
+
+  /// Fire-and-forget download in background without awaiting.
+  /// Excellent for performance where we want to show a URL instantly
+  /// but silently cache it for future offline uses.
+  void downloadAndCacheInBackground(String url, {String folder = 'media'}) {
+    final cleanUrl = url.trim();
+    if (cleanUrl.isEmpty || !cleanUrl.startsWith('http')) return;
+
+    if (isFileCached(cleanUrl)) return;
+    
+    // Don't wait, let it run in background
+    downloadAndCacheFile(cleanUrl, folder: folder);
+  }
 }

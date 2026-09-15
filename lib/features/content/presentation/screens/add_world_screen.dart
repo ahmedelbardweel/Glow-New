@@ -105,13 +105,13 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
                   children: [
                     TextFormField(
                       controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'اسم العالم (مثال: الغابات)'),
+                      decoration: const InputDecoration(hintText: 'اسم العالم (مثال: الغابات)'),
                       validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _descController,
-                      decoration: const InputDecoration(labelText: 'وصف العالم'),
+                      decoration: const InputDecoration(hintText: 'وصف العالم'),
                       maxLines: 3,
                       validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
                     ),

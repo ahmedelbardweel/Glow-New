@@ -55,10 +55,10 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
             worldsLoaded: (_) => true,
             orElse: () => false,
           );
-          if (!isAlreadyLoaded) {
+          if (!isAlreadyLoaded || e.forceRefresh) {
             emit(const ContentState.loading());
           }
-          final result = await getWorlds(NoParams());
+          final result = await getWorlds(GetWorldsParams(forceRefresh: e.forceRefresh));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
             (worlds) => emit(ContentState.worldsLoaded(worlds)),
@@ -89,8 +89,9 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           );
         },
         getMissions: (e) async {
-          emit(const ContentState.loading());
-          final result = await getMissions(e.worldId);
+          if (e.forceRefresh) emit(const ContentState.loading());
+          else emit(const ContentState.loading()); // could optimize this, but loading is fine if fast
+          final result = await getMissions(GetMissionsParams(e.worldId, forceRefresh: e.forceRefresh));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
             (missions) => emit(ContentState.missionsLoaded(missions)),
@@ -124,8 +125,9 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           );
         },
         getStories: (e) async {
-          emit(const ContentState.loading());
-          final result = await getStories(e.missionId);
+          if (e.forceRefresh) emit(const ContentState.loading());
+          else emit(const ContentState.loading());
+          final result = await getStories(GetStoriesParams(e.missionId, forceRefresh: e.forceRefresh));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
             (stories) => emit(ContentState.storiesLoaded(stories)),
@@ -156,8 +158,9 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           );
         },
         getQuestions: (e) async {
-          emit(const ContentState.loading());
-          final result = await getQuestions(e.missionId);
+          if (e.forceRefresh) emit(const ContentState.loading());
+          else emit(const ContentState.loading());
+          final result = await getQuestions(GetQuestionsParams(e.missionId, forceRefresh: e.forceRefresh));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
             (questions) => emit(ContentState.questionsLoaded(questions)),

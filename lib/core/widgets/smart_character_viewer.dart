@@ -18,7 +18,7 @@ class SmartCharacterViewer extends StatefulWidget {
 
 class _SmartCharacterViewerState extends State<SmartCharacterViewer> {
   String? _localPath;
-  bool _isLoading = false;
+  bool _isLoading = false; // Kept for compatibility if used elsewhere, but not needed.
   String _modelSrc = '';
 
   @override
@@ -35,7 +35,7 @@ class _SmartCharacterViewerState extends State<SmartCharacterViewer> {
     }
   }
 
-  void _loadModel() async {
+  void _loadModel() {
     final modelUrl = CharacterHelper.getModelPath(widget.characterName);
     
     if (modelUrl.startsWith('http')) {
@@ -47,37 +47,25 @@ class _SmartCharacterViewerState extends State<SmartCharacterViewer> {
         if (mounted) {
           setState(() {
             _modelSrc = 'file://$cachedPath';
-            _isLoading = false;
           });
         }
         return;
       }
       
-      // If not cached, show loading and download
+      // If not cached, instantly set the HTTP URL so ModelViewer streams it immediately
       if (mounted) {
         setState(() {
-          _isLoading = true;
-          _modelSrc = modelUrl; // fallback to url if download fails
+          _modelSrc = modelUrl;
         });
       }
       
-      final downloadedPath = await resourceManager.downloadAndCacheFile(modelUrl, folder: '3d_models');
-      if (downloadedPath != null && mounted) {
-        setState(() {
-          _modelSrc = 'file://$downloadedPath';
-          _isLoading = false;
-        });
-      } else if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      // In the background, silently cache it for future use without awaiting
+      resourceManager.downloadAndCacheInBackground(modelUrl, folder: '3d_models');
     } else {
       // Local asset
       if (mounted) {
         setState(() {
           _modelSrc = modelUrl;
-          _isLoading = false;
         });
       }
     }
@@ -85,46 +73,21 @@ class _SmartCharacterViewerState extends State<SmartCharacterViewer> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading && _modelSrc.isEmpty) {
-      return Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(
-            CharacterHelper.getColor(widget.characterName),
-          ),
-        ),
-      );
+    if (_modelSrc.isEmpty) {
+      return const SizedBox();
     }
 
-    return Stack(
-      children: [
-        ModelViewer(
-          key: ValueKey(_modelSrc),
-          src: _modelSrc,
-          alt: "3D Character",
-          autoRotate: true,
-          cameraControls: true,
-          // Add smart environment for better colors!
-          environmentImage: 'neutral', // Better lighting
-          interactionPrompt: InteractionPrompt.none,
-          // Hide default UI
-          poster: '',
-        ),
-        if (_isLoading)
-          Positioned(
-            top: 8,
-            right: 8,
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  CharacterHelper.getColor(widget.characterName),
-                ),
-              ),
-            ),
-          ),
-      ],
+    return ModelViewer(
+      key: ValueKey(_modelSrc),
+      src: _modelSrc,
+      alt: "3D Character",
+      autoRotate: true,
+      cameraControls: true,
+      // Add smart environment for better colors!
+      environmentImage: 'neutral', // Better lighting
+      interactionPrompt: InteractionPrompt.none,
+      // Hide default UI
+      poster: '',
     );
   }
 }

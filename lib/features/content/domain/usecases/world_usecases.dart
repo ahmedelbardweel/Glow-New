@@ -4,14 +4,19 @@ import '../../../../core/usecases/usecase.dart';
 import '../entities/world_entity.dart';
 import '../repositories/content_repository.dart';
 
-class GetWorldsUseCase implements UseCase<List<WorldEntity>, NoParams> {
+class GetWorldsParams {
+  final bool forceRefresh;
+  GetWorldsParams({this.forceRefresh = false});
+}
+
+class GetWorldsUseCase implements UseCase<List<WorldEntity>, GetWorldsParams> {
   final ContentRepository repository;
 
   GetWorldsUseCase(this.repository);
 
   @override
-  Future<Either<Failure, List<WorldEntity>>> call(NoParams params) async {
-    return await repository.getWorlds();
+  Future<Either<Failure, List<WorldEntity>>> call(GetWorldsParams params) async {
+    return await repository.getWorlds(forceRefresh: params.forceRefresh);
   }
 }
 

@@ -62,7 +62,7 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> {
                 TextField(
                   controller: _emailController,
                   decoration: const InputDecoration(
-                    labelText: 'البريد الإلكتروني',
+                    hintText: 'البريد الإلكتروني',
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
@@ -71,7 +71,7 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> {
                 TextField(
                   controller: _passwordController,
                   decoration: const InputDecoration(
-                    labelText: 'كلمة المرور',
+                    hintText: 'كلمة المرور',
                     prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
@@ -80,7 +80,7 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> {
                 TextField(
                   controller: _childCodeController,
                   decoration: const InputDecoration(
-                    labelText: 'كود الطفل التعريفي (CH-XXXX)',
+                    hintText: 'كود الطفل التعريفي (CH-XXXX)',
                     prefixIcon: Icon(Icons.code),
                   ),
                 ),

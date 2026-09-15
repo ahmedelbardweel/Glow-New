@@ -62,7 +62,7 @@ class ChildMissionCompleteScreen extends StatelessWidget {
                       AppColors.border_radius,
                     ),
                     border: Border.all(
-                      color: const Color(0xFFE2E8F0),
+                      color: AppColors.inputBorder,
                       width: 2,
                     ), // Unified simple border
                   ),

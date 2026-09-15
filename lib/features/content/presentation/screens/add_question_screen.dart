@@ -112,7 +112,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                   children: [
                     TextFormField(
                       controller: _questionController,
-                      decoration: const InputDecoration(labelText: 'نص السؤال'),
+                      decoration: const InputDecoration(hintText: 'نص السؤال'),
                       validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
                       maxLines: 3,
                     ),
@@ -139,7 +139,7 @@ class _AddQuestionScreenState extends State<AddQuestionScreen> {
                             Expanded(
                               child: TextFormField(
                                 controller: _optionsControllers[index],
-                                decoration: InputDecoration(labelText: 'الخيار ${index + 1}'),
+                                decoration: InputDecoration(hintText: 'الخيار ${index + 1}'),
                                 validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
                               ),
                             ),

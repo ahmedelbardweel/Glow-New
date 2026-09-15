@@ -1,3 +1,4 @@
+import 'package:Glow/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
 void showAdminActionsBottomSheet({
@@ -12,7 +13,7 @@ void showAdminActionsBottomSheet({
       return Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+          borderRadius:  BorderRadius.all(Radius.circular(AppColors.border_radius)),
           border: Border.all(color: Colors.grey.shade300, width: 1),
         ),
         child: SafeArea(
@@ -25,10 +26,10 @@ void showAdminActionsBottomSheet({
                 height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               ListTile(
                 title: const Text(
                   'تعديل',
@@ -40,7 +41,7 @@ void showAdminActionsBottomSheet({
                   onEdit();
                 },
               ),
-              Divider(height: 1, color: Colors.grey.shade200),
+              const Divider(height: 5, color: AppColors.inputBorder),
               ListTile(
                 title: const Text(
                   'حذف',

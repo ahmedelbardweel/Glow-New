@@ -5,14 +5,20 @@ import '../entities/mission_entity.dart';
 import '../entities/child_progress_entity.dart';
 import '../repositories/content_repository.dart';
 
-class GetMissionsUseCase implements UseCase<List<MissionEntity>, String> {
+class GetMissionsParams {
+  final String worldId;
+  final bool forceRefresh;
+  GetMissionsParams(this.worldId, {this.forceRefresh = false});
+}
+
+class GetMissionsUseCase implements UseCase<List<MissionEntity>, GetMissionsParams> {
   final ContentRepository repository;
 
   GetMissionsUseCase(this.repository);
 
   @override
-  Future<Either<Failure, List<MissionEntity>>> call(String worldId) async {
-    return await repository.getMissions(worldId);
+  Future<Either<Failure, List<MissionEntity>>> call(GetMissionsParams params) async {
+    return await repository.getMissions(params.worldId, forceRefresh: params.forceRefresh);
   }
 }
 

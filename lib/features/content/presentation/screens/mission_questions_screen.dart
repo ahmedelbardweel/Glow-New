@@ -54,93 +54,99 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
                 if (questions.isEmpty) {
                   return const Center(child: Text('لا توجد أسئلة مضافة في هذه المهمة حتى الآن.'));
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: questions.length,
-                  itemBuilder: (context, index) {
-                    final question = questions[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${index + 1}. ${question.questionText}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.more_vert),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () {
-                                    showAdminActionsBottomSheet(
-                                      context: context,
-                                      onEdit: () async {
-                                        final result = await context.push('/admin/add-question', extra: {'mission': widget.mission, 'questionToEdit': question});
-                                        if (result == true) {
-                                          _contentBloc.add(ContentEvent.getQuestions(widget.mission.id));
-                                        }
-                                      },
-                                      onDelete: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (ctx) => AlertDialog(
-                                            title: const Text('تأكيد الحذف'),
-                                            content: const Text('هل أنت متأكد من حذف هذا السؤال؟'),
-                                            actions: [
-                                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-                                              TextButton(
-                                                onPressed: () {
-                                                  Navigator.pop(ctx);
-                                                  _contentBloc.add(ContentEvent.deleteQuestion(question.id));
-                                                },
-                                                child: const Text('حذف', style: TextStyle(color: Colors.red)),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            ...List.generate(question.options.length, (optIndex) {
-                              final isCorrect = optIndex == question.correctAnswerIndex;
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: isCorrect ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                  border: isCorrect ? Border.all(color: Colors.green) : null,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      isCorrect ? Icons.check_circle : Icons.circle_outlined,
-                                      color: isCorrect ? Colors.green : Colors.grey,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text(question.options[optIndex])),
-                                  ],
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                    );
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    _contentBloc.add(ContentEvent.getQuestions(widget.mission.id, forceRefresh: true));
+                    await Future.delayed(const Duration(milliseconds: 500));
                   },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: questions.length,
+                    itemBuilder: (context, index) {
+                      final question = questions[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${index + 1}. ${question.questionText}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.more_vert),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: () {
+                                      showAdminActionsBottomSheet(
+                                        context: context,
+                                        onEdit: () async {
+                                          final result = await context.push('/admin/add-question', extra: {'mission': widget.mission, 'questionToEdit': question});
+                                          if (result == true) {
+                                            _contentBloc.add(ContentEvent.getQuestions(widget.mission.id));
+                                          }
+                                        },
+                                        onDelete: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text('تأكيد الحذف'),
+                                              content: const Text('هل أنت متأكد من حذف هذا السؤال؟'),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.pop(ctx);
+                                                    _contentBloc.add(ContentEvent.deleteQuestion(question.id));
+                                                  },
+                                                  child: const Text('حذف', style: TextStyle(color: Colors.red)),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              ...List.generate(question.options.length, (optIndex) {
+                                final isCorrect = optIndex == question.correctAnswerIndex;
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: isCorrect ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                    border: isCorrect ? Border.all(color: Colors.green) : null,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isCorrect ? Icons.check_circle : Icons.circle_outlined,
+                                        color: isCorrect ? Colors.green : Colors.grey,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(question.options[optIndex])),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
               orElse: () => const SizedBox(),

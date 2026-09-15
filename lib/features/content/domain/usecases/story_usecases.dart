@@ -5,14 +5,20 @@ import '../../../../core/usecases/usecase.dart';
 import '../entities/story_entity.dart';
 import '../repositories/content_repository.dart';
 
-class GetStoriesUseCase implements UseCase<List<StoryEntity>, String> {
+class GetStoriesParams {
+  final String missionId;
+  final bool forceRefresh;
+  GetStoriesParams(this.missionId, {this.forceRefresh = false});
+}
+
+class GetStoriesUseCase implements UseCase<List<StoryEntity>, GetStoriesParams> {
   final ContentRepository repository;
 
   GetStoriesUseCase(this.repository);
 
   @override
-  Future<Either<Failure, List<StoryEntity>>> call(String missionId) async {
-    return await repository.getStories(missionId);
+  Future<Either<Failure, List<StoryEntity>>> call(GetStoriesParams params) async {
+    return await repository.getStories(params.missionId, forceRefresh: params.forceRefresh);
   }
 }
 

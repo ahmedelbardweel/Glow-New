@@ -30,25 +30,30 @@ class ContentRepositoryImpl implements ContentRepository {
   });
 
   @override
-  Future<Either<Failure, List<WorldEntity>>> getWorlds() async {
+  Future<Either<Failure, List<WorldEntity>>> getWorlds({bool forceRefresh = false}) async {
     final cachedWorlds = await localDataSource.getCachedWorlds();
 
     if (await networkInfo.isConnected) {
-      try {
-        final worlds = await remoteDataSource.getWorlds();
+      // Trigger background sync
+      remoteDataSource.getWorlds().then((worlds) async {
         await localDataSource.cacheWorlds(worlds);
-        // Pre-cache cover images in background
         for (var w in worlds) {
           if (w.imageUrl.isNotEmpty) {
-            resourceManager.downloadAndCacheFile(w.imageUrl, folder: 'images');
+            resourceManager.downloadAndCacheInBackground(w.imageUrl, folder: 'images');
           }
         }
-        return Right(worlds);
-      } catch (e) {
-        if (cachedWorlds.isNotEmpty) {
-          return Right(cachedWorlds);
+      }).catchError((_) {});
+
+      if (!forceRefresh && cachedWorlds.isNotEmpty) {
+        return Right(cachedWorlds);
+      } else {
+        try {
+          final worlds = await remoteDataSource.getWorlds();
+          await localDataSource.cacheWorlds(worlds);
+          return Right(worlds);
+        } catch (e) {
+          return Left(ServerFailure(e.toString()));
         }
-        return Left(ServerFailure(e.toString()));
       }
     } else {
       if (cachedWorlds.isNotEmpty) {
@@ -83,19 +88,25 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   @override
-  Future<Either<Failure, List<MissionEntity>>> getMissions(String worldId) async {
+  Future<Either<Failure, List<MissionEntity>>> getMissions(String worldId, {bool forceRefresh = false}) async {
     final cachedMissions = await localDataSource.getCachedMissions(worldId);
 
     if (await networkInfo.isConnected) {
-      try {
-        final missions = await remoteDataSource.getMissions(worldId);
+      // Trigger background sync
+      remoteDataSource.getMissions(worldId).then((missions) async {
         await localDataSource.cacheMissions(worldId, missions);
-        return Right(missions);
-      } catch (e) {
-        if (cachedMissions.isNotEmpty) {
-          return Right(cachedMissions);
+      }).catchError((_) {});
+
+      if (!forceRefresh && cachedMissions.isNotEmpty) {
+        return Right(cachedMissions);
+      } else {
+        try {
+          final missions = await remoteDataSource.getMissions(worldId);
+          await localDataSource.cacheMissions(worldId, missions);
+          return Right(missions);
+        } catch (e) {
+          return Left(ServerFailure(e.toString()));
         }
-        return Left(ServerFailure(e.toString()));
       }
     } else {
       if (cachedMissions.isNotEmpty) {
@@ -131,28 +142,33 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   @override
-  Future<Either<Failure, List<StoryEntity>>> getStories(String missionId) async {
+  Future<Either<Failure, List<StoryEntity>>> getStories(String missionId, {bool forceRefresh = false}) async {
     final cachedStories = await localDataSource.getCachedStories(missionId);
 
     if (await networkInfo.isConnected) {
-      try {
-        final stories = await remoteDataSource.getStories(missionId);
+      // Background sync
+      remoteDataSource.getStories(missionId).then((stories) async {
         await localDataSource.cacheStories(missionId, stories);
-        // Download audio and images in background
         for (var s in stories) {
           if (s.audioUrl != null && s.audioUrl!.isNotEmpty) {
-            resourceManager.downloadAndCacheFile(s.audioUrl!, folder: 'audio');
+            resourceManager.downloadAndCacheInBackground(s.audioUrl!, folder: 'audio');
           }
           if (s.imageUrl.isNotEmpty) {
-            resourceManager.downloadAndCacheFile(s.imageUrl, folder: 'images');
+            resourceManager.downloadAndCacheInBackground(s.imageUrl, folder: 'images');
           }
         }
-        return Right(stories);
-      } catch (e) {
-        if (cachedStories.isNotEmpty) {
-          return Right(cachedStories);
+      }).catchError((_) {});
+
+      if (!forceRefresh && cachedStories.isNotEmpty) {
+        return Right(cachedStories);
+      } else {
+        try {
+          final stories = await remoteDataSource.getStories(missionId);
+          await localDataSource.cacheStories(missionId, stories);
+          return Right(stories);
+        } catch (e) {
+          return Left(ServerFailure(e.toString()));
         }
-        return Left(ServerFailure(e.toString()));
       }
     } else {
       if (cachedStories.isNotEmpty) {
@@ -190,19 +206,25 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   @override
-  Future<Either<Failure, List<QuestionEntity>>> getQuestions(String missionId) async {
+  Future<Either<Failure, List<QuestionEntity>>> getQuestions(String missionId, {bool forceRefresh = false}) async {
     final cachedQuestions = await localDataSource.getCachedQuestions(missionId);
 
     if (await networkInfo.isConnected) {
-      try {
-        final questions = await remoteDataSource.getQuestions(missionId);
+      // Background sync
+      remoteDataSource.getQuestions(missionId).then((questions) async {
         await localDataSource.cacheQuestions(missionId, questions);
-        return Right(questions);
-      } catch (e) {
-        if (cachedQuestions.isNotEmpty) {
-          return Right(cachedQuestions);
+      }).catchError((_) {});
+
+      if (!forceRefresh && cachedQuestions.isNotEmpty) {
+        return Right(cachedQuestions);
+      } else {
+        try {
+          final questions = await remoteDataSource.getQuestions(missionId);
+          await localDataSource.cacheQuestions(missionId, questions);
+          return Right(questions);
+        } catch (e) {
+          return Left(ServerFailure(e.toString()));
         }
-        return Left(ServerFailure(e.toString()));
       }
     } else {
       if (cachedQuestions.isNotEmpty) {

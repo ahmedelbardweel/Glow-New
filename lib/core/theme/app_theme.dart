@@ -66,7 +66,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppColors.border_radius),
-          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+          side: const BorderSide(color: AppColors.inputBorder, width: 1),
         ),
         clipBehavior: Clip.antiAlias,
       ),
@@ -76,15 +76,15 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppColors.border_radius),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+          borderSide: const BorderSide(color: AppColors.inputBorder, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppColors.border_radius),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+          borderSide: const BorderSide(color: AppColors.inputBorder, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppColors.border_radius),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: const BorderSide(color: AppColors.inputBorder, width: 1),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppColors.border_radius),

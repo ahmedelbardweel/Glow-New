@@ -104,7 +104,7 @@ class CharacterHelper {
   }
 
   static String getModelPath(String rawName) {
-    if (rawName.startsWith('http')) return rawName;
+    if (rawName.startsWith('http') || rawName.startsWith('file://')) return rawName;
 
     final lower = rawName.toLowerCase();
     for (var key in characters.keys) {

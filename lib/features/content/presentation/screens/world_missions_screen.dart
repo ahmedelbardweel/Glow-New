@@ -53,57 +53,63 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
                 if (missions.isEmpty) {
                   return const Center(child: Text('لا توجد مهام في هذا العالم حتى الآن.'));
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: missions.length,
-                  itemBuilder: (context, index) {
-                    final mission = missions[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: ListTile(
-                        leading: CircleAvatar(child: Text('${index + 1}')),
-                        title: Text(mission.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('الوسم: ${mission.badgeName} | النجوم: ${mission.starsReward}'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.more_vert),
-                          onPressed: () {
-                            showAdminActionsBottomSheet(
-                              context: context,
-                              onEdit: () async {
-                                final result = await context.push('/admin/add-mission', extra: {'world': widget.world, 'missionToEdit': mission});
-                                if (result == true) {
-                                  _contentBloc.add(ContentEvent.getMissions(widget.world.id));
-                                }
-                              },
-                              onDelete: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('تأكيد الحذف'),
-                                    content: const Text('هل أنت متأكد من حذف هذه المهمة؟'),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(ctx);
-                                          _contentBloc.add(ContentEvent.deleteMission(mission.id));
-                                        },
-                                        child: const Text('حذف', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            );
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    _contentBloc.add(ContentEvent.getMissions(widget.world.id, forceRefresh: true));
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(10),
+                    itemCount: missions.length,
+                    itemBuilder: (context, index) {
+                      final mission = missions[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: ListTile(
+                          leading: CircleAvatar(child: Text('${index + 1}')),
+                          title: Text(mission.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('الوسم: ${mission.badgeName} | النجوم: ${mission.starsReward}'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.more_vert),
+                            onPressed: () {
+                              showAdminActionsBottomSheet(
+                                context: context,
+                                onEdit: () async {
+                                  final result = await context.push('/admin/add-mission', extra: {'world': widget.world, 'missionToEdit': mission});
+                                  if (result == true) {
+                                    _contentBloc.add(ContentEvent.getMissions(widget.world.id));
+                                  }
+                                },
+                                onDelete: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('تأكيد الحذف'),
+                                      content: const Text('هل أنت متأكد من حذف هذه المهمة؟'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.pop(ctx);
+                                            _contentBloc.add(ContentEvent.deleteMission(mission.id));
+                                          },
+                                          child: const Text('حذف', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            context.push('/admin/mission-stories', extra: mission);
                           },
                         ),
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          context.push('/admin/mission-stories', extra: mission);
-                        },
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 );
               },
               orElse: () => const SizedBox(),

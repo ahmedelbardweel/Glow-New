@@ -288,7 +288,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           TextField(
             controller: _codeController,
             decoration: InputDecoration(
-              labelText: 'كود الطفل',
+              hintText: 'كود الطفل',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppColors.border_radius),
               ),

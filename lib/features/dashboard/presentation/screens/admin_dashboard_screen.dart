@@ -11,6 +11,7 @@ import '../../../content/presentation/bloc/content_state.dart';
 import '../../../../core/utils/logout_helper.dart';
 import '../../../../core/utils/admin_actions_bottom_sheet.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
+import '../../../../core/widgets/offline_aware_image.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -125,47 +126,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 if (worlds.isEmpty) {
                   return const Center(child: Text('لا توجد عوالم مضافة حتى الآن. أضف عالمك الأول!'));
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: worlds.length,
-                  itemBuilder: (context, index) {
-                    final world = worlds[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Stack(
-                        children: [
-                          // Background Image
-                          if (world.imageUrl.isNotEmpty)
-                            Image.network(
-                              world.imageUrl,
-                              height: 180,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    _contentBloc.add(const ContentEvent.getWorlds(forceRefresh: true));
+                    // Optional: wait a bit for the bloc to process
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: worlds.length,
+                    itemBuilder: (context, index) {
+                      final world = worlds[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          children: [
+                            // Background Image
+                            if (world.imageUrl.isNotEmpty)
+                              OfflineAwareImage(
+                                imageUrl: world.imageUrl,
+                                height: 180,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorWidget: Container(
+                                  height: 180,
+                                  width: double.infinity,
+                                  color: Theme.of(context).colorScheme.primaryContainer,
+                                  child: const Icon(Icons.broken_image, size: 64, color: Colors.white54),
+                                ),
+                              )
+                            else
+                              Container(
                                 height: 180,
                                 width: double.infinity,
                                 color: Theme.of(context).colorScheme.primaryContainer,
-                                child: const Icon(Icons.broken_image, size: 64, color: Colors.white54),
+                                child: const Icon(Icons.public, size: 64, color: Colors.white54),
                               ),
-                            )
-                          else
-                            Container(
-                              height: 180,
-                              width: double.infinity,
-                              color: Theme.of(context).colorScheme.primaryContainer,
-                              child: const Icon(Icons.public, size: 64, color: Colors.white54),
-                            ),
                           // Gradient Overlay
                           Positioned.fill(
                             child: Container(
@@ -303,9 +310,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                     );
                   },
-                );
-              },
-              orElse: () => const SizedBox(),
+                ),
+              );
+            },
+            orElse: () => const SizedBox(),
             );
           },
         ),

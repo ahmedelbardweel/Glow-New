@@ -27,8 +27,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  final _customCharacterNameController = TextEditingController();
-  
+
   String _selectedCharacter = 'fort_frontal.glb';
   String _customCharacterColorKey = 'fort';
   final List<String> _avatars = CharacterHelper.characters.keys.toList();
@@ -49,7 +48,6 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         _selectedCharacter = character;
       } else {
         _selectedCharacter = ''; // It's a custom uploaded character
-        _customCharacterNameController.text = CharacterHelper.getCleanName(character);
         _customCharacterColorKey = CharacterHelper.getColorKey(character);
       }
     }
@@ -59,7 +57,6 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
-    _customCharacterNameController.dispose();
     _contentBloc.close();
     super.dispose();
   }
@@ -71,9 +68,9 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       builder: (ctx) => Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+          borderRadius: BorderRadius.circular(AppColors.border_radius),
         ),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 50),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -81,7 +78,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
+              margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(AppColors.border_radius),
@@ -89,16 +86,16 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
             ),
             Text(
               'اختر ملف صوتي',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               'اختر ملفاً صوتياً من هاتفك لإرفاقه بالقصة',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -121,9 +118,9 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('حدث خطأ: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
                   }
                 }
               },
@@ -131,7 +128,9 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(AppColors.border_radius),
                 ),
                 child: Row(
@@ -140,7 +139,9 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        borderRadius: BorderRadius.circular(
+                          AppColors.border_radius,
+                        ),
                       ),
                       child: const Icon(Icons.folder_open, color: Colors.white),
                     ),
@@ -151,20 +152,25 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                         children: [
                           Text(
                             'اختر من الملفات',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
                             'MP3, WAV, M4A, AAC',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                           ),
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.primary),
+                    Icon(
+                      Icons.chevron_right,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ],
                 ),
               ),
@@ -181,8 +187,12 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.errorContainer.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(
+                      AppColors.border_radius,
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -190,17 +200,22 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.error,
-                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                          borderRadius: BorderRadius.circular(
+                            AppColors.border_radius,
+                          ),
                         ),
-                        child: const Icon(Icons.delete_outline, color: Colors.white),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Text(
                         'إزالة الملف الصوتي',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.error,
-                            ),
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                   ),
@@ -208,11 +223,16 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            SizedBox(
+            Container(
               width: double.infinity,
               child: OutlinedButton(
+                style: const ButtonStyle(
+                  side: WidgetStatePropertyAll(
+                    BorderSide(color: AppColors.inputBorder),
+                  ),
+                ),
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء'),
+                child: const Text('إلغاء', style: TextStyle(color: Colors.black)),
               ),
             ),
           ],
@@ -249,19 +269,15 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     if (_formKey.currentState!.validate()) {
       String charName = _selectedCharacter;
       if (_characterFile != null) {
-        if (_customCharacterNameController.text.trim().isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('الرجاء إدخال اسم للشخصية المخصصة')),
-          );
-          return;
-        }
-        charName = 'custom|$_customCharacterColorKey|${_customCharacterNameController.text.trim()}';
+        charName =
+            'custom|$_customCharacterColorKey|${CharacterHelper.getCleanName(_customCharacterColorKey)}';
       } else if (_selectedCharacter.isEmpty) {
         charName = widget.storyToEdit?.characterName ?? '';
       }
 
       final story = StoryEntity(
-        id: widget.storyToEdit?.id ?? '', // Supabase gen_random_uuid will handle this if empty
+        id: widget.storyToEdit?.id ?? '',
+        // Supabase gen_random_uuid will handle this if empty
         missionId: widget.mission.id,
         title: _titleController.text.trim(),
         characterName: charName,
@@ -271,9 +287,21 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         orderIndex: widget.storyToEdit?.orderIndex ?? 0,
       );
       if (widget.storyToEdit != null) {
-        _contentBloc.add(ContentEvent.updateStory(story, audioFile: _audioFile, characterFile: _characterFile));
+        _contentBloc.add(
+          ContentEvent.updateStory(
+            story,
+            audioFile: _audioFile,
+            characterFile: _characterFile,
+          ),
+        );
       } else {
-        _contentBloc.add(ContentEvent.addStory(story, audioFile: _audioFile, characterFile: _characterFile));
+        _contentBloc.add(
+          ContentEvent.addStory(
+            story,
+            audioFile: _audioFile,
+            characterFile: _characterFile,
+          ),
+        );
       }
     }
   }
@@ -285,300 +313,390 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: Text(widget.storyToEdit != null ? 'تعديل القصة' : 'إضافة قصة لـ: ${widget.mission.title}'),
+          title: Text(
+            widget.storyToEdit != null
+                ? 'تعديل القصة'
+                : 'إضافة قصة لـ: ${widget.mission.title}',
+          ),
           elevation: 0,
-          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.white,
         ),
         body: BlocConsumer<ContentBloc, ContentState>(
           listener: (context, state) {
             state.maybeWhen(
               storyAdded: (_) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة القصة بنجاح!')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('تمت إضافة القصة بنجاح!')),
+                );
                 context.pop(true);
               },
               storiesLoaded: (_) {
                 if (widget.storyToEdit != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث القصة بنجاح!')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('تم تحديث القصة بنجاح!')),
+                  );
                   context.pop(true);
                 }
               },
               error: (msg) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
               },
               orElse: () {},
             );
           },
           builder: (context, state) {
-            final isLoading = state.maybeWhen(loading: () => true, orElse: () => false);
+            final isLoading = state.maybeWhen(
+              loading: () => true,
+              orElse: () => false,
+            );
 
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Form(
                   key: _formKey,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        children: [
-                          TextFormField(
-                      controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'عنوان القصة'),
-                      validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'الشخصية الراوية',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    // Big 3D Viewer for the selected avatar
-                    if (_characterFile == null)
-                      Container(
-                        height: 250,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7), // Amber-100
-                          borderRadius: BorderRadius.circular(AppColors.border_radius),
-                          border: Border.all(color: const Color(0xFFF59E0B), width: 3), // Amber-500
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: SmartCharacterViewer(
-                          key: ValueKey(_selectedCharacter), // Rebuild when character changes
-                          characterName: _selectedCharacter,
-                        ),
-                      )
-                    else
-                      Container(
-                        height: 250,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant,
-                          borderRadius: BorderRadius.circular(AppColors.border_radius),
-                          border: Border.all(color: Theme.of(context).colorScheme.outline, width: 1),
-                        ),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.view_in_ar, size: 64, color: Colors.grey),
-                              const SizedBox(height: 16),
-                              Text(
-                                'تم اختيار شخصية مخصصة\n${_characterFile!.path.split('/').last}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    // Selection Grid
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 5,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                      ),
-                      itemCount: _avatars.length,
-                      itemBuilder: (context, index) {
-                        final avatar = _avatars[index];
-                        final isSelected = _selectedCharacter.toLowerCase().contains(avatar);
-                        final displayName = CharacterHelper.getCleanName(avatar);
-                        final charColor = CharacterHelper.getColor(avatar);
-                        
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedCharacter = avatar),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(AppColors.border_radius),
-                              border: Border.all(
-                                color: isSelected ? charColor : Colors.transparent,
-                                width: 3,
-                              ),
-                              color: isSelected ? charColor.withOpacity(0.15) : Theme.of(context).colorScheme.surface,
-                            ),
-                            child: Center(
-                              child: Text(
-                                displayName,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected ? charColor : Colors.grey,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    // Upload custom 3D character button
-                    InkWell(
-                      onTap: _pickCharacter,
-                      borderRadius: BorderRadius.circular(AppColors.border_radius),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(AppColors.border_radius),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView(
                           children: [
-                            Expanded(
-                              child: Text(
-                                _characterFile != null ? 'الشخصية: ${_characterFile!.path.split('/').last}' : 'أو ارفع شخصية مخصصة (3D)',
-                                style: TextStyle(
-                                  color: _characterFile != null ? Colors.black87 : Colors.grey.shade600,
-                                  fontSize: 16,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            TextFormField(
+                              controller: _titleController,
+                              decoration: const InputDecoration(
+                                hintText: 'عنوان القصة',
                               ),
+                              validator: (val) =>
+                                  val == null || val.isEmpty ? 'مطلوب' : null,
                             ),
-                            Icon(
-                              _characterFile != null ? Icons.check_circle : Icons.upload_file,
-                              color: _characterFile != null ? Colors.green : Colors.grey.shade600,
+                            const SizedBox(height: 24),
+                            Text(
+                              'الشخصية الراوية',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (_characterFile != null) ...[
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _customCharacterNameController,
-                        decoration: const InputDecoration(labelText: 'اسم الشخصية المخصصة'),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'اختر لون الشخصية المخصصة',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: _avatars.map((avatar) {
-                          final charColor = CharacterHelper.getColor(avatar);
-                          final isSelected = _customCharacterColorKey == avatar;
-                          return GestureDetector(
-                            onTap: () => setState(() => _customCharacterColorKey = avatar),
-                            child: Container(
-                              width: 40,
-                              height: 40,
+                            const SizedBox(height: 12),
+                            // Big 3D Viewer for the selected avatar
+                            Container(
+                              height: 250,
+                              width: double.infinity,
                               decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: charColor.withOpacity(isSelected ? 1.0 : 0.3),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceVariant.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(
+                                  AppColors.border_radius,
+                                ),
                                 border: Border.all(
-                                  color: isSelected ? Colors.black87 : Colors.transparent,
+                                  color: AppColors.inputBorder,
                                   width: 2,
                                 ),
                               ),
-                              child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _characterFile = null;
-                              _selectedCharacter = _avatars.first;
-                            });
-                          },
-                          icon: const Icon(Icons.close, size: 18),
-                          label: const Text('إلغاء الشخصية المخصصة'),
-                          style: TextButton.styleFrom(foregroundColor: Colors.red),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    InkWell(
-                      onTap: _pickAudio,
-                      borderRadius: BorderRadius.circular(AppColors.border_radius),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(AppColors.border_radius),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _audioFile != null
-                                    ? 'ملف الصوت: ${_audioFile!.path.split('/').last}'
-                                    : 'إرفاق ملف صوتي (اختياري)',
-                                style: TextStyle(
-                                  color: _audioFile != null ? Colors.black87 : Colors.grey.shade600,
-                                  fontSize: 16,
+                              clipBehavior: Clip.antiAlias,
+                              child: SmartCharacterViewer(
+                                key: ValueKey(
+                                  _characterFile != null
+                                      ? _characterFile!.path
+                                      : _selectedCharacter,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                characterName: _characterFile != null
+                                    ? 'file://${_characterFile!.path}'
+                                    : _selectedCharacter,
                               ),
                             ),
-                            Icon(
-                              _audioFile != null ? Icons.check_circle : Icons.audiotrack,
-                              color: _audioFile != null ? Colors.green : Colors.grey.shade600,
+                            const SizedBox(height: 16),
+                            // Selection Grid
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 5,
+                                    crossAxisSpacing: 8,
+                                    mainAxisSpacing: 8,
+                                  ),
+                              itemCount: _avatars.length,
+                              itemBuilder: (context, index) {
+                                final avatar = _avatars[index];
+                                final isSelected = _selectedCharacter
+                                    .toLowerCase()
+                                    .contains(avatar);
+                                final displayName =
+                                    CharacterHelper.getCleanName(avatar);
+                                final charColor = CharacterHelper.getColor(
+                                  avatar,
+                                );
+
+                                return GestureDetector(
+                                  onTap: () => setState(
+                                    () => _selectedCharacter = avatar,
+                                  ),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(
+                                        AppColors.border_radius,
+                                      ),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? charColor
+                                            : Colors.transparent,
+                                        width: 3,
+                                      ),
+                                      color: isSelected
+                                          ? charColor.withOpacity(0.15)
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.surface,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        displayName,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected
+                                              ? charColor
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            // Upload custom 3D character button
+                            InkWell(
+                              onTap: _pickCharacter,
+                              borderRadius: BorderRadius.circular(
+                                AppColors.border_radius,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(
+                                    AppColors.border_radius,
+                                  ),
+                                  border: Border.all(
+                                    color: AppColors.inputBorder,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _characterFile != null
+                                            ? 'الشخصية: ${_characterFile!.path.split('/').last}'
+                                            : 'أو ارفع شخصية مخصصة (3D)',
+                                        style: TextStyle(
+                                          color: _characterFile != null
+                                              ? Colors.black87
+                                              : Colors.grey.shade500,
+                                          fontSize: 16,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Icon(
+                                      _characterFile != null
+                                          ? Icons.check_circle
+                                          : Icons.upload_file,
+                                      color: _characterFile != null
+                                          ? Colors.green
+                                          : Colors.grey.shade500,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (_characterFile != null) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                'اختر ثيم ولون الشخصية المخصصة',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: _avatars.map((avatar) {
+                                  final charColor = CharacterHelper.getColor(
+                                    avatar,
+                                  );
+                                  final charName = CharacterHelper.getCleanName(
+                                    avatar,
+                                  );
+                                  final isSelected =
+                                      _customCharacterColorKey == avatar;
+                                  return GestureDetector(
+                                    onTap: () => setState(
+                                      () => _customCharacterColorKey = avatar,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: charColor.withOpacity(
+                                              isSelected ? 1.0 : 0.3,
+                                            ),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? AppColors.inputBorder
+                                                  : Colors.transparent,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: isSelected
+                                              ? const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 20,
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          charName,
+                                          style: TextStyle(
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                            color: isSelected
+                                                ? charColor
+                                                : Colors.grey.shade500,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _characterFile = null;
+                                      _selectedCharacter = _avatars.first;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.close, size: 18),
+                                  label: const Text('إلغاء الشخصية المخصصة'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            InkWell(
+                              onTap: _pickAudio,
+                              borderRadius: BorderRadius.circular(
+                                AppColors.border_radius,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(
+                                    AppColors.border_radius,
+                                  ),
+                                  border: Border.all(
+                                    color: AppColors.inputBorder,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _audioFile != null
+                                            ? 'ملف الصوت: ${_audioFile!.path.split('/').last}'
+                                            : 'إرفاق ملف صوتي (اختياري)',
+                                        style: TextStyle(
+                                          color: _audioFile != null
+                                              ? Colors.black87
+                                              : Colors.grey.shade500,
+                                          fontSize: 16,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Icon(
+                                      _audioFile != null
+                                          ? Icons.check_circle
+                                          : Icons.audiotrack,
+                                      color: _audioFile != null
+                                          ? Colors.green
+                                          : Colors.grey.shade500,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            TextFormField(
+                              controller: _contentController,
+                              decoration: const InputDecoration(
+                                hintText: 'محتوى القصة',
+                              ),
+                              maxLines: 10,
+                              validator: (val) =>
+                                  val == null || val.isEmpty ? 'مطلوب' : null,
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _contentController,
-                      decoration: const InputDecoration(
-                        labelText: 'محتوى القصة',
-                        alignLabelWithHint: true,
-                      ),
-                      maxLines: 10,
-                      validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
-                    ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : _submit,
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: isLoading ? null : _submit,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  widget.storyToEdit != null
+                                      ? 'تحديث القصة'
+                                      : 'نشر القصة الآن',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
-                        child: isLoading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(
-                                widget.storyToEdit != null ? 'تحديث القصة' : 'نشر القصة الآن',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
+            );
           },
         ),
       ),

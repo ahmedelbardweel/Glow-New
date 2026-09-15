@@ -58,7 +58,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 TextField(
                   controller: _emailController,
                   decoration: const InputDecoration(
-                    labelText: 'البريد الإلكتروني للإدارة',
+                    hintText: 'البريد الإلكتروني للإدارة',
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
@@ -67,7 +67,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 TextField(
                   controller: _passwordController,
                   decoration: const InputDecoration(
-                    labelText: 'كلمة المرور',
+                    hintText: 'كلمة المرور',
                     prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,

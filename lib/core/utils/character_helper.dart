@@ -36,9 +36,21 @@ class CharacterHelper {
     }
 
     // Fallback if it's a custom character
-    String clean = rawName
+    String nameToProcess = rawName;
+    if (rawName.startsWith('http')) {
+      try {
+        final uri = Uri.parse(rawName);
+        if (uri.queryParameters.containsKey('name')) {
+          return uri.queryParameters['name']!;
+        }
+        nameToProcess = uri.pathSegments.last;
+      } catch (_) {}
+    }
+
+    String clean = nameToProcess
         .toUpperCase()
         .replaceAll('.GLB', '')
+        .replaceAll('.GLTF', '')
         .split('_')
         .first;
     if (clean.length > 1) {
@@ -48,6 +60,18 @@ class CharacterHelper {
   }
 
   static Color getColor(String rawName) {
+    if (rawName.startsWith('http')) {
+      try {
+        final uri = Uri.parse(rawName);
+        if (uri.queryParameters.containsKey('color')) {
+          final colorKey = uri.queryParameters['color']!;
+          if (characters.containsKey(colorKey)) {
+            return characters[colorKey]!['color'] as Color;
+          }
+        }
+      } catch (_) {}
+    }
+
     final lower = rawName.toLowerCase();
     for (var key in characters.keys) {
       if (lower.contains(key)) {
@@ -55,6 +79,28 @@ class CharacterHelper {
       }
     }
     return Colors.purple.shade300; // Default color for custom characters
+  }
+
+  static String getColorKey(String rawName) {
+    if (rawName.startsWith('http')) {
+      try {
+        final uri = Uri.parse(rawName);
+        if (uri.queryParameters.containsKey('color')) {
+          final colorKey = uri.queryParameters['color']!;
+          if (characters.containsKey(colorKey)) {
+            return colorKey;
+          }
+        }
+      } catch (_) {}
+    }
+
+    final lower = rawName.toLowerCase();
+    for (var key in characters.keys) {
+      if (lower.contains(key)) {
+        return key;
+      }
+    }
+    return 'fort'; // Default
   }
 
   static String getModelPath(String rawName) {

@@ -3,7 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
+import '../../../../core/widgets/smart_character_viewer.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../content/domain/entities/mission_entity.dart';
@@ -27,8 +27,10 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
+  final _customCharacterNameController = TextEditingController();
   
   String _selectedCharacter = 'fort_frontal.glb';
+  String _customCharacterColorKey = 'fort';
   final List<String> _avatars = CharacterHelper.characters.keys.toList();
 
   File? _characterFile;
@@ -47,6 +49,8 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         _selectedCharacter = character;
       } else {
         _selectedCharacter = ''; // It's a custom uploaded character
+        _customCharacterNameController.text = CharacterHelper.getCleanName(character);
+        _customCharacterColorKey = CharacterHelper.getColorKey(character);
       }
     }
   }
@@ -55,6 +59,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _customCharacterNameController.dispose();
     _contentBloc.close();
     super.dispose();
   }
@@ -242,12 +247,24 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
+      String charName = _selectedCharacter;
+      if (_characterFile != null) {
+        if (_customCharacterNameController.text.trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('الرجاء إدخال اسم للشخصية المخصصة')),
+          );
+          return;
+        }
+        charName = 'custom|$_customCharacterColorKey|${_customCharacterNameController.text.trim()}';
+      } else if (_selectedCharacter.isEmpty) {
+        charName = widget.storyToEdit?.characterName ?? '';
+      }
+
       final story = StoryEntity(
         id: widget.storyToEdit?.id ?? '', // Supabase gen_random_uuid will handle this if empty
         missionId: widget.mission.id,
         title: _titleController.text.trim(),
-        characterName: _characterFile != null ? _characterFile!.path.split('/').last : 
-                       (_selectedCharacter.isEmpty ? (widget.storyToEdit?.characterName ?? '') : _selectedCharacter),
+        characterName: charName,
         content: _contentController.text.trim(),
         imageUrl: widget.storyToEdit?.imageUrl ?? '',
         audioUrl: widget.storyToEdit?.audioUrl,
@@ -326,9 +343,9 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                           border: Border.all(color: const Color(0xFFF59E0B), width: 3), // Amber-500
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: Flutter3DViewer(
+                        child: SmartCharacterViewer(
                           key: ValueKey(_selectedCharacter), // Rebuild when character changes
-                          src: CharacterHelper.getModelPath(_selectedCharacter),
+                          characterName: _selectedCharacter,
                         ),
                       )
                     else
@@ -434,17 +451,54 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       ),
                     ),
                     if (_characterFile != null) ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _customCharacterNameController,
+                        decoration: const InputDecoration(labelText: 'اسم الشخصية المخصصة'),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'اختر لون الشخصية المخصصة',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _characterFile = null;
-                            _selectedCharacter = _avatars.first;
-                          });
-                        },
-                        icon: const Icon(Icons.close, size: 18),
-                        label: const Text('إلغاء الشخصية المخصصة'),
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: _avatars.map((avatar) {
+                          final charColor = CharacterHelper.getColor(avatar);
+                          final isSelected = _customCharacterColorKey == avatar;
+                          return GestureDetector(
+                            onTap: () => setState(() => _customCharacterColorKey = avatar),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: charColor.withOpacity(isSelected ? 1.0 : 0.3),
+                                border: Border.all(
+                                  color: isSelected ? Colors.black87 : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                              child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _characterFile = null;
+                              _selectedCharacter = _avatars.first;
+                            });
+                          },
+                          icon: const Icon(Icons.close, size: 18),
+                          label: const Text('إلغاء الشخصية المخصصة'),
+                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),

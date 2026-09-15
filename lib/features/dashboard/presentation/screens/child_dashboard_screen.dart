@@ -129,7 +129,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
     return BlocProvider.value(
       value: _contentBloc,
       child: Scaffold(
-        extendBodyBehindAppBar: true,
+        extendBodyBehindAppBar: false,
         appBar: AppBar(
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,8 +189,10 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
             ],
           ),
           centerTitle: false,
-          backgroundColor: Colors.white.withOpacity(0.4),
+          backgroundColor: Colors.white,
           elevation: 0,
+          foregroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -323,8 +325,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
               colors: [Color(0xFFE0F7FA), Color(0xFFF3E5F5), Color(0xFFFFF3E0)],
             ),
           ),
-          child: SafeArea(
-            child: Column(
+          child: Column(
               children: [
                 Expanded(
                   child: BlocBuilder<ContentBloc, ContentState>(
@@ -684,7 +685,6 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                 ),
               ],
             ),
-          ),
         ),
       ),
     );

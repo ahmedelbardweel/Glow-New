@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
+import '../../../../core/widgets/smart_character_viewer.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../content/domain/entities/story_entity.dart';
@@ -57,8 +57,8 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
                     borderRadius: BorderRadius.circular(AppColors.border_radius),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: Flutter3DViewer(
-                    src: 'assets/3d/${widget.story.characterName}',
+                  child: SmartCharacterViewer(
+                    characterName: widget.story.characterName,
                   ),
                 ),
               ),

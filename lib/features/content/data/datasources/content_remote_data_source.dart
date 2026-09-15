@@ -158,9 +158,22 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
       await supabaseClient.storage
           .from('story_characters')
           .upload(fileName, characterFile);
-      characterName = supabaseClient.storage
+      final publicUrl = supabaseClient.storage
           .from('story_characters')
           .getPublicUrl(fileName);
+          
+      if (characterName.startsWith('custom|')) {
+        final parts = characterName.split('|');
+        if (parts.length >= 3) {
+          final colorKey = parts[1];
+          final customName = parts[2];
+          characterName = '$publicUrl?color=$colorKey&name=${Uri.encodeComponent(customName)}';
+        } else {
+          characterName = publicUrl;
+        }
+      } else {
+        characterName = publicUrl;
+      }
     }
 
     final storyToSave = StoryModel(
@@ -209,9 +222,22 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
       await supabaseClient.storage
           .from('story_characters')
           .upload(fileName, characterFile);
-      characterName = supabaseClient.storage
+      final publicUrl = supabaseClient.storage
           .from('story_characters')
           .getPublicUrl(fileName);
+          
+      if (characterName.startsWith('custom|')) {
+        final parts = characterName.split('|');
+        if (parts.length >= 3) {
+          final colorKey = parts[1];
+          final customName = parts[2];
+          characterName = '$publicUrl?color=$colorKey&name=${Uri.encodeComponent(customName)}';
+        } else {
+          characterName = publicUrl;
+        }
+      } else {
+        characterName = publicUrl;
+      }
     }
 
     final storyToSave = StoryModel(

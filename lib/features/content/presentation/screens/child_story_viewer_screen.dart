@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
+import '../../../../core/widgets/smart_character_viewer.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/resource_manager.dart';
 import '../../domain/entities/mission_entity.dart';
@@ -432,40 +433,14 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                     AppColors.border_radius,
                                   ),
                                   child: RepaintBoundary(
-                                    child: Flutter3DViewer(
+                                    child: SmartCharacterViewer(
                                       key: ValueKey(story.characterName),
-                                      src: CharacterHelper.getModelPath(
-                                        story.characterName,
-                                      ),
+                                      characterName: story.characterName,
                                     ),
                                   ),
                                 ),
                               ),
-                              // Tap Gestures
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: _previousStory,
-                                      behavior: HitTestBehavior.translucent,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: _togglePlayPause,
-                                      behavior: HitTestBehavior.translucent,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: _currentIndex < _stories.length - 1
-                                          ? _nextStory
-                                          : null,
-                                      behavior: HitTestBehavior.translucent,
-                                    ),
-                                  ),
-                                ],
-                              ),
+
                             ],
                           ),
                         ),
@@ -508,27 +483,30 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: CharacterHelper.getColor(
-                                        story.characterName,
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 4,
                                       ),
-                                      borderRadius: BorderRadius.circular(
-                                        AppColors.border_radius,
+                                      decoration: BoxDecoration(
+                                        color: CharacterHelper.getColor(
+                                          story.characterName,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          AppColors.border_radius,
+                                        ),
                                       ),
-                                    ),
-                                    child: Text(
-                                      CharacterHelper.getCleanName(
-                                        story.characterName,
-                                      ),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                      child: Text(
+                                        CharacterHelper.getCleanName(
+                                          story.characterName,
+                                        ),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ),

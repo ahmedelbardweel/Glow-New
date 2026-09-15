@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
+import '../../../../core/widgets/smart_character_viewer.dart';
 import '../../../../core/theme/app_colors.dart' show AppColors;
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
@@ -134,9 +134,9 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
                 border: Border.all(color: const Color(0xFFF59E0B), width: 3), // Amber-500
               ),
               clipBehavior: Clip.antiAlias,
-              child: Flutter3DViewer(
+              child: SmartCharacterViewer(
                 key: ValueKey(_selectedAvatar), // Rebuild when avatar changes
-                src: 'assets/3d/$_selectedAvatar',
+                characterName: _selectedAvatar,
               ),
             ),
             const SizedBox(height: 24),

@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 
 class CharacterHelper {
+  /// The five identities share one mesh, skeleton and animation library.
+  static const sharedModelPath = 'assets/3d/glow_mascot.glb';
   static const Map<String, Map<String, dynamic>> characters = {
     'fort': {
       'color': Color(0xFF733434), // Red/Coral
-      'model': 'fort_frontal.glb',
+      'model': 'glow_mascot.glb',
     },
     'lort': {
       'color': Color(0xFFD4AC0D), // Golden/Yellow
-      'model': 'lort_frontal.glb',
+      'model': 'glow_mascot.glb',
     },
     'mort': {
       'color': Color(0xFF9C1B42), // Deep Magenta/Red
-      'model': 'mort_frontal.glb',
+      'model': 'glow_mascot.glb',
     },
     'port': {
       'color': Color(0xFF22592A), // Darker Green
-      'model': 'port_frontal.glb',
+      'model': 'glow_mascot.glb',
     },
     'qort': {
       'color': Color(0xFF033E8C), // Blue
-      'model': 'qort_frontal.glb',
+      'model': 'glow_mascot.glb',
     },
   };
 
@@ -100,24 +102,15 @@ class CharacterHelper {
         return key;
       }
     }
-    return 'fort'; // Default
+    return 'qort'; // Default
   }
 
   static String getModelPath(String rawName) {
-    if (rawName.startsWith('http') || rawName.startsWith('file://')) return rawName;
-
-    final lower = rawName.toLowerCase();
-    for (var key in characters.keys) {
-      if (lower.contains(key)) {
-        return 'assets/3d/${characters[key]!['model']}';
-      }
+    if (rawName.startsWith('http') || rawName.startsWith('file://')) {
+      return rawName;
     }
 
-    // Custom uploaded local model fallback
-    String clean = rawName.trim().toLowerCase();
-    if (!clean.endsWith('.glb') && !clean.endsWith('.gltf')) {
-      clean += '.glb';
-    }
-    return 'assets/3d/$clean';
+    // Resolve legacy saved filenames without changing the stored identity.
+    return sharedModelPath;
   }
 }

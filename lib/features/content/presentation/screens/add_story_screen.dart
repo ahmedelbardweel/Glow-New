@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/smart_character_viewer.dart';
+import '../../../../core/widgets/character_studio_screen.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../content/domain/entities/mission_entity.dart';
@@ -232,7 +233,10 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                   ),
                 ),
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء', style: TextStyle(color: Colors.black)),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: Colors.black),
+                ),
               ),
             ),
           ],
@@ -395,11 +399,6 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: SmartCharacterViewer(
-                                key: ValueKey(
-                                  _characterFile != null
-                                      ? _characterFile!.path
-                                      : _selectedCharacter,
-                                ),
                                 characterName: _characterFile != null
                                     ? 'file://${_characterFile!.path}'
                                     : _selectedCharacter,
@@ -407,6 +406,19 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                             ),
                             const SizedBox(height: 16),
                             // Selection Grid
+                            Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.animation),
+                                label: const Text('تجربة حركات الشخصية'),
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        const CharacterStudioScreen(),
+                                  ),
+                                ),
+                              ),
+                            ),
                             GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),

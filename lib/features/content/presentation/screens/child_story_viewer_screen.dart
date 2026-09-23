@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -25,14 +24,17 @@ class ChildStoryViewerScreen extends StatefulWidget {
   State<ChildStoryViewerScreen> createState() => _ChildStoryViewerScreenState();
 }
 
-class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
+class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
+    with WidgetsBindingObserver {
   late ContentBloc _contentBloc;
 
   List<StoryEntity> _stories = [];
   int _currentIndex = 0;
 
   // Audio Player and Progress
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  AudioPlayer? _audioPlayer;
+  final List<StreamSubscription<dynamic>> _audioSubscriptions = [];
+  Future<void> _audioCommands = Future<void>.value();
   final ValueNotifier<Duration> _positionNotifier = ValueNotifier<Duration>(
     Duration.zero,
   );
@@ -40,40 +42,103 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
   Duration _totalDuration = const Duration(seconds: 10); // default if no audio
   bool _hasAudio = false;
   bool _isMuted = false;
+  bool _playRequested = true;
+  bool _isAppActive = true;
+  bool _audioCompleted = false;
+  bool _leaving = false;
+  int _sceneGeneration = 0;
 
   Timer? _fallbackTimer;
+  final Stopwatch _fallbackClock = Stopwatch();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    _isAppActive = lifecycle == null || lifecycle == AppLifecycleState.resumed;
     _contentBloc = sl<ContentBloc>();
     _contentBloc.add(ContentEvent.getStories(widget.mission.id));
-
-    _audioPlayer.onDurationChanged.listen((duration) {
-      if (mounted && _hasAudio) setState(() => _totalDuration = duration);
-    });
-
-    _audioPlayer.onPositionChanged.listen((position) {
-      if (_hasAudio) _positionNotifier.value = position;
-    });
-
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted && _hasAudio) {
-        setState(() {
-          _isPlaying = state == PlayerState.playing;
-        });
-      }
-    });
-
-    _audioPlayer.onPlayerComplete.listen((_) {
-      if (mounted && _hasAudio) _nextStory();
-    });
   }
 
-  void _startStory() async {
+  bool _isCurrentScene(int generation) =>
+      mounted && !_leaving && generation == _sceneGeneration;
+
+  void _listenToAudio(AudioPlayer player, int generation) {
+    _audioSubscriptions.addAll([
+      player.onDurationChanged.listen((duration) {
+        if (_isCurrentScene(generation) && duration > Duration.zero) {
+          setState(() => _totalDuration = duration);
+        }
+      }, onError: (Object error) => _onAudioError(error, generation)),
+      player.onPositionChanged.listen((position) {
+        if (_isCurrentScene(generation) && _hasAudio) {
+          _positionNotifier.value = position;
+        }
+      }, onError: (Object error) => _onAudioError(error, generation)),
+      player.onPlayerStateChanged.listen((state) {
+        if (_isCurrentScene(generation) && _hasAudio) {
+          setState(() {
+            _isPlaying =
+                state == PlayerState.playing && _playRequested && _isAppActive;
+          });
+        }
+      }),
+      player.onPlayerComplete.listen((_) {
+        if (!_isCurrentScene(generation) || !_hasAudio) return;
+        _audioCompleted = true;
+        if (_playRequested && _isAppActive) {
+          _nextStory();
+        } else {
+          setState(() => _isPlaying = false);
+        }
+      }, onError: (Object error) => _onAudioError(error, generation)),
+    ]);
+  }
+
+  void _onAudioError(Object error, int generation) {
+    // Preparation errors are handled by _loadAudio, which tries the next source.
+    if (_isCurrentScene(generation) && _hasAudio) {
+      debugPrint('Story audio stream failed: $error');
+      _startFallbackTimer(generation);
+    }
+  }
+
+  void _detachAudio() {
+    for (final subscription in _audioSubscriptions) {
+      unawaited(subscription.cancel());
+    }
+    _audioSubscriptions.clear();
+    final player = _audioPlayer;
+    _audioPlayer = null;
+    _audioCommands = Future<void>.value();
+    if (player != null) unawaited(_disposePlayer(player));
+  }
+
+  Future<void> _disposePlayer(AudioPlayer player) async {
+    try {
+      await player.dispose();
+    } catch (error) {
+      debugPrint('Story audio disposal failed: $error');
+    }
+  }
+
+  void _startStory() {
+    if (!mounted || _leaving || _stories.isEmpty) return;
+    final generation = ++_sceneGeneration;
     _fallbackTimer?.cancel();
+    _fallbackClock
+      ..stop()
+      ..reset();
+    _detachAudio();
+    setState(() {
+      _playRequested = true;
+      _isPlaying = false;
+      _hasAudio = false;
+      _audioCompleted = false;
+      _totalDuration = const Duration(seconds: 10);
+    });
     _positionNotifier.value = Duration.zero;
-    if (_stories.isEmpty) return;
 
     final currentStory = _stories[_currentIndex];
     final audioUrl = currentStory.audioUrl?.trim() ?? '';
@@ -83,58 +148,76 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
       final nextStory = _stories[_currentIndex + 1];
       final nextAudio = nextStory.audioUrl?.trim() ?? '';
       if (nextAudio.startsWith('http')) {
-        sl<ResourceManager>().downloadAndCacheFile(nextAudio, folder: 'audio');
+        sl<ResourceManager>().downloadAndCacheInBackground(
+          nextAudio,
+          folder: 'audio',
+        );
       }
     }
 
-    if (audioUrl.isNotEmpty) {
-      final resourceManager = sl<ResourceManager>();
-      final localAudioPath = resourceManager.getLocalFilePath(audioUrl);
-
-      if (localAudioPath != null) {
-        _hasAudio = true;
-        try {
-          await _audioPlayer.setSource(DeviceFileSource(localAudioPath));
-          await _audioPlayer.resume();
-          return;
-        } catch (_) {
-          // If local play failed, fallback to url
-        }
-      }
-
-      if (audioUrl.startsWith('http')) {
-        _hasAudio = true;
-        try {
-          await _audioPlayer.setSourceUrl(audioUrl);
-          await _audioPlayer.resume();
-          // Cache in background for offline use
-          resourceManager.downloadAndCacheFile(audioUrl, folder: 'audio');
-          return;
-        } catch (e) {
-          _hasAudio = false;
-          _audioPlayer.stop(); // Explicitly stop if error
-          _startFallbackTimer();
-          return;
-        }
-      }
+    if (audioUrl.isEmpty) {
+      _startFallbackTimer(generation);
+      return;
     }
 
-    // No audio to play for this scene
-    _hasAudio = false;
-    _audioPlayer.stop(); // Explicitly stop any currently playing audio
-    _startFallbackTimer();
+    // Each scene owns its player so a delayed load cannot replace new audio.
+    final player = AudioPlayer();
+    _audioPlayer = player;
+    _listenToAudio(player, generation);
+    unawaited(_loadAudio(player, audioUrl, generation));
   }
 
-  void _startFallbackTimer() {
-    _totalDuration = const Duration(
-      seconds: 10,
-    ); // 10 seconds default viewing time
-    _isPlaying = true;
+  Future<void> _loadAudio(
+    AudioPlayer player,
+    String audioUrl,
+    int generation,
+  ) async {
+    final resourceManager = sl<ResourceManager>();
+    final localPath = resourceManager.getLocalFilePath(audioUrl);
+    final sources = <Source>[
+      if (localPath != null) DeviceFileSource(localPath),
+      if (audioUrl.startsWith('http')) UrlSource(audioUrl),
+    ];
+    for (final source in sources) {
+      try {
+        await player.setSource(source);
+        if (!_isCurrentScene(generation)) return;
+        await player.setVolume(_isMuted ? 0 : 1);
+        if (!_isCurrentScene(generation)) return;
+        setState(() => _hasAudio = true);
+        _syncPlayback();
+        resourceManager.downloadAndCacheInBackground(audioUrl, folder: 'audio');
+        return;
+      } catch (error) {
+        if (!_isCurrentScene(generation)) return;
+        debugPrint('Story audio source unavailable: $error');
+      }
+    }
+    if (_isCurrentScene(generation)) _startFallbackTimer(generation);
+  }
+
+  void _startFallbackTimer(int generation) {
+    if (!_isCurrentScene(generation)) return;
+    _detachAudio();
+    _fallbackTimer?.cancel();
+    _fallbackClock
+      ..stop()
+      ..reset();
+    setState(() {
+      _hasAudio = false;
+      _totalDuration = const Duration(seconds: 10);
+      _isPlaying = _playRequested && _isAppActive;
+    });
+    if (_isPlaying) _fallbackClock.start();
     _positionNotifier.value = Duration.zero;
     _fallbackTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!_isCurrentScene(generation)) {
+        timer.cancel();
+        return;
+      }
       if (!_isPlaying) return;
-      final next = _positionNotifier.value + const Duration(milliseconds: 100);
-      _positionNotifier.value = next;
+      final next = _fallbackClock.elapsed;
+      _positionNotifier.value = next > _totalDuration ? _totalDuration : next;
       if (next >= _totalDuration) {
         timer.cancel();
         _nextStory();
@@ -142,35 +225,63 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
     });
   }
 
-  void _togglePlayPause() {
-    if (_hasAudio) {
-      if (_isPlaying) {
-        _audioPlayer.pause();
-      } else {
-        _audioPlayer.resume();
+  void _queueAudioCommand(Future<void> Function(AudioPlayer) command) {
+    final player = _audioPlayer;
+    final generation = _sceneGeneration;
+    if (player == null) return;
+    _audioCommands = _audioCommands.then((_) async {
+      if (!_isCurrentScene(generation) || player != _audioPlayer) return;
+      try {
+        await command(player);
+      } catch (error) {
+        if (_isCurrentScene(generation) && player == _audioPlayer) {
+          debugPrint('Story audio playback failed: $error');
+          _startFallbackTimer(generation);
+        }
       }
-    } else {
-      setState(() {
-        _isPlaying = !_isPlaying;
-      });
-    }
-  }
-
-  void _toggleMute() {
-    setState(() {
-      _isMuted = !_isMuted;
-      _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0);
     });
   }
 
-  void _replayStory() {
+  void _syncPlayback() {
+    if (!mounted || _leaving) return;
+    final shouldPlay = _playRequested && _isAppActive;
     if (_hasAudio) {
-      _audioPlayer.seek(Duration.zero);
-      _audioPlayer.resume();
-    } else {
-      _positionNotifier.value = Duration.zero;
-      _isPlaying = true;
+      if (!shouldPlay) setState(() => _isPlaying = false);
+      _queueAudioCommand((player) async {
+        if (_playRequested && _isAppActive) {
+          if (_audioCompleted) {
+            _nextStory();
+          } else {
+            await player.resume();
+          }
+        } else {
+          await player.pause();
+        }
+      });
+    } else if (_fallbackTimer?.isActive ?? false) {
+      setState(() => _isPlaying = shouldPlay);
+      if (shouldPlay) {
+        _fallbackClock.start();
+      } else {
+        _fallbackClock.stop();
+      }
     }
+  }
+
+  void _togglePlayPause() {
+    setState(() => _playRequested = !_playRequested);
+    _syncPlayback();
+  }
+
+  void _toggleMute() {
+    setState(() => _isMuted = !_isMuted);
+    _queueAudioCommand((player) => player.setVolume(_isMuted ? 0 : 1));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppActive = state == AppLifecycleState.resumed;
+    _syncPlayback();
   }
 
   void _restartMission() {
@@ -181,6 +292,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
   }
 
   void _nextStory() {
+    if (!mounted || _leaving) return;
     if (_currentIndex < _stories.length - 1) {
       setState(() {
         _currentIndex++;
@@ -188,29 +300,27 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
       _startStory();
     } else {
       // Finished all stories
-      _audioPlayer.stop();
-      _fallbackTimer?.cancel();
+      _stopPlayback();
       context.pushReplacement('/child/quiz-intro', extra: widget.mission);
     }
   }
 
-  void _previousStory() {
-    if (_currentIndex > 0) {
-      setState(() {
-        _currentIndex--;
-      });
-      _startStory();
-    } else {
-      _replayStory();
-    }
+  void _stopPlayback() {
+    _leaving = true;
+    ++_sceneGeneration;
+    _playRequested = false;
+    _isPlaying = false;
+    _fallbackTimer?.cancel();
+    _fallbackClock.stop();
+    _detachAudio();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPlayback();
     _positionNotifier.dispose();
-    _audioPlayer.dispose();
-    _fallbackTimer?.cancel();
-    _contentBloc.close();
+    unawaited(_contentBloc.close());
     super.dispose();
   }
 
@@ -320,7 +430,9 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.05,
+                                          ),
                                           blurRadius: 4,
                                           offset: const Offset(0, 2),
                                         ),
@@ -359,7 +471,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                   // Back Button (Right)
                                   GestureDetector(
                                     onTap: () {
-                                      _audioPlayer.stop();
+                                      _stopPlayback();
                                       context.pop();
                                     },
                                     child: Container(
@@ -374,8 +486,8 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                         ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.05,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.05,
                                             ),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
@@ -422,7 +534,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                     BoxShadow(
                                       color: CharacterHelper.getColor(
                                         story.characterName,
-                                      ).withOpacity(0.2),
+                                      ).withValues(alpha: 0.2),
                                       blurRadius: 10,
                                       offset: const Offset(0, 5),
                                     ),
@@ -434,13 +546,16 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                   ),
                                   child: RepaintBoundary(
                                     child: SmartCharacterViewer(
-                                      key: ValueKey(story.characterName),
                                       characterName: story.characterName,
+                                      storyText:
+                                          '${story.title}\n${story.content}',
+                                      isPlaying: _isPlaying,
+                                      isSpeaking: _hasAudio && _isPlaying,
+                                      playbackPosition: _positionNotifier,
                                     ),
                                   ),
                                 ),
                               ),
-
                             ],
                           ),
                         ),
@@ -458,7 +573,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 10,
                                 offset: const Offset(0, 5),
                               ),
@@ -533,7 +648,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                     vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Colors.black.withValues(alpha: 0.05),
                                     borderRadius: BorderRadius.circular(
                                       AppColors.border_radius,
                                     ),
@@ -557,7 +672,9 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                                       ],
                                       IconButton(
                                         icon: Icon(
-                                          _isPlaying
+                                          (_audioPlayer != null && !_hasAudio
+                                                  ? _playRequested
+                                                  : _isPlaying)
                                               ? Icons.pause
                                               : Icons.play_arrow,
                                           color: CharacterHelper.getColor(
@@ -596,17 +713,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen> {
                             width: double.infinity,
                             height: 56,
                             child: FilledButton(
-                              onPressed: () {
-                                if (_currentIndex < _stories.length - 1) {
-                                  _nextStory();
-                                } else {
-                                  _audioPlayer.stop();
-                                  context.pushReplacement(
-                                    '/child/quiz-intro',
-                                    extra: widget.mission,
-                                  );
-                                }
-                              },
+                              onPressed: _nextStory,
                               style: FilledButton.styleFrom(
                                 backgroundColor: CharacterHelper.getColor(
                                   story.characterName,

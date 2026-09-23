@@ -135,7 +135,6 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
               ),
               clipBehavior: Clip.antiAlias,
               child: SmartCharacterViewer(
-                key: ValueKey(_selectedAvatar), // Rebuild when avatar changes
                 characterName: _selectedAvatar,
               ),
             ),

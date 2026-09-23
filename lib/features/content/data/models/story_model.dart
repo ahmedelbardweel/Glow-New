@@ -10,6 +10,7 @@ class StoryModel extends StoryEntity {
     required super.imageUrl,
     required super.orderIndex,
     super.audioUrl,
+    super.timelineData,
   });
 
   factory StoryModel.fromEntity(StoryEntity entity) {
@@ -22,6 +23,7 @@ class StoryModel extends StoryEntity {
       imageUrl: entity.imageUrl,
       orderIndex: entity.orderIndex,
       audioUrl: entity.audioUrl,
+      timelineData: entity.timelineData,
     );
   }
 
@@ -35,6 +37,7 @@ class StoryModel extends StoryEntity {
       imageUrl: json['image_url'] as String? ?? '',
       orderIndex: json['order_index'] as int? ?? 0,
       audioUrl: json['audio_url'] as String?,
+      timelineData: json['timeline_data'] as String?,
     );
   }
 
@@ -48,6 +51,7 @@ class StoryModel extends StoryEntity {
       'image_url': imageUrl,
       'order_index': orderIndex,
       if (audioUrl != null) 'audio_url': audioUrl,
+      if (timelineData != null) 'timeline_data': timelineData,
     };
   }
 }

@@ -14,6 +14,8 @@ import '../bloc/content_state.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/utils/character_helper.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
+import 'dart:convert';
+import '../../../../core/models/story_timeline.dart';
 
 class ChildStoryViewerScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -47,6 +49,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
   bool _audioCompleted = false;
   bool _leaving = false;
   int _sceneGeneration = 0;
+  StoryTimeline? _currentTimeline;
 
   Timer? _fallbackTimer;
   final Stopwatch _fallbackClock = Stopwatch();
@@ -142,6 +145,15 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
     final currentStory = _stories[_currentIndex];
     final audioUrl = currentStory.audioUrl?.trim() ?? '';
+    if (currentStory.timelineData != null) {
+      try {
+        _currentTimeline = StoryTimeline.fromJson(jsonDecode(currentStory.timelineData!));
+      } catch (_) {
+        _currentTimeline = null;
+      }
+    } else {
+      _currentTimeline = null;
+    }
 
     // Pre-cache next scene's audio in the background for instant transition
     if (_currentIndex + 1 < _stories.length) {
@@ -545,13 +557,22 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                     AppColors.border_radius,
                                   ),
                                   child: RepaintBoundary(
-                                    child: SmartCharacterViewer(
-                                      characterName: story.characterName,
-                                      storyText:
-                                          '${story.title}\n${story.content}',
-                                      isPlaying: _isPlaying,
-                                      isSpeaking: _hasAudio && _isPlaying,
-                                      playbackPosition: _positionNotifier,
+                                    child: ValueListenableBuilder<Duration>(
+                                      valueListenable: _positionNotifier,
+                                      builder: (context, position, child) {
+                                        String activeChar = story.characterName;
+                                        if (_currentTimeline != null) {
+                                          final t = position.inMilliseconds / 1000.0;
+                                          activeChar = _currentTimeline!.getActiveCharacterAt(t) ?? story.characterName;
+                                        }
+                                        return SmartCharacterViewer(
+                                          characterName: activeChar,
+                                          storyText: '${story.title}\n${story.content}',
+                                          isPlaying: _isPlaying,
+                                          isSpeaking: _hasAudio && _isPlaying,
+                                          playbackPosition: _positionNotifier,
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
@@ -145,12 +146,22 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       size: widget.size,
       settings: three.Settings(
         clearColor: 0xF4F7F5,
-        // This is a stylized character, so supersampling and MSAA consume GPU
-        // memory without a visible benefit on a phone-sized card.
+        // Disable MSAA and shadows — this is a stylized character, these
+        // features consume GPU memory without visible benefit on mobile.
         antialias: false,
         enableShadowMap: false,
         toneMapping: three.NoToneMapping,
-        screenResolution: _compatibilityMode ? 0.72 : 1.0,
+        // SurfaceProducer API causes shader validation errors on many Android
+        // devices. Fall back to the older texture path on native platforms.
+        useSurfaceProducer: kIsWeb,
+        // Stencil buffer is unused; disabling it reduces driver state changes.
+        stencil: false,
+        // mediump is sufficient for this cartoon character and avoids
+        // precision-related GL errors on older Mali and Adreno GPUs.
+        precision: three.Precision.mediump,
+        screenResolution: _compatibilityMode
+            ? 0.6
+            : (!kIsWeb && (Platform.isAndroid || Platform.isIOS) ? 0.85 : 1.0),
       ),
       setup: () => _setup(generation),
       onError: (error, stack) {
@@ -198,6 +209,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     three.GLTFData? data;
     try {
       data = await _loadModel(loader);
+    } catch (e, stack) {
+      debugPrint('=== GLB LOAD ERROR ===\n$e\n$stack');
+      rethrow;
     } finally {
       loader.dispose();
     }

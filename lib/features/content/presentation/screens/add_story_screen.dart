@@ -11,8 +11,11 @@ import '../../../content/domain/entities/mission_entity.dart';
 import '../../../content/domain/entities/story_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
+import 'dart:convert';
 import '../../../content/presentation/bloc/content_state.dart';
 import '../../../../core/utils/character_helper.dart';
+import '../../../../core/models/story_timeline.dart';
+import '../../../../core/widgets/story_timeline_editor.dart';
 
 class AddStoryScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -35,6 +38,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
 
   File? _characterFile;
   File? _audioFile;
+  StoryTimeline? _timeline;
   late ContentBloc _contentBloc;
 
   @override
@@ -50,6 +54,11 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       } else {
         _selectedCharacter = ''; // It's a custom uploaded character
         _customCharacterColorKey = CharacterHelper.getColorKey(character);
+      }
+      if (widget.storyToEdit!.timelineData != null) {
+        try {
+          _timeline = StoryTimeline.fromJson(jsonDecode(widget.storyToEdit!.timelineData!));
+        } catch (_) {}
       }
     }
   }
@@ -289,6 +298,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         imageUrl: widget.storyToEdit?.imageUrl ?? '',
         audioUrl: widget.storyToEdit?.audioUrl,
         orderIndex: widget.storyToEdit?.orderIndex ?? 0,
+        timelineData: _timeline != null ? jsonEncode(_timeline!.toJson()) : null,
       );
       if (widget.storyToEdit != null) {
         _contentBloc.add(
@@ -663,6 +673,16 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                 ),
                               ),
                             ),
+                            if (_audioFile != null) ...[
+                              const SizedBox(height: 16),
+                              StoryTimelineEditor(
+                                audioFile: _audioFile!,
+                                initialTimeline: _timeline,
+                                onTimelineChanged: (val) {
+                                  setState(() => _timeline = val);
+                                },
+                              ),
+                            ],
                             const SizedBox(height: 24),
                             TextFormField(
                               controller: _contentController,

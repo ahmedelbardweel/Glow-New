@@ -9,6 +9,7 @@ class StoryEntity extends Equatable {
   final String imageUrl;
   final int orderIndex;
   final String? audioUrl;
+  final String? timelineData; // JSON string representing StoryTimeline
 
   const StoryEntity({
     required this.id,
@@ -19,8 +20,9 @@ class StoryEntity extends Equatable {
     required this.imageUrl,
     required this.orderIndex,
     this.audioUrl,
+    this.timelineData,
   });
 
   @override
-  List<Object?> get props => [id, missionId, title, characterName, content, imageUrl, orderIndex, audioUrl];
+  List<Object?> get props => [id, missionId, title, characterName, content, imageUrl, orderIndex, audioUrl, timelineData];
 }

@@ -10,7 +10,7 @@ class StoryBlock {
   });
 
   bool isPlaying(double currentTime) {
-    return currentTime >= startTime && currentTime < endTime;
+    return currentTime >= startTime && currentTime <= endTime;
   }
 
   factory StoryBlock.fromJson(Map<String, dynamic> json) {

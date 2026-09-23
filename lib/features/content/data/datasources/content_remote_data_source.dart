@@ -185,6 +185,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
       imageUrl: story.imageUrl,
       orderIndex: story.orderIndex,
       audioUrl: audioUrl,
+      timelineData: story.timelineData,
     );
 
     final response = await supabaseClient
@@ -249,6 +250,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
       imageUrl: story.imageUrl,
       orderIndex: story.orderIndex,
       audioUrl: audioUrl,
+      timelineData: story.timelineData,
     );
 
     final response = await supabaseClient

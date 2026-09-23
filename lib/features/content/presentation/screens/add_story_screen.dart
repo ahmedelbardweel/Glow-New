@@ -11,6 +11,8 @@ import '../../../content/domain/entities/mission_entity.dart';
 import '../../../content/domain/entities/story_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'dart:async';
 import 'dart:convert';
 import '../../../content/presentation/bloc/content_state.dart';
 import '../../../../core/utils/character_helper.dart';
@@ -32,14 +34,18 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
 
-  String _selectedCharacter = 'fort_frontal.glb';
-  String _customCharacterColorKey = 'fort';
-  final List<String> _avatars = CharacterHelper.characters.keys.toList();
-
   File? _characterFile;
   File? _audioFile;
   StoryTimeline? _timeline;
   late ContentBloc _contentBloc;
+  
+  AudioPlayer? _audioPlayer;
+  bool _isPlaying = false;
+  final ValueNotifier<Duration> _positionNotifier = ValueNotifier(Duration.zero);
+  Duration _totalDuration = Duration.zero;
+  StreamSubscription? _playerStateSubscription;
+  StreamSubscription? _durationSubscription;
+  StreamSubscription? _positionSubscription;
 
   @override
   void initState() {
@@ -48,12 +54,9 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     if (widget.storyToEdit != null) {
       _titleController.text = widget.storyToEdit!.title;
       _contentController.text = widget.storyToEdit!.content;
-      final character = widget.storyToEdit!.characterName;
-      if (_avatars.any((a) => character.toLowerCase().contains(a))) {
-        _selectedCharacter = character;
-      } else {
-        _selectedCharacter = ''; // It's a custom uploaded character
-        _customCharacterColorKey = CharacterHelper.getColorKey(character);
+      
+      if (widget.storyToEdit!.audioUrl != null && widget.storyToEdit!.audioUrl!.isNotEmpty) {
+        _initAudio(UrlSource(widget.storyToEdit!.audioUrl!));
       }
       if (widget.storyToEdit!.timelineData != null) {
         try {
@@ -68,7 +71,65 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     _titleController.dispose();
     _contentController.dispose();
     _contentBloc.close();
+    _playerStateSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _positionSubscription?.cancel();
+    _audioPlayer?.dispose();
+    _positionNotifier.dispose();
     super.dispose();
+  }
+
+  Future<void> _initAudio(Source source) async {
+    _audioPlayer?.dispose();
+    _playerStateSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _positionSubscription?.cancel();
+    
+    _audioPlayer = AudioPlayer();
+    
+    _playerStateSubscription = _audioPlayer!.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+        if (!_isPlaying && state == PlayerState.completed) {
+          _positionNotifier.value = Duration.zero;
+        }
+      }
+    });
+
+    _durationSubscription = _audioPlayer!.onDurationChanged.listen((duration) {
+      if (mounted) {
+        setState(() {
+          _totalDuration = duration;
+        });
+      }
+    });
+
+    _positionSubscription = _audioPlayer!.onPositionChanged.listen((position) {
+      if (mounted) {
+        _positionNotifier.value = position;
+      }
+    });
+
+    await _audioPlayer!.setReleaseMode(ReleaseMode.stop);
+    await _audioPlayer!.setSource(source);
+    // When changing audio, pause playback
+    setState(() {
+      _isPlaying = false;
+      _positionNotifier.value = Duration.zero;
+    });
+  }
+
+
+
+  void _togglePlayPause() async {
+    if (_audioPlayer == null) return;
+    if (_isPlaying) {
+      await _audioPlayer!.pause();
+    } else {
+      await _audioPlayer!.resume();
+    }
   }
 
   Future<void> _pickAudio() async {
@@ -124,6 +185,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       setState(() {
                         _audioFile = File(pickedPath);
                       });
+                      _initAudio(DeviceFileSource(pickedPath));
                     }
                   }
                 } catch (e) {
@@ -265,7 +327,6 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         if (pickedPath != null) {
           setState(() {
             _characterFile = File(pickedPath);
-            _selectedCharacter = ''; // Clear selection since custom is picked
           });
         }
       }
@@ -280,12 +341,18 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
-      String charName = _selectedCharacter;
+      String charName = 'qort'; // Default character
+      
+      if (_timeline != null && _timeline!.blocks.isNotEmpty) {
+        charName = _timeline!.blocks.first.characterId;
+      } else if (widget.storyToEdit != null && widget.storyToEdit!.characterName.isNotEmpty) {
+        charName = widget.storyToEdit!.characterName;
+      }
+      
       if (_characterFile != null) {
-        charName =
-            'custom|$_customCharacterColorKey|${CharacterHelper.getCleanName(_customCharacterColorKey)}';
-      } else if (_selectedCharacter.isEmpty) {
-        charName = widget.storyToEdit?.characterName ?? '';
+        // We will default the custom model to use 'fort' color scheme if no timeline is provided.
+        // Or if timeline is provided, we use the color scheme of the first character.
+        charName = 'custom|${CharacterHelper.getColorKey(charName)}|مخصصة';
       }
 
       final story = StoryEntity(
@@ -376,6 +443,30 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                       Expanded(
                         child: ListView(
                           children: [
+
+                            if (_audioFile == null)
+                              TextFormField(
+                                readOnly: true,
+                                onTap: _pickAudio,
+                                decoration: const InputDecoration(
+                                  hintText: 'إرفاق ملف صوتي',
+                                ),
+                              ),
+                            if (_audioFile != null) ...[
+                              const SizedBox(height: 16),
+                              StoryTimelineEditor(
+                                audioFile: _audioFile!,
+                                initialTimeline: _timeline,
+                                positionNotifier: _positionNotifier,
+                                audioPlayer: _audioPlayer,
+                                isPlaying: _isPlaying,
+                                onTogglePlay: _togglePlayPause,
+                                onTimelineChanged: (val) {
+                                  setState(() => _timeline = val);
+                                },
+                              ),
+                            ],
+                            const SizedBox(height: 24),
                             TextFormField(
                               controller: _titleController,
                               decoration: const InputDecoration(
@@ -384,312 +475,13 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                               validator: (val) =>
                                   val == null || val.isEmpty ? 'مطلوب' : null,
                             ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'الشخصية الراوية',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 12),
-                            // Big 3D Viewer for the selected avatar
-                            Container(
-                              height: 250,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceVariant.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(
-                                  AppColors.border_radius,
-                                ),
-                                border: Border.all(
-                                  color: AppColors.inputBorder,
-                                  width: 2,
-                                ),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: SmartCharacterViewer(
-                                characterName: _characterFile != null
-                                    ? 'file://${_characterFile!.path}'
-                                    : _selectedCharacter,
-                              ),
-                            ),
                             const SizedBox(height: 16),
-                            // Selection Grid
-                            Align(
-                              alignment: AlignmentDirectional.centerEnd,
-                              child: TextButton.icon(
-                                icon: const Icon(Icons.animation),
-                                label: const Text('تجربة حركات الشخصية'),
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        const CharacterStudioScreen(),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 5,
-                                    crossAxisSpacing: 8,
-                                    mainAxisSpacing: 8,
-                                  ),
-                              itemCount: _avatars.length,
-                              itemBuilder: (context, index) {
-                                final avatar = _avatars[index];
-                                final isSelected = _selectedCharacter
-                                    .toLowerCase()
-                                    .contains(avatar);
-                                final displayName =
-                                    CharacterHelper.getCleanName(avatar);
-                                final charColor = CharacterHelper.getColor(
-                                  avatar,
-                                );
-
-                                return GestureDetector(
-                                  onTap: () => setState(
-                                    () => _selectedCharacter = avatar,
-                                  ),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(
-                                        AppColors.border_radius,
-                                      ),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? charColor
-                                            : Colors.transparent,
-                                        width: 3,
-                                      ),
-                                      color: isSelected
-                                          ? charColor.withOpacity(0.15)
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.surface,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        displayName,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected
-                                              ? charColor
-                                              : Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            // Upload custom 3D character button
-                            InkWell(
-                              onTap: _pickCharacter,
-                              borderRadius: BorderRadius.circular(
-                                AppColors.border_radius,
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(
-                                    AppColors.border_radius,
-                                  ),
-                                  border: Border.all(
-                                    color: AppColors.inputBorder,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _characterFile != null
-                                            ? 'الشخصية: ${_characterFile!.path.split('/').last}'
-                                            : 'أو ارفع شخصية مخصصة (3D)',
-                                        style: TextStyle(
-                                          color: _characterFile != null
-                                              ? Colors.black87
-                                              : Colors.grey.shade500,
-                                          fontSize: 16,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Icon(
-                                      _characterFile != null
-                                          ? Icons.check_circle
-                                          : Icons.upload_file,
-                                      color: _characterFile != null
-                                          ? Colors.green
-                                          : Colors.grey.shade500,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (_characterFile != null) ...[
-                              const SizedBox(height: 16),
-                              Text(
-                                'اختر ثيم ولون الشخصية المخصصة',
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: _avatars.map((avatar) {
-                                  final charColor = CharacterHelper.getColor(
-                                    avatar,
-                                  );
-                                  final charName = CharacterHelper.getCleanName(
-                                    avatar,
-                                  );
-                                  final isSelected =
-                                      _customCharacterColorKey == avatar;
-                                  return GestureDetector(
-                                    onTap: () => setState(
-                                      () => _customCharacterColorKey = avatar,
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: charColor.withOpacity(
-                                              isSelected ? 1.0 : 0.3,
-                                            ),
-                                            border: Border.all(
-                                              color: isSelected
-                                                  ? AppColors.inputBorder
-                                                  : Colors.transparent,
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: isSelected
-                                              ? const Icon(
-                                                  Icons.check,
-                                                  color: Colors.white,
-                                                  size: 20,
-                                                )
-                                              : null,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          charName,
-                                          style: TextStyle(
-                                            fontWeight: isSelected
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                            color: isSelected
-                                                ? charColor
-                                                : Colors.grey.shade500,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: TextButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _characterFile = null;
-                                      _selectedCharacter = _avatars.first;
-                                    });
-                                  },
-                                  icon: const Icon(Icons.close, size: 18),
-                                  label: const Text('إلغاء الشخصية المخصصة'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 24),
-                            InkWell(
-                              onTap: _pickAudio,
-                              borderRadius: BorderRadius.circular(
-                                AppColors.border_radius,
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(
-                                    AppColors.border_radius,
-                                  ),
-                                  border: Border.all(
-                                    color: AppColors.inputBorder,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _audioFile != null
-                                            ? 'ملف الصوت: ${_audioFile!.path.split('/').last}'
-                                            : 'إرفاق ملف صوتي (اختياري)',
-                                        style: TextStyle(
-                                          color: _audioFile != null
-                                              ? Colors.black87
-                                              : Colors.grey.shade500,
-                                          fontSize: 16,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Icon(
-                                      _audioFile != null
-                                          ? Icons.check_circle
-                                          : Icons.audiotrack,
-                                      color: _audioFile != null
-                                          ? Colors.green
-                                          : Colors.grey.shade500,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (_audioFile != null) ...[
-                              const SizedBox(height: 16),
-                              StoryTimelineEditor(
-                                audioFile: _audioFile!,
-                                initialTimeline: _timeline,
-                                onTimelineChanged: (val) {
-                                  setState(() => _timeline = val);
-                                },
-                              ),
-                            ],
-                            const SizedBox(height: 24),
                             TextFormField(
                               controller: _contentController,
                               decoration: const InputDecoration(
                                 hintText: 'محتوى القصة',
                               ),
-                              maxLines: 10,
+                              maxLines: 4,
                               validator: (val) =>
                                   val == null || val.isEmpty ? 'مطلوب' : null,
                             ),

@@ -53,6 +53,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
   Timer? _fallbackTimer;
   final Stopwatch _fallbackClock = Stopwatch();
+  Timer? _pollingTimer;
 
   @override
   void initState() {
@@ -85,6 +86,9 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
             _isPlaying =
                 state == PlayerState.playing && _playRequested && _isAppActive;
           });
+          if (_isPlaying) {
+            _startPositionPolling(player, generation);
+          }
         }
       }),
       player.onPlayerComplete.listen((_) {
@@ -97,6 +101,22 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
         }
       }, onError: (Object error) => _onAudioError(error, generation)),
     ]);
+  }
+
+  void _startPositionPolling(AudioPlayer player, int generation) {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
+      if (!mounted || !_isPlaying || !_isCurrentScene(generation)) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final pos = await player.getCurrentPosition();
+        if (pos != null && _hasAudio) {
+          _positionNotifier.value = pos;
+        }
+      } catch (_) {}
+    });
   }
 
   void _onAudioError(Object error, int generation) {
@@ -112,6 +132,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       unawaited(subscription.cancel());
     }
     _audioSubscriptions.clear();
+    _pollingTimer?.cancel();
     final player = _audioPlayer;
     _audioPlayer = null;
     _audioCommands = Future<void>.value();
@@ -147,7 +168,9 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     final audioUrl = currentStory.audioUrl?.trim() ?? '';
     if (currentStory.timelineData != null) {
       try {
-        _currentTimeline = StoryTimeline.fromJson(jsonDecode(currentStory.timelineData!));
+        _currentTimeline = StoryTimeline.fromJson(
+          jsonDecode(currentStory.timelineData!),
+        );
       } catch (_) {
         _currentTimeline = null;
       }
@@ -526,236 +549,261 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
                         // Interactive Tap Areas & 3D Character
                         Expanded(
-                          child: Stack(
-                            children: [
-                              // 3D Character Viewer
-                              Container(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(
-                                    AppColors.border_radius,
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: CharacterHelper.getColor(
-                                        story.characterName,
-                                      ).withValues(alpha: 0.2),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    AppColors.border_radius,
-                                  ),
-                                  child: RepaintBoundary(
-                                    child: ValueListenableBuilder<Duration>(
-                                      valueListenable: _positionNotifier,
-                                      builder: (context, position, child) {
-                                        String activeChar = story.characterName;
-                                        if (_currentTimeline != null) {
-                                          final t = position.inMilliseconds / 1000.0;
-                                          activeChar = _currentTimeline!.getActiveCharacterAt(t) ?? story.characterName;
-                                        }
-                                        return SmartCharacterViewer(
-                                          characterName: activeChar,
-                                          storyText: '${story.title}\n${story.content}',
-                                          isPlaying: _isPlaying,
-                                          isSpeaking: _hasAudio && _isPlaying,
-                                          playbackPosition: _positionNotifier,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                          child: ValueListenableBuilder<Duration>(
+                            valueListenable: _positionNotifier,
+                            builder: (context, position, child) {
+                              String activeChar = story.characterName;
+                              if (_currentTimeline != null) {
+                                final t = position.inMilliseconds / 1000.0;
+                                activeChar =
+                                    _currentTimeline!.getActiveCharacterAt(t) ??
+                                    story.characterName;
+                              }
 
-                        const SizedBox(height: 16),
-
-                        // Text and Controls Area
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(
-                              AppColors.border_radius,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              return Column(
                                 children: [
-                                  Text(
-                                    _isPlaying
-                                        ? 'جارٍ القراءة...'
-                                        : 'متوقف مؤقتاً',
-                                    style: TextStyle(
-                                      color: _isPlaying
-                                          ? Colors.green
-                                          : Colors.orange,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
+                                  Expanded(
+                                    child: Stack(
+                                      children: [
+                                        // 3D Character Viewer
+                                        Container(
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              AppColors.border_radius,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: CharacterHelper.getColor(
+                                                  activeChar,
+                                                ).withValues(alpha: 0.2),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 5),
+                                              ),
+                                            ],
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              AppColors.border_radius,
+                                            ),
+                                            child: RepaintBoundary(
+                                              child: SmartCharacterViewer(
+                                                characterName: activeChar,
+                                                storyText:
+                                                    '${story.title}\n${story.content}',
+                                                isPlaying: _isPlaying,
+                                                isSpeaking:
+                                                    _hasAudio && _isPlaying,
+                                                playbackPosition:
+                                                    _positionNotifier,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  Flexible(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 4,
+                                  const SizedBox(height: 16),
+                                  // Text and Controls Area
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(
+                                        AppColors.border_radius,
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: CharacterHelper.getColor(
-                                          story.characterName,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.05,
+                                          ),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 5),
                                         ),
-                                        borderRadius: BorderRadius.circular(
-                                          AppColors.border_radius,
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _isPlaying
+                                                  ? 'جارٍ القراءة...'
+                                                  : 'متوقف مؤقتاً',
+                                              style: TextStyle(
+                                                color: _isPlaying
+                                                    ? Colors.green
+                                                    : Colors.orange,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Flexible(
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      CharacterHelper.getColor(
+                                                        activeChar,
+                                                      ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        AppColors.border_radius,
+                                                      ),
+                                                ),
+                                                child: Text(
+                                                  CharacterHelper.getCleanName(
+                                                    activeChar,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                      child: Text(
-                                        CharacterHelper.getCleanName(
-                                          story.characterName,
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          story.content,
+                                          style: const TextStyle(
+                                            color: Color(0xFF2C3E50),
+                                            fontSize: 14,
+                                            height: 1.6,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          textAlign: TextAlign.right,
+                                          textDirection: TextDirection.rtl,
                                         ),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
+                                        const SizedBox(height: 24),
+                                        // Media Controls
+                                        Center(
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(
+                                                alpha: 0.05,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    AppColors.border_radius,
+                                                  ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (_hasAudio) ...[
+                                                  IconButton(
+                                                    icon: Icon(
+                                                      _isMuted
+                                                          ? Icons.volume_off
+                                                          : Icons.volume_up,
+                                                      color:
+                                                          CharacterHelper.getColor(
+                                                            activeChar,
+                                                          ),
+                                                    ),
+                                                    onPressed: _toggleMute,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                ],
+                                                IconButton(
+                                                  icon: Icon(
+                                                    (_audioPlayer != null &&
+                                                                !_hasAudio
+                                                            ? _playRequested
+                                                            : _isPlaying)
+                                                        ? Icons.pause
+                                                        : Icons.play_arrow,
+                                                    color:
+                                                        CharacterHelper.getColor(
+                                                          activeChar,
+                                                        ),
+                                                  ),
+                                                  onPressed: _togglePlayPause,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                IconButton(
+                                                  icon: Icon(
+                                                    Icons.replay,
+                                                    color:
+                                                        CharacterHelper.getColor(
+                                                          activeChar,
+                                                        ),
+                                                  ),
+                                                  onPressed: _restartMission,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
-                                        overflow: TextOverflow.ellipsis,
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Bottom Action Button
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0,
+                                      vertical: 8.0,
+                                    ),
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      height: 56,
+                                      child: FilledButton(
+                                        onPressed: _nextStory,
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor:
+                                              CharacterHelper.getColor(
+                                                activeChar,
+                                              ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              AppColors.border_radius,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _currentIndex < _stories.length - 1
+                                              ? 'متابعة المشهد'
+                                              : 'إنهاء القصة والتحدي',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                story.content,
-                                style: const TextStyle(
-                                  color: Color(0xFF2C3E50),
-                                  fontSize: 14,
-                                  height: 1.6,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.right,
-                                textDirection: TextDirection.rtl,
-                              ),
-                              const SizedBox(height: 24),
-                              // Media Controls
-                              Center(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    borderRadius: BorderRadius.circular(
-                                      AppColors.border_radius,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (_hasAudio) ...[
-                                        IconButton(
-                                          icon: Icon(
-                                            _isMuted
-                                                ? Icons.volume_off
-                                                : Icons.volume_up,
-                                            color: CharacterHelper.getColor(
-                                              story.characterName,
-                                            ),
-                                          ),
-                                          onPressed: _toggleMute,
-                                        ),
-                                        const SizedBox(width: 8),
-                                      ],
-                                      IconButton(
-                                        icon: Icon(
-                                          (_audioPlayer != null && !_hasAudio
-                                                  ? _playRequested
-                                                  : _isPlaying)
-                                              ? Icons.pause
-                                              : Icons.play_arrow,
-                                          color: CharacterHelper.getColor(
-                                            story.characterName,
-                                          ),
-                                        ),
-                                        onPressed: _togglePlayPause,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: Icon(
-                                          Icons.replay,
-                                          color: CharacterHelper.getColor(
-                                            story.characterName,
-                                          ),
-                                        ),
-                                        onPressed: _restartMission,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Bottom Action Button
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 8.0,
-                          ),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: FilledButton(
-                              onPressed: _nextStory,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: CharacterHelper.getColor(
-                                  story.characterName,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    AppColors.border_radius,
-                                  ),
-                                ),
-                              ),
-                              child: Text(
-                                _currentIndex < _stories.length - 1
-                                    ? 'متابعة المشهد'
-                                    : 'إنهاء القصة والتحدي',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ),
                       ],

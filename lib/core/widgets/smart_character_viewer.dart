@@ -20,7 +20,8 @@ class _CharacterModelBytesCache {
   static Future<Uint8List> loadAsset(String assetPath) {
     return _assets.putIfAbsent(assetPath, () async {
       final data = await rootBundle.load(assetPath);
-      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      final view = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      return Uint8List.fromList(view);
     });
   }
 }
@@ -146,22 +147,18 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       size: widget.size,
       settings: three.Settings(
         clearColor: 0xF4F7F5,
-        // Disable MSAA and shadows — this is a stylized character, these
-        // features consume GPU memory without visible benefit on mobile.
-        antialias: false,
+        // Enable MSAA for smooth stylized cartoon edges
+        antialias: true,
         enableShadowMap: false,
         toneMapping: three.NoToneMapping,
         // SurfaceProducer API causes shader validation errors on many Android
         // devices. Fall back to the older texture path on native platforms.
         useSurfaceProducer: kIsWeb,
-        // Stencil buffer is unused; disabling it reduces driver state changes.
         stencil: false,
-        // mediump is sufficient for this cartoon character and avoids
-        // precision-related GL errors on older Mali and Adreno GPUs.
-        precision: three.Precision.mediump,
+        precision: three.Precision.highp, // higher precision for better quality
         screenResolution: _compatibilityMode
-            ? 0.6
-            : (!kIsWeb && (Platform.isAndroid || Platform.isIOS) ? 0.85 : 1.0),
+            ? 0.8
+            : (!kIsWeb && (Platform.isAndroid || Platform.isIOS) ? 1.0 : 2.0),
       ),
       setup: () => _setup(generation),
       onError: (error, stack) {
@@ -465,6 +462,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   void didUpdateWidget(covariant _CharacterSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     final old = oldWidget.configuration;
+    debugPrint('SmartCharacterViewer didUpdateWidget: old=${old.characterName}, new=${config.characterName}');
     if (old.characterName != config.characterName) _recolor();
     if (old.storyText != config.storyText) {
       _plan = StoryMotionPlan.fromText(config.storyText);
@@ -575,17 +573,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
               ),
             ),
           if (!_ready && _error == null)
-            const Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: EdgeInsets.only(top: 14),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
+            const SizedBox.shrink(),
           if (_error != null)
             Align(
               alignment: Alignment.bottomCenter,

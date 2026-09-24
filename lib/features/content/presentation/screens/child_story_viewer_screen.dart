@@ -63,7 +63,9 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     _isAppActive = lifecycle == null || lifecycle == AppLifecycleState.resumed;
     _contentBloc = sl<ContentBloc>();
-    _contentBloc.add(ContentEvent.getStories(widget.mission.id, forceRefresh: true));
+    _contentBloc.add(
+      ContentEvent.getStories(widget.mission.id),
+    );
   }
 
   bool _isCurrentScene(int generation) =>
@@ -106,7 +108,9 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
   void _startPositionPolling(AudioPlayer player, int generation) {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
+    _pollingTimer = Timer.periodic(const Duration(milliseconds: 100), (
+      timer,
+    ) async {
       if (!mounted || !_isPlaying || !_isCurrentScene(generation)) {
         timer.cancel();
         return;
@@ -242,8 +246,10 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       ..reset();
     setState(() {
       _hasAudio = false;
-      _totalDuration = _currentTimeline != null 
-          ? Duration(milliseconds: (_currentTimeline!.totalDuration * 1000).round()) 
+      _totalDuration = _currentTimeline != null
+          ? Duration(
+              milliseconds: (_currentTimeline!.totalDuration * 1000).round(),
+            )
           : const Duration(seconds: 10);
       _isPlaying = _playRequested && _isAppActive;
     });
@@ -341,6 +347,16 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       // Finished all stories
       _stopPlayback();
       context.pushReplacement('/child/quiz-intro', extra: widget.mission);
+    }
+  }
+
+  void _previousStory() {
+    if (!mounted || _leaving) return;
+    if (_currentIndex > 0) {
+      setState(() {
+        _currentIndex--;
+      });
+      _startStory();
     }
   }
 
@@ -551,6 +567,46 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
                         const SizedBox(height: 8),
 
+                        // Subtitles (Outside, Top)
+                        if (story.content.trim().isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(
+                                color: AppColors.inputBorder,
+                                width: 1.5,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                AppColors.border_radius,
+                              ),
+                            ),
+                            width: double.infinity,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 80),
+                              child: SingleChildScrollView(
+                                child: Text(
+                                  story.content,
+                                  style: const TextStyle(
+                                    color: AppColors.secondary,
+                                    fontSize: 16,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  textDirection: TextDirection.rtl,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        if (story.content.trim().isNotEmpty)
+                          const SizedBox(height: 8),
+
                         // Interactive Tap Areas & 3D Character
                         Expanded(
                           child: ValueListenableBuilder<Duration>(
@@ -560,14 +616,22 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                               CharacterMotion? activeMotion;
                               if (_currentTimeline != null) {
                                 final t = position.inMilliseconds / 1000.0;
-                                activeChar = _currentTimeline!.getActiveCharacterAt(t) ??
-                                    (_currentTimeline!.blocks.isNotEmpty ? _currentTimeline!.blocks.first.characterId : story.characterName);
-                                final motionId = _currentTimeline!.getActiveMotionAt(t);
+                                activeChar =
+                                    _currentTimeline!.getActiveCharacterAt(t) ??
+                                    (_currentTimeline!.blocks.isNotEmpty
+                                        ? _currentTimeline!
+                                              .blocks
+                                              .first
+                                              .characterId
+                                        : story.characterName);
+                                final motionId = _currentTimeline!
+                                    .getActiveMotionAt(t);
                                 if (motionId != null) {
-                                  activeMotion = CharacterMotion.values.firstWhere(
-                                    (m) => m.name == motionId,
-                                    orElse: () => CharacterMotion.idle,
-                                  );
+                                  activeMotion = CharacterMotion.values
+                                      .firstWhere(
+                                        (m) => m.name == motionId,
+                                        orElse: () => CharacterMotion.idle,
+                                      );
                                 }
                               }
 
@@ -575,21 +639,32 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                 children: [
                                   Expanded(
                                     child: Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
-                                        borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                        border: Border.all(color: Colors.white, width: 2),
+                                        borderRadius: BorderRadius.circular(
+                                          AppColors.border_radius,
+                                        ),
+                                        border: Border.all(
+                                          color: AppColors.inputBorder,
+                                          width: 1.5,
+                                        ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: CharacterHelper.getColor(activeChar).withValues(alpha: 0.2),
+                                            color: CharacterHelper.getColor(
+                                              activeChar,
+                                            ).withValues(alpha: 0.2),
                                             blurRadius: 10,
                                             offset: const Offset(0, 5),
                                           ),
                                         ],
                                       ),
                                       child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                        borderRadius: BorderRadius.circular(
+                                          AppColors.border_radius,
+                                        ),
                                         child: Stack(
                                           children: [
                                             // 3D Character Viewer (Full area)
@@ -597,116 +672,181 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                               child: RepaintBoundary(
                                                 child: SmartCharacterViewer(
                                                   characterName: activeChar,
-                                                  storyText: '${story.title}\n${story.content}',
+                                                  storyText:
+                                                      '${story.title}\n${story.content}',
                                                   isPlaying: _isPlaying,
-                                                  isSpeaking: _hasAudio && _isPlaying,
-                                                  playbackPosition: _positionNotifier,
+                                                  isSpeaking:
+                                                      _hasAudio && _isPlaying,
+                                                  playbackPosition:
+                                                      _positionNotifier,
                                                   motion: activeMotion,
                                                 ),
                                               ),
                                             ),
 
-                                            // Subtitles Overlay (Bottom, above controls)
-                                            if (story.content.trim().isNotEmpty)
-                                              Positioned(
-                                                left: 16,
-                                                right: 16,
-                                                bottom: 80, // Space for controls
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black.withValues(alpha: 0.6),
-                                                    borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                                  ),
-                                                  child: ConstrainedBox(
-                                                    constraints: const BoxConstraints(maxHeight: 80),
-                                                    child: SingleChildScrollView(
-                                                      child: Text(
-                                                        story.content,
-                                                        style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 16,
-                                                          height: 1.5,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                        textAlign: TextAlign.center,
-                                                        textDirection: TextDirection.rtl,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-
-                                            // Video Player Controls (Bottom)
+                                            // Character Name (Top Center)
                                             Positioned(
+                                              top: 16,
                                               left: 0,
                                               right: 0,
-                                              bottom: 0,
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                                decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    begin: Alignment.bottomCenter,
-                                                    end: Alignment.topCenter,
-                                                    colors: [
-                                                      Colors.black.withValues(alpha: 0.5),
-                                                      Colors.transparent,
-                                                    ],
+                                              child: Center(
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 8,
                                                   ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    // Replay Button
-                                                    IconButton(
-                                                      icon: const Icon(Icons.replay, color: Colors.white, size: 28),
-                                                      onPressed: _restartMission,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.transparent,
+                                                    border: Border.all(
+                                                      color: AppColors.inputBorder,
+                                                      width: 1.5,
                                                     ),
-                                                    const SizedBox(width: 24),
-                                                    // Play/Pause Button
-                                                    GestureDetector(
-                                                      onTap: _togglePlayPause,
-                                                      child: Container(
-                                                        padding: const EdgeInsets.all(12),
-                                                        decoration: BoxDecoration(
-                                                          color: CharacterHelper.getColor(activeChar),
-                                                          shape: BoxShape.circle,
-                                                          boxShadow: [
-                                                            BoxShadow(
-                                                              color: CharacterHelper.getColor(activeChar).withValues(alpha: 0.5),
-                                                              blurRadius: 8,
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        child: Icon(
-                                                          (_audioPlayer != null && !_hasAudio ? _playRequested : _isPlaying)
-                                                              ? Icons.pause
-                                                              : Icons.play_arrow,
-                                                          color: Colors.white,
-                                                          size: 32,
-                                                        ),
-                                                      ),
+                                                    borderRadius: BorderRadius.circular(
+                                                      AppColors.border_radius,
                                                     ),
-                                                    const SizedBox(width: 24),
-                                                    // Mute Button
-                                                    if (_hasAudio)
-                                                      IconButton(
-                                                        icon: Icon(
-                                                          _isMuted ? Icons.volume_off : Icons.volume_up,
-                                                          color: Colors.white,
-                                                          size: 28,
-                                                        ),
-                                                        onPressed: _toggleMute,
-                                                      )
-                                                    else
-                                                      const SizedBox(width: 44), // To balance the row if no audio
-                                                  ],
+                                                  ),
+                                                  child: Text(
+                                                    CharacterHelper.getCleanName(activeChar),
+                                                    style: const TextStyle(
+                                                      color: AppColors.secondary,
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ),
+
+                                            // Previous Button (Right Side)
+                                            Positioned(
+                                              right: 0,
+                                              top: 0,
+                                              bottom: 0,
+                                              width: 50,
+                                              child: GestureDetector(
+                                                onTap: _currentIndex > 0 ? _previousStory : null,
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      begin: Alignment.centerRight,
+                                                      end: Alignment.centerLeft,
+                                                      colors: [
+                                                        CharacterHelper.getColor(activeChar).withValues(alpha: 0.5),
+                                                        CharacterHelper.getColor(activeChar).withValues(alpha: 0.0),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  child: Center(
+                                                    child: _currentIndex > 0 
+                                                        ? const Icon(
+                                                            Icons.chevron_left,
+                                                            color: Colors.black,
+                                                            size: 40,
+                                                          )
+                                                        : const SizedBox(),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Next Button (Left Side)
+                                            Positioned(
+                                              left: 0,
+                                              top: 0,
+                                              bottom: 0,
+                                              width: 50,
+                                              child: GestureDetector(
+                                                onTap: _nextStory,
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    gradient: LinearGradient(
+                                                      begin: Alignment.centerLeft,
+                                                      end: Alignment.centerRight,
+                                                      colors: [
+                                                        CharacterHelper.getColor(activeChar).withValues(alpha: 0.5),
+                                                        CharacterHelper.getColor(activeChar).withValues(alpha: 0.0),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  child: const Center(
+                                                    child: Icon(
+                                                      Icons.chevron_right,
+                                                      color: Colors.black,
+                                                      size: 40,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+
+
+
                                           ],
                                         ),
                                       ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Video Player Controls (Bottom)
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      border: Border.all(
+                                        color: AppColors.inputBorder,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        // Replay Button
+                                        IconButton(
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.grey.shade200,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.replay,
+                                            color: AppColors.secondary,
+                                            size: 28,
+                                          ),
+                                          onPressed: _restartMission,
+                                        ),
+                                        const SizedBox(width: 24),
+                                        // Play/Pause Button
+                                        IconButton(
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.grey.shade200,
+                                            padding: const EdgeInsets.all(12),
+                                          ),
+                                          icon: Icon(
+                                            (_audioPlayer != null && !_hasAudio ? _playRequested : _isPlaying)
+                                                ? Icons.pause
+                                                : Icons.play_arrow,
+                                            color: AppColors.secondary,
+                                            size: 32,
+                                          ),
+                                          onPressed: _togglePlayPause,
+                                        ),
+                                        const SizedBox(width: 24),
+                                        // Mute Button
+                                        if (_hasAudio)
+                                          IconButton(
+                                            style: IconButton.styleFrom(
+                                              backgroundColor: Colors.grey.shade200,
+                                            ),
+                                            icon: Icon(
+                                              _isMuted ? Icons.volume_off : Icons.volume_up,
+                                              color: AppColors.secondary,
+                                              size: 28,
+                                            ),
+                                            onPressed: _toggleMute,
+                                          )
+                                        else
+                                          const SizedBox(width: 44),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(height: 16),
@@ -722,19 +862,24 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                       child: FilledButton(
                                         onPressed: _nextStory,
                                         style: FilledButton.styleFrom(
-                                          backgroundColor: CharacterHelper.getColor(activeChar),
+                                          backgroundColor:
+                                              CharacterHelper.getColor(
+                                                activeChar,
+                                              ),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                            borderRadius: BorderRadius.circular(
+                                              AppColors.border_radius,
+                                            ),
                                           ),
                                         ),
                                         child: Text(
                                           _currentIndex < _stories.length - 1
                                               ? 'متابعة المشهد'
                                               : 'إنهاء القصة والتحدي',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                            color: CharacterHelper.getColor(activeChar).computeLuminance() > 0.5 ? Colors.black : Colors.white,
                                           ),
                                         ),
                                       ),

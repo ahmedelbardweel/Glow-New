@@ -133,22 +133,26 @@ class SyncService {
         await localDataSource.cacheMissions(world.id, remoteMissions);
 
         await Future.wait(remoteMissions.map((mission) async {
-          final storiesFuture = remoteDataSource.getStories(mission.id);
-          final questionsFuture = remoteDataSource.getQuestions(mission.id);
-          final remoteStories = await storiesFuture;
-          final remoteQuestions = await questionsFuture;
+          try {
+            final storiesFuture = remoteDataSource.getStories(mission.id);
+            final questionsFuture = remoteDataSource.getQuestions(mission.id);
+            final remoteStories = await storiesFuture;
+            final remoteQuestions = await questionsFuture;
 
-          await localDataSource.cacheStories(mission.id, remoteStories);
-          await localDataSource.cacheQuestions(mission.id, remoteQuestions);
+            await localDataSource.cacheStories(mission.id, remoteStories);
+            await localDataSource.cacheQuestions(mission.id, remoteQuestions);
 
             for (var story in remoteStories) {
               resourceManager.cacheCharacterModels(story.characterName, story.timelineData);
-            if (story.audioUrl != null && story.audioUrl!.isNotEmpty) {
-              mediaTasks.add(resourceManager.downloadAndCacheFile(story.audioUrl!, folder: 'audio'));
+              if (story.audioUrl != null && story.audioUrl!.isNotEmpty) {
+                mediaTasks.add(resourceManager.downloadAndCacheFile(story.audioUrl!, folder: 'audio'));
+              }
+              if (story.imageUrl.isNotEmpty) {
+                mediaTasks.add(resourceManager.downloadAndCacheFile(story.imageUrl, folder: 'images'));
+              }
             }
-            if (story.imageUrl.isNotEmpty) {
-              mediaTasks.add(resourceManager.downloadAndCacheFile(story.imageUrl, folder: 'images'));
-            }
+          } catch (e) {
+            debugPrint('Failed to sync mission ${mission.id}: $e');
           }
         }));
       }));

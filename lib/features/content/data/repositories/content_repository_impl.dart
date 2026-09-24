@@ -52,7 +52,10 @@ class ContentRepositoryImpl implements ContentRepository {
           await localDataSource.cacheWorlds(worlds);
           return Right(worlds);
         } catch (e) {
-          return Left(ServerFailure(e.toString()));
+          if (cachedWorlds.isNotEmpty) {
+            return Right(cachedWorlds);
+          }
+          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
         }
       }
     } else {
@@ -105,7 +108,10 @@ class ContentRepositoryImpl implements ContentRepository {
           await localDataSource.cacheMissions(worldId, missions);
           return Right(missions);
         } catch (e) {
-          return Left(ServerFailure(e.toString()));
+          if (cachedMissions.isNotEmpty) {
+            return Right(cachedMissions);
+          }
+          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
         }
       }
     } else {
@@ -168,7 +174,10 @@ class ContentRepositoryImpl implements ContentRepository {
           await localDataSource.cacheStories(missionId, stories);
           return Right(stories);
         } catch (e) {
-          return Left(ServerFailure(e.toString()));
+          if (cachedStories.isNotEmpty) {
+            return Right(cachedStories);
+          }
+          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
         }
       }
     } else {
@@ -215,7 +224,10 @@ class ContentRepositoryImpl implements ContentRepository {
           await localDataSource.cacheQuestions(missionId, questions);
           return Right(questions);
         } catch (e) {
-          return Left(ServerFailure(e.toString()));
+          if (cachedQuestions.isNotEmpty) {
+            return Right(cachedQuestions);
+          }
+          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
         }
       }
     } else {
@@ -268,13 +280,11 @@ class ContentRepositoryImpl implements ContentRepository {
         starsReward: matchedMission?.starsReward,
       );
 
-      // 3. Sync to Supabase if connected, otherwise queue for later
+      // 3. Sync to Supabase in background if connected, otherwise queue for later
       if (await networkInfo.isConnected) {
-        try {
-          await remoteDataSource.completeMission(missionId, childId);
-        } catch (_) {
+        remoteDataSource.completeMission(missionId, childId).catchError((_) async {
           await localDataSource.addPendingCompletion(childId, missionId);
-        }
+        });
       } else {
         await localDataSource.addPendingCompletion(childId, missionId);
       }
@@ -290,15 +300,24 @@ class ContentRepositoryImpl implements ContentRepository {
     final cachedProgress = await localDataSource.getCachedChildProgress(childId);
 
     if (await networkInfo.isConnected) {
-      try {
-        final progressList = await remoteDataSource.getCompletedMissions(childId);
+      // Background sync
+      remoteDataSource.getCompletedMissions(childId).then((progressList) async {
         await localDataSource.cacheChildProgress(childId, progressList);
-        return Right(progressList);
-      } catch (e) {
-        if (cachedProgress.isNotEmpty) {
-          return Right(cachedProgress);
+      }).catchError((_) {});
+
+      if (cachedProgress.isNotEmpty) {
+        return Right(cachedProgress);
+      } else {
+        try {
+          final progressList = await remoteDataSource.getCompletedMissions(childId);
+          await localDataSource.cacheChildProgress(childId, progressList);
+          return Right(progressList);
+        } catch (e) {
+          if (cachedProgress.isNotEmpty) {
+            return Right(cachedProgress);
+          }
+          return Left(ServerFailure(e.toString()));
         }
-        return Left(ServerFailure(e.toString()));
       }
     } else {
       return Right(cachedProgress);

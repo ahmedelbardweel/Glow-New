@@ -15,16 +15,25 @@ class ChildProgressModel extends ChildProgressEntity {
     // If joined with missions table or loaded from local cache
     final missionData = json['missions'] as Map<String, dynamic>?;
     
+    // Safely parse starsReward to handle both int and double from JSON decode
+    dynamic starsRaw = missionData?['stars_reward'] ?? json['stars_reward'];
+    int? parsedStars;
+    if (starsRaw is num) {
+      parsedStars = starsRaw.toInt();
+    } else if (starsRaw is String) {
+      parsedStars = int.tryParse(starsRaw);
+    }
+
     return ChildProgressModel(
       id: (json['id'] as String?) ?? '',
-      childId: json['child_id'] as String,
-      missionId: json['mission_id'] as String,
+      childId: (json['child_id'] as String?) ?? '',
+      missionId: (json['mission_id'] as String?) ?? '',
       completedAt: json['completed_at'] != null 
-          ? DateTime.parse(json['completed_at'] as String) 
+          ? DateTime.tryParse(json['completed_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      missionTitle: (missionData?['title'] ?? json['mission_title']) as String?,
-      badgeName: (missionData?['badge_name'] ?? json['badge_name']) as String?,
-      starsReward: (missionData?['stars_reward'] ?? json['stars_reward']) as int?,
+      missionTitle: (missionData?['title'] ?? json['mission_title'])?.toString(),
+      badgeName: (missionData?['badge_name'] ?? json['badge_name'])?.toString(),
+      starsReward: parsedStars,
     );
   }
 

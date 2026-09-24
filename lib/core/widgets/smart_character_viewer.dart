@@ -10,6 +10,7 @@ import '../di/injection_container.dart';
 import '../services/resource_manager.dart';
 import '../services/character_asset_cache.dart';
 import '../utils/character_helper.dart';
+import 'mobile_character_viewer.dart';
 
 /// One skinned GLB with reusable animations and five material colors.
 /// Speaking uses a stylized cadence, not phoneme-based lip synchronization.
@@ -37,6 +38,21 @@ class SmartCharacterViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final source = CharacterHelper.getModelPath(characterName);
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.android)) {
+      return MobileCharacterViewer(
+        key: ValueKey(source),
+        characterName: characterName,
+        storyText: storyText,
+        isPlaying: isPlaying,
+        isSpeaking: isSpeaking,
+        interactive: interactive,
+        showSkeleton: showSkeleton,
+        motion: motion,
+        playbackPosition: playbackPosition,
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(
@@ -589,9 +605,11 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
               ),
             ),
           if (!_ready && _error == null)
-            const ColoredBox(
-              color: Color(0xFFF4F7F5),
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ColoredBox(
+              color: const Color(0xFFF4F7F5),
+              child: _GlowingLoader(
+                color: CharacterHelper.getColor(config.characterName),
+              ),
             ),
           if (_error != null)
             Align(
@@ -697,5 +715,59 @@ class _GuardedThreeJS extends three.ThreeJS {
         'Character native cleanup after initialization failure: $error',
       );
     }
+  }
+}
+
+class _GlowingLoader extends StatefulWidget {
+  final Color color;
+  const _GlowingLoader({required this.color});
+
+  @override
+  State<_GlowingLoader> createState() => _GlowingLoaderState();
+}
+
+class _GlowingLoaderState extends State<_GlowingLoader> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final value = Curves.easeInOutSine.transform(_controller.value);
+          return Container(
+            height: 100 + (50 * value),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  widget.color.withValues(alpha: 0.4 + (0.2 * value)),
+                  widget.color.withValues(alpha: 0.0),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

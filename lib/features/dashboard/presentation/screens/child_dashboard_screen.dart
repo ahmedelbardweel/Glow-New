@@ -1,3 +1,4 @@
+import 'package:Glow/core/network/network_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -56,34 +57,23 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
       });
     }
 
+    final isConnected = await sl<NetworkInfo>().isConnected;
+    if (!isConnected) {
+      _syncService.syncState.value = const SyncStatusState(
+        status: SyncStatus.offline,
+        message: 'وضع عدم الاتصال (أوفلاين)',
+      );
+    }
+
     _contentBloc.add(const ContentEvent.getWorlds());
     await _fetchProgress();
-    
-    _syncService.syncState.addListener(_onSyncStateChanged);
 
-    // Start background sync & network listener
-    _syncService.startAutoSyncListener(childId: childId);
-    _syncService.syncAll(childId: childId, silent: true).then((_) {
-      if (mounted) {
-        _contentBloc.add(const ContentEvent.getWorlds());
-        _fetchProgress();
-      }
-    });
+    _syncService.syncState.addListener(_onSyncStateChanged);
   }
 
   void _onSyncStateChanged() {
-    final state = _syncService.syncState.value;
-    if (state.status == SyncStatus.error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(state.message, style: const TextStyle(fontFamily: 'Cairo')),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 10),
-          ),
-        );
-      }
-    }
+    // Sync errors and success are now completely silent to the child.
+    // The top status bar icon (cloud) alone will reflect the current state.
   }
 
   Future<void> _fetchProgress() async {
@@ -282,7 +272,8 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
               valueListenable: _syncService.syncState,
               builder: (context, syncState, _) {
                 IconData icon;
-                if (syncState.isOffline) {
+                if (syncState.isOffline ||
+                    syncState.status == SyncStatus.error) {
                   icon = Icons.cloud_off_rounded;
                 } else if (syncState.status == SyncStatus.syncing) {
                   icon = Icons.cloud_sync_rounded;
@@ -307,12 +298,16 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                 );
               },
             ),
-            const SizedBox(width: 5,),
+            const SizedBox(width: 5),
             Padding(
               padding: const EdgeInsets.only(left: 10),
               child: InkWell(
                 onTap: () => showLogoutBottomSheet(context),
-                  child: const Icon(Icons.more_vert, color: Colors.black, size: 22)
+                child: const Icon(
+                  Icons.more_vert,
+                  color: Colors.black,
+                  size: 22,
+                ),
               ),
             ),
           ],
@@ -326,365 +321,342 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
             ),
           ),
           child: Column(
-              children: [
-                Expanded(
-                  child: BlocBuilder<ContentBloc, ContentState>(
-                    builder: (context, state) {
-                      return state.maybeWhen(
-                        loading: () => const ShimmerLoading(),
-                        error: (msg) => Center(
-                          child: Text(
-                            'خطأ: $msg',
-                            style: const TextStyle(color: Colors.red),
-                          ),
+            children: [
+              Expanded(
+                child: BlocBuilder<ContentBloc, ContentState>(
+                  builder: (context, state) {
+                    return state.maybeWhen(
+                      loading: () => const ShimmerLoading(),
+                      error: (msg) => Center(
+                        child: Text(
+                          'خطأ: $msg',
+                          style: const TextStyle(color: Colors.red),
                         ),
-                        worldsLoaded: (worlds) {
-                          Future<void> _handleRefresh() async {
-                            HapticFeedback.mediumImpact();
-                            _contentBloc.add(const ContentEvent.getWorlds());
-                            if (_childId != null) {
-                              _syncService.syncAll(
-                                childId: _childId,
-                                silent: true,
-                              );
-                            }
-                            await Future.delayed(
-                              const Duration(milliseconds: 800),
+                      ),
+                      worldsLoaded: (worlds) {
+                        Future<void> _handleRefresh() async {
+                          HapticFeedback.mediumImpact();
+                          _contentBloc.add(const ContentEvent.getWorlds());
+                          if (_childId != null) {
+                            _syncService.syncAll(
+                              childId: _childId,
+                              silent: true,
                             );
                           }
+                          await Future.delayed(
+                            const Duration(milliseconds: 800),
+                          );
+                        }
 
-                          if (worlds.isEmpty) {
-                            return RefreshIndicator(
-                              onRefresh: _handleRefresh,
-                              color: const Color(0xFF9B59B6),
-                              child: ListView(
-                                physics: const AlwaysScrollableScrollPhysics(
-                                  parent: BouncingScrollPhysics(),
-                                ),
-                                children: [
-                                  SizedBox(
-                                    height:
-                                        MediaQuery.of(context).size.height *
-                                        0.5,
-                                    child: const Center(
-                                      child: Text(
-                                        'لا توجد عوالم بعد. احبس أنفاسك واسحب للأسفل للتحديث!',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                        if (worlds.isEmpty) {
+                          return RefreshIndicator(
+                            onRefresh: _handleRefresh,
+                            color: const Color(0xFF9B59B6),
+                            child: ListView(
+                              physics: const AlwaysScrollableScrollPhysics(
+                                parent: BouncingScrollPhysics(),
+                              ),
+                              children: [
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.5,
+                                  child: const Center(
+                                    child: Text(
+                                      'لا توجد عوالم بعد. احبس أنفاسك واسحب للأسفل للتحديث!',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
-                            );
-                          }
+                                ),
+                              ],
+                            ),
+                          );
+                        }
 
-                          return ValueListenableBuilder<
-                            ({
-                              int stars,
-                              int badges,
-                              int completedMissionsCount,
-                            })
-                          >(
-                            valueListenable: _statsNotifier,
-                            builder: (context, stats, child) {
-                              return RefreshIndicator(
-                                onRefresh: _handleRefresh,
-                                color: const Color(0xFF9B59B6),
-                                child: ListView.builder(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
-                                  ),
-                                  cacheExtent: 500,
-                                  physics: const AlwaysScrollableScrollPhysics(
-                                    parent: BouncingScrollPhysics(),
-                                  ),
-                                  itemCount: worlds.length,
-                                  itemBuilder: (context, index) {
-                                    final world = worlds[index];
-                                    final bool isLocked =
-                                        index > 0 &&
-                                        stats.completedMissionsCount <
-                                            (index * 2);
+                        return ValueListenableBuilder<
+                          ({int stars, int badges, int completedMissionsCount})
+                        >(
+                          valueListenable: _statsNotifier,
+                          builder: (context, stats, child) {
+                            return RefreshIndicator(
+                              onRefresh: _handleRefresh,
+                              color: const Color(0xFF9B59B6),
+                              child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                cacheExtent: 500,
+                                physics: const AlwaysScrollableScrollPhysics(
+                                  parent: BouncingScrollPhysics(),
+                                ),
+                                itemCount: worlds.length,
+                                itemBuilder: (context, index) {
+                                  final world = worlds[index];
+                                  final bool isLocked =
+                                      index > 0 &&
+                                      stats.completedMissionsCount <
+                                          (index * 2);
 
-                                    return RepaintBoundary(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          if (isLocked) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'أكمل العالم السابق لفتح هذا العالم!',
-                                                ),
-                                                behavior:
-                                                    SnackBarBehavior.floating,
-                                                backgroundColor: Colors.orange,
+                                  return RepaintBoundary(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        if (isLocked) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'أكمل العالم السابق لفتح هذا العالم!',
                                               ),
-                                            );
-                                            HapticFeedback.heavyImpact();
-                                            return;
-                                          }
-                                          HapticFeedback.lightImpact();
-                                          context.push(
-                                            '/child/world-missions',
-                                            extra: world,
-                                          );
-                                        },
-                                        child: Container(
-                                          margin: const EdgeInsets.only(
-                                            bottom: 24,
-                                          ),
-                                          height: 200,
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(
-                                              AppColors.border_radius,
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                              backgroundColor: Colors.orange,
                                             ),
-                                            boxShadow: [
-                                              BoxShadow(
+                                          );
+                                          HapticFeedback.heavyImpact();
+                                          return;
+                                        }
+                                        HapticFeedback.lightImpact();
+                                        context.push(
+                                          '/child/world-missions',
+                                          extra: world,
+                                        );
+                                      },
+                                      child: Container(
+                                        margin: const EdgeInsets.only(
+                                          bottom: 24,
+                                        ),
+                                        height: 200,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            AppColors.border_radius,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: isLocked
+                                                  ? Colors.black.withOpacity(
+                                                      0.05,
+                                                    )
+                                                  : Colors.black.withOpacity(
+                                                      0.15,
+                                                    ),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 6),
+                                            ),
+                                          ],
+                                        ),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: Stack(
+                                          children: [
+                                            // Background Image with Offline Support
+                                            if (world.imageUrl.isNotEmpty)
+                                              ColorFiltered(
+                                                colorFilter: isLocked
+                                                    ? const ColorFilter.matrix([
+                                                        0.2126,
+                                                        0.7152,
+                                                        0.0722,
+                                                        0,
+                                                        0,
+                                                        0.2126,
+                                                        0.7152,
+                                                        0.0722,
+                                                        0,
+                                                        0,
+                                                        0.2126,
+                                                        0.7152,
+                                                        0.0722,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        1,
+                                                        0,
+                                                      ])
+                                                    : const ColorFilter.mode(
+                                                        Colors.transparent,
+                                                        BlendMode.multiply,
+                                                      ),
+                                                child: OfflineAwareImage(
+                                                  imageUrl: world.imageUrl,
+                                                  height: double.infinity,
+                                                  width: double.infinity,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              )
+                                            else
+                                              Container(
                                                 color: isLocked
-                                                    ? Colors.black.withOpacity(
-                                                        0.05,
-                                                      )
-                                                    : Colors.black.withOpacity(
-                                                        0.15,
-                                                      ),
-                                                blurRadius: 12,
-                                                offset: const Offset(0, 6),
-                                              ),
-                                            ],
-                                          ),
-                                          clipBehavior: Clip.antiAlias,
-                                          child: Stack(
-                                            children: [
-                                              // Background Image with Offline Support
-                                              if (world.imageUrl.isNotEmpty)
-                                                ColorFiltered(
-                                                  colorFilter: isLocked
-                                                      ? const ColorFilter.matrix(
-                                                          [
-                                                            0.2126,
-                                                            0.7152,
-                                                            0.0722,
-                                                            0,
-                                                            0,
-                                                            0.2126,
-                                                            0.7152,
-                                                            0.0722,
-                                                            0,
-                                                            0,
-                                                            0.2126,
-                                                            0.7152,
-                                                            0.0722,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            1,
-                                                            0,
-                                                          ],
-                                                        )
-                                                      : const ColorFilter.mode(
-                                                          Colors.transparent,
-                                                          BlendMode.multiply,
-                                                        ),
-                                                  child: OfflineAwareImage(
-                                                    imageUrl: world.imageUrl,
-                                                    height: double.infinity,
-                                                    width: double.infinity,
-                                                    fit: BoxFit.cover,
-                                                  ),
-                                                )
-                                              else
-                                                Container(
-                                                  color: isLocked
-                                                      ? Colors.grey
-                                                      : const Color(0xFF3498DB),
-                                                  child: const Center(
-                                                    child: Icon(
-                                                      Icons.public,
-                                                      size: 80,
-                                                      color: Colors.white30,
-                                                    ),
+                                                    ? Colors.grey
+                                                    : const Color(0xFF3498DB),
+                                                child: const Center(
+                                                  child: Icon(
+                                                    Icons.public,
+                                                    size: 80,
+                                                    color: Colors.white30,
                                                   ),
                                                 ),
+                                              ),
 
-                                              // Vibrant Overlay (Darker if locked)
-                                              Positioned.fill(
+                                            // Vibrant Overlay (Darker if locked)
+                                            Positioned.fill(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      Colors.black.withOpacity(
+                                                        isLocked ? 0.95 : 0.85,
+                                                      ),
+                                                      Colors.black.withOpacity(
+                                                        isLocked ? 0.6 : 0.2,
+                                                      ),
+                                                      isLocked
+                                                          ? Colors.black
+                                                                .withOpacity(
+                                                                  0.4,
+                                                                )
+                                                          : Colors.transparent,
+                                                    ],
+                                                    begin:
+                                                        Alignment.bottomCenter,
+                                                    end: Alignment.topCenter,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Decorative elements (stars or lock)
+                                            Positioned(
+                                              top: isLocked ? 20 : -20,
+                                              right: isLocked ? 20 : -20,
+                                              child: Icon(
+                                                isLocked
+                                                    ? Icons.lock_rounded
+                                                    : Icons.star_rounded,
+                                                size: isLocked ? 40 : 100,
+                                                color: Colors.white.withOpacity(
+                                                  isLocked ? 0.8 : 0.1,
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Lock overlay text in the center
+                                            if (isLocked)
+                                              Center(
                                                 child: Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 8,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    gradient: LinearGradient(
-                                                      colors: [
-                                                        Colors.black
-                                                            .withOpacity(
-                                                              isLocked
-                                                                  ? 0.95
-                                                                  : 0.85,
-                                                            ),
-                                                        Colors.black
-                                                            .withOpacity(
-                                                              isLocked
-                                                                  ? 0.6
-                                                                  : 0.2,
-                                                            ),
-                                                        isLocked
-                                                            ? Colors.black
-                                                                  .withOpacity(
-                                                                    0.4,
-                                                                  )
-                                                            : Colors
-                                                                  .transparent,
-                                                      ],
-                                                      begin: Alignment
-                                                          .bottomCenter,
-                                                      end: Alignment.topCenter,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-
-                                              // Decorative elements (stars or lock)
-                                              Positioned(
-                                                top: isLocked ? 20 : -20,
-                                                right: isLocked ? 20 : -20,
-                                                child: Icon(
-                                                  isLocked
-                                                      ? Icons.lock_rounded
-                                                      : Icons.star_rounded,
-                                                  size: isLocked ? 40 : 100,
-                                                  color: Colors.white
-                                                      .withOpacity(
-                                                        isLocked ? 0.8 : 0.1,
-                                                      ),
-                                                ),
-                                              ),
-
-                                              // Lock overlay text in the center
-                                              if (isLocked)
-                                                Center(
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 16,
-                                                          vertical: 8,
+                                                    color: Colors.black45,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          20,
                                                         ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black45,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            20,
-                                                          ),
-                                                    ),
-                                                    child: const Text(
-                                                      'مغلق - أكمل العالم السابق',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 14,
-                                                      ),
+                                                  ),
+                                                  child: const Text(
+                                                    'مغلق - أكمل العالم السابق',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 14,
                                                     ),
                                                   ),
                                                 ),
-
-                                              // Content
-                                              Positioned(
-                                                bottom: 20,
-                                                left: 20,
-                                                right: 20,
-                                                child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.end,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Text(
-                                                            world.title,
-                                                            style: TextStyle(
-                                                              color: isLocked
-                                                                  ? Colors
-                                                                        .white70
-                                                                  : Colors
-                                                                        .white,
-                                                              fontSize: 16,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w900,
-                                                              letterSpacing:
-                                                                  1.1,
-                                                              shadows: const [
-                                                                Shadow(
-                                                                  color: Colors
-                                                                      .black54,
-                                                                  blurRadius: 4,
-                                                                  offset:
-                                                                      Offset(
-                                                                        0,
-                                                                        2,
-                                                                      ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                          const SizedBox(
-                                                            height: 6,
-                                                          ),
-                                                          Text(
-                                                            world.description,
-                                                            style: TextStyle(
-                                                              color: isLocked
-                                                                  ? Colors
-                                                                        .white54
-                                                                  : Colors.white
-                                                                        .withOpacity(
-                                                                          0.9,
-                                                                        ),
-                                                              fontSize: 15,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w500,
-                                                            ),
-                                                            maxLines: 2,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
                                               ),
-                                            ],
-                                          ),
+
+                                            // Content
+                                            Positioned(
+                                              bottom: 20,
+                                              left: 20,
+                                              right: 20,
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          world.title,
+                                                          style: TextStyle(
+                                                            color: isLocked
+                                                                ? Colors.white70
+                                                                : Colors.white,
+                                                            fontSize: 16,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                            letterSpacing: 1.1,
+                                                            shadows: const [
+                                                              Shadow(
+                                                                color: Colors
+                                                                    .black54,
+                                                                blurRadius: 4,
+                                                                offset: Offset(
+                                                                  0,
+                                                                  2,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 6,
+                                                        ),
+                                                        Text(
+                                                          world.description,
+                                                          style: TextStyle(
+                                                            color: isLocked
+                                                                ? Colors.white54
+                                                                : Colors.white
+                                                                      .withOpacity(
+                                                                        0.9,
+                                                                      ),
+                                                            fontSize: 15,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          );
-                        },
-                        orElse: () => const SizedBox(),
-                      );
-                    },
-                  ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        );
+                      },
+                      orElse: () => const SizedBox(),
+                    );
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
         ),
       ),
     );

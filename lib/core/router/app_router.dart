@@ -50,46 +50,94 @@ class AppRouter {
       ),
       GoRoute(
         path: '/child-dashboard',
-        builder: (context, state) => const ChildDashboardScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const ChildDashboardScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 150),
+        ),
       ),
       GoRoute(
         path: '/child/world-missions',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final world = state.extra as WorldEntity;
-          return ChildWorldMissionsScreen(world: world);
+          return CustomTransitionPage(
+            child: ChildWorldMissionsScreen(world: world),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1, 0),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              );
+            },
+            transitionDuration: const Duration(milliseconds: 200),
+          );
         },
       ),
       GoRoute(
         path: '/child/story-viewer',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
-          return ChildStoryViewerScreen(mission: mission);
+          return CustomTransitionPage(
+            child: ChildStoryViewerScreen(mission: mission),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 150),
+          );
         },
       ),
       GoRoute(
         path: '/child/quiz',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
-          return ChildQuizScreen(mission: mission);
+          return CustomTransitionPage(
+            child: ChildQuizScreen(mission: mission),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 150),
+          );
         },
       ),
       GoRoute(
         path: '/child/quiz-intro',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
-          return ChildQuizIntroScreen(mission: mission);
+          return CustomTransitionPage(
+            child: ChildQuizIntroScreen(mission: mission),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 150),
+          );
         },
       ),
       GoRoute(
         path: '/child/mission-complete',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
-          return ChildMissionCompleteScreen(mission: mission);
+          return CustomTransitionPage(
+            child: ChildMissionCompleteScreen(mission: mission),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 150),
+          );
         },
       ),
       GoRoute(
         path: '/child/badges',
-        builder: (context, state) => const ChildBadgesScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const ChildBadgesScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 150),
+        ),
       ),
       GoRoute(
         path: '/parent-auth',

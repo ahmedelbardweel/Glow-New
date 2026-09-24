@@ -39,9 +39,15 @@ void main() {
         if (object is three.SkinnedMesh) meshes.add(object);
       });
       expect(meshes, isNotEmpty);
-      expect(meshes, hasLength(3));
+      expect(meshes, hasLength(4));
       expect(meshes.first.geometry!.attributes['_glow_skin_region'], isNotNull);
-      expect(meshes.first.skeleton!.bones, hasLength(19));
+      expect(meshes.first.skeleton!.bones, hasLength(21));
+      expect(root.getObjectByName('EyeLeft'), isA<three.Bone>());
+      expect(root.getObjectByName('EyeRight'), isA<three.Bone>());
+      expect(
+        meshes.where((mesh) => mesh.morphTargetInfluences.length == 4),
+        hasLength(1),
+      );
       expect(root.getObjectByName('Jaw'), isA<three.Bone>());
       expect(root.getObjectByName('MouthCornerLeft'), isA<three.Bone>());
       expect(root.getObjectByName('MouthCornerRight'), isA<three.Bone>());

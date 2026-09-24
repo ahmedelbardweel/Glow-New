@@ -141,7 +141,8 @@ class SyncService {
           await localDataSource.cacheStories(mission.id, remoteStories);
           await localDataSource.cacheQuestions(mission.id, remoteQuestions);
 
-          for (var story in remoteStories) {
+            for (var story in remoteStories) {
+              resourceManager.cacheCharacterModels(story.characterName, story.timelineData);
             if (story.audioUrl != null && story.audioUrl!.isNotEmpty) {
               mediaTasks.add(resourceManager.downloadAndCacheFile(story.audioUrl!, folder: 'audio'));
             }

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'core/services/character_asset_cache.dart';
 import 'package:flutter/material.dart';
 
 import 'core/widgets/character_studio_screen.dart';
@@ -6,6 +8,7 @@ import 'core/widgets/character_studio_screen.dart';
 /// No account, backend initialization, or network assets are required.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(CharacterAssetCache.instance.prewarm());
   runApp(
     MaterialApp(
       title: 'Glow — استوديو الشخصية',

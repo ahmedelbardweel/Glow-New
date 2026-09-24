@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:Glow/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
+import '../animation/story_motion.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../models/story_timeline.dart';
 import '../utils/character_helper.dart';
@@ -35,6 +36,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   late AudioPlayer _localAudioPlayer; 
   Duration _totalDuration = Duration.zero;
   List<StoryBlock> _blocks = [];
+  List<StoryMotionBlock> _motionBlocks = [];
   bool _isLoading = true;
   
   double _pixelsPerSecond = 80.0;
@@ -43,16 +45,25 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   final double _waveformHeight = 40.0;
   
   final GlobalKey _trackKey = GlobalKey();
+  final GlobalKey _motionTrackKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
   
   int? _selectedBlockIndex;
+  int? _selectedMotionBlockIndex;
+  String? _lastPreviewCharacter;
+  String? _lastPreviewMotion;
 
   @override
   void initState() {
     super.initState();
     _localAudioPlayer = AudioPlayer();
-    if (widget.initialTimeline != null && widget.initialTimeline!.blocks.isNotEmpty) {
-      _blocks = List.from(widget.initialTimeline!.blocks);
+    if (widget.initialTimeline != null) {
+      if (widget.initialTimeline!.blocks.isNotEmpty) {
+        _blocks = List.from(widget.initialTimeline!.blocks);
+      }
+      if (widget.initialTimeline!.motionBlocks.isNotEmpty) {
+        _motionBlocks = List.from(widget.initialTimeline!.motionBlocks);
+      }
     }
     _loadAudioDuration();
     
@@ -124,8 +135,10 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
 
   void _notifyChanged() {
     _blocks.sort((a, b) => a.startTime.compareTo(b.startTime));
+    _motionBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
     widget.onTimelineChanged(StoryTimeline(
       blocks: _blocks,
+      motionBlocks: _motionBlocks,
       totalDuration: _totalDuration.inMilliseconds / 1000.0,
     ));
   }
@@ -262,6 +275,12 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
         _selectedBlockIndex = null;
       });
       _notifyChanged();
+    } else if (_selectedMotionBlockIndex != null) {
+      setState(() {
+        _motionBlocks.removeAt(_selectedMotionBlockIndex!);
+        _selectedMotionBlockIndex = null;
+      });
+      _notifyChanged();
     }
   }
 
@@ -270,6 +289,116 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       if (time >= b.startTime && time <= b.endTime) return b.characterId;
     }
     return null;
+  }
+
+  String? _getActiveMotionAt(double time) {
+    for (var b in _motionBlocks) {
+      if (time >= b.startTime && time <= b.endTime) return b.motionId;
+    }
+    return null;
+  }
+
+  void _addMotionBlockAtTime(String motionId, double timeInSeconds) {
+    final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
+    if (totalSeconds == 0) return;
+
+    if (timeInSeconds < 0) timeInSeconds = 0;
+    double end = timeInSeconds + 3.0;
+    if (end > totalSeconds) end = totalSeconds;
+
+    final List<StoryMotionBlock> updatedBlocks = [];
+    for (var b in _motionBlocks) {
+      if (b.endTime <= timeInSeconds || b.startTime >= end) {
+        updatedBlocks.add(b);
+      } else if (b.startTime < timeInSeconds && b.endTime > end) {
+        updatedBlocks.add(
+          StoryMotionBlock(motionId: b.motionId, startTime: b.startTime, endTime: timeInSeconds),
+        );
+        updatedBlocks.add(
+          StoryMotionBlock(motionId: b.motionId, startTime: end, endTime: b.endTime),
+        );
+      } else if (b.startTime < timeInSeconds && b.endTime <= end) {
+        updatedBlocks.add(
+          StoryMotionBlock(motionId: b.motionId, startTime: b.startTime, endTime: timeInSeconds),
+        );
+      } else if (b.startTime >= timeInSeconds && b.endTime > end) {
+        updatedBlocks.add(
+          StoryMotionBlock(motionId: b.motionId, startTime: end, endTime: b.endTime),
+        );
+      }
+    }
+    updatedBlocks.add(
+      StoryMotionBlock(motionId: motionId, startTime: timeInSeconds, endTime: end),
+    );
+
+    setState(() {
+      _motionBlocks = updatedBlocks;
+      _selectedMotionBlockIndex = _motionBlocks.indexWhere((b) => b.startTime == timeInSeconds);
+      _selectedBlockIndex = null;
+    });
+    _notifyChanged();
+  }
+
+  void _updateMotionBlockStart(int index, double deltaSeconds) {
+    final block = _motionBlocks[index];
+    double newStart = block.startTime + deltaSeconds;
+    if (newStart < 0) newStart = 0;
+    if (newStart > block.endTime - 0.5) newStart = block.endTime - 0.5;
+    if (index > 0) {
+      final prevBlock = _motionBlocks[index - 1];
+      if (newStart < prevBlock.endTime) newStart = prevBlock.endTime;
+    }
+    setState(() {
+      _motionBlocks[index] = StoryMotionBlock(
+        motionId: block.motionId,
+        startTime: newStart,
+        endTime: block.endTime,
+      );
+    });
+    _notifyChanged();
+  }
+
+  void _updateMotionBlockEnd(int index, double deltaSeconds) {
+    final block = _motionBlocks[index];
+    double newEnd = block.endTime + deltaSeconds;
+    final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
+    if (newEnd > totalSeconds) newEnd = totalSeconds;
+    if (newEnd < block.startTime + 0.5) newEnd = block.startTime + 0.5;
+    if (index < _motionBlocks.length - 1) {
+      final nextBlock = _motionBlocks[index + 1];
+      if (newEnd > nextBlock.startTime) newEnd = nextBlock.startTime;
+    }
+    setState(() {
+      _motionBlocks[index] = StoryMotionBlock(
+        motionId: block.motionId,
+        startTime: block.startTime,
+        endTime: newEnd,
+      );
+    });
+    _notifyChanged();
+  }
+
+  void _moveMotionBlock(int index, double deltaSeconds) {
+    final block = _motionBlocks[index];
+    double newStart = block.startTime + deltaSeconds;
+    double duration = block.endTime - block.startTime;
+    if (newStart < 0) newStart = 0;
+    final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
+    if (newStart + duration > totalSeconds) newStart = totalSeconds - duration;
+    if (index > 0 && newStart < _motionBlocks[index - 1].endTime) {
+      newStart = _motionBlocks[index - 1].endTime;
+    }
+    if (index < _motionBlocks.length - 1 && (newStart + duration) > _motionBlocks[index + 1].startTime) {
+      newStart = _motionBlocks[index + 1].startTime - duration;
+    }
+    setState(() {
+      _motionBlocks[index] = StoryMotionBlock(
+        motionId: block.motionId,
+        startTime: newStart,
+        endTime: newStart + duration,
+      );
+    });
+    _notifyChanged();
   }
   
   void _duplicateBlock() {
@@ -341,6 +470,9 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               isPlaying: widget.isPlaying,
                               isSpeaking: widget.isPlaying && widget.audioFile.existsSync(),
                               playbackPosition: widget.positionNotifier,
+                              motion: _getActiveMotionAt(currentTime) != null 
+                                  ? CharacterMotion.values.firstWhere((m) => m.name == _getActiveMotionAt(currentTime)!, orElse: () => CharacterMotion.idle) 
+                                  : null,
                             )
                           : const Center(
                               child: Text(
@@ -384,41 +516,94 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                         borderRadius: BorderRadius.circular(AppColors.border_radius),
                         border: Border.all(color: AppColors.inputBorder),
                       ),
-                      child: SizedBox(
-                        height: 50,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: CharacterHelper.characters.keys.map((key) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
-                              child: Draggable<String>(
-                                data: key,
-                                feedback: Material(
-                                  color: Colors.transparent,
-                                  child: Container(
-                                    width: 80,
-                                    height: _blockHeight,
-                                    decoration: BoxDecoration(
-                                      color: CharacterHelper.getColor(key).withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        CharacterHelper.getCleanName(key),
-                                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height: 50,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: CharacterHelper.characters.keys.map((key) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+                                  child: Draggable<String>(
+                                    data: key,
+                                    feedback: Material(
+                                      color: Colors.transparent,
+                                      child: Container(
+                                        width: 80,
+                                        height: _blockHeight,
+                                        decoration: BoxDecoration(
+                                          color: CharacterHelper.getColor(key).withOpacity(0.8),
+                                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            CharacterHelper.getCleanName(key),
+                                            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
                                       ),
                                     ),
+                                    childWhenDragging: Opacity(
+                                      opacity: 0.3,
+                                      child: _buildPaletteItem(key),
+                                    ),
+                                    child: _buildPaletteItem(key),
                                   ),
-                                ),
-                                childWhenDragging: Opacity(
-                                  opacity: 0.3,
-                                  child: _buildPaletteItem(key),
-                                ),
-                                child: _buildPaletteItem(key),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const Divider(height: 1, color: AppColors.inputBorder),
+                          SizedBox(
+                            height: 50,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: CharacterMotion.values.map((motion) {
+                                final isSelected = _selectedMotionBlockIndex != null && _motionBlocks.isNotEmpty && _selectedMotionBlockIndex! < _motionBlocks.length && _motionBlocks[_selectedMotionBlockIndex!].motionId == motion.name;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+                                  child: Draggable<String>(
+                                    data: motion.name,
+                                    feedback: Material(
+                                      color: Colors.transparent,
+                                      child: Container(
+                                        width: 80,
+                                        height: _blockHeight,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white, 
+                                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                          border: Border.all(color: AppColors.inputBorder),
+                                        ),
+                                        child: Center(child: Text(motion.arabicLabel, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))),
+                                      ),
+                                    ),
+                                    childWhenDragging: Opacity(
+                                      opacity: 0.3,
+                                      child: Container(
+                                        width: 80,
+                                        height: _blockHeight,
+                                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppColors.border_radius), border: Border.all(color: AppColors.inputBorder)),
+                                        child: Center(child: Text(motion.arabicLabel, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))),
+                                      ),
+                                    ),
+                                    child: Container(
+                                      width: 80,
+                                      height: _blockHeight,
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? Colors.teal.shade300 : Colors.white, 
+                                        borderRadius: BorderRadius.circular(AppColors.border_radius), 
+                                        border: Border.all(color: isSelected ? Colors.teal.shade300 : AppColors.inputBorder)
+                                      ),
+                                      child: Center(child: Text(motion.arabicLabel, style: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold))),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -483,7 +668,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
               Directionality(
                 textDirection: TextDirection.ltr,
                 child: SizedBox(
-                  height: 180,
+                  height: 250,
                   child: SingleChildScrollView(
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
@@ -550,11 +735,13 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               height: _trackHeight,
                               child: DragTarget<String>(
                                 onAcceptWithDetails: (details) {
-                                  if (_trackKey.currentContext != null) {
-                                    final RenderBox box = _trackKey.currentContext!.findRenderObject() as RenderBox;
-                                    final Offset localOffset = box.globalToLocal(details.offset);
-                                    final double time = localOffset.dx / _pixelsPerSecond;
-                                    _addBlockAtTime(details.data, time);
+                                  if (CharacterHelper.characters.keys.contains(details.data)) {
+                                    if (_trackKey.currentContext != null) {
+                                      final RenderBox box = _trackKey.currentContext!.findRenderObject() as RenderBox;
+                                      final Offset localOffset = box.globalToLocal(details.offset);
+                                      final double time = localOffset.dx / _pixelsPerSecond;
+                                      _addBlockAtTime(details.data, time);
+                                    }
                                   }
                                 },
                                 builder: (context, candidateData, rejectedData) {
@@ -569,6 +756,42 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                       clipBehavior: Clip.none,
                                       children: _blocks.asMap().entries.map((entry) {
                                         return _buildTimelineBlock(entry.key, entry.value);
+                                      }).toList(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            // Motion Blocks Track
+                            Positioned(
+                              left: 0,
+                              top: 25 + _waveformHeight + 5 + _trackHeight + 5,
+                              width: trackWidth,
+                              height: _trackHeight,
+                              child: DragTarget<String>(
+                                onAcceptWithDetails: (details) {
+                                  if (CharacterMotion.values.any((m) => m.name == details.data)) {
+                                    if (_motionTrackKey.currentContext != null) {
+                                      final RenderBox box = _motionTrackKey.currentContext!.findRenderObject() as RenderBox;
+                                      final Offset localOffset = box.globalToLocal(details.offset);
+                                      final double time = localOffset.dx / _pixelsPerSecond;
+                                      _addMotionBlockAtTime(details.data, time);
+                                    }
+                                  }
+                                },
+                                builder: (context, candidateData, rejectedData) {
+                                  return Container(
+                                    key: _motionTrackKey,
+                                    decoration: BoxDecoration(
+                                      color: candidateData.isNotEmpty ? Colors.teal.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      border: Border.all(color: candidateData.isNotEmpty ? Colors.teal : Colors.transparent, width: 2),
+                                    ),
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: _motionBlocks.asMap().entries.map((entry) {
+                                        return _buildMotionBlockWidget(entry.key, entry.value);
                                       }).toList(),
                                     ),
                                   );
@@ -789,6 +1012,101 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                 ),
               ),
             ]
+          ],
+        ),
+      ),
+    );
+  }
+  Widget _buildMotionBlockWidget(int index, StoryMotionBlock block) {
+    final left = block.startTime * _pixelsPerSecond;
+    final width = (block.endTime - block.startTime) * _pixelsPerSecond;
+    final isSelected = _selectedMotionBlockIndex == index;
+
+    final motion = CharacterMotion.values.firstWhere((m) => m.name == block.motionId, orElse: () => CharacterMotion.idle);
+
+    return Positioned(
+      left: left,
+      top: 5,
+      width: width,
+      height: _blockHeight,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedMotionBlockIndex = index;
+            _selectedBlockIndex = null;
+          });
+        },
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Main Body
+            GestureDetector(
+              onHorizontalDragUpdate: (details) {
+                _moveMotionBlock(index, details.delta.dx / _pixelsPerSecond);
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade300,
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  border: Border.all(
+                    color: isSelected ? Colors.teal.shade800 : Colors.teal.shade400,
+                    width: isSelected ? 2.5 : 1.0,
+                  ),
+                  boxShadow: const [BoxShadow(color: Colors.teal, blurRadius: 4, offset: Offset(0, 2))],
+                ),
+                child: Center(
+                  child: Text(
+                    motion.arabicLabel,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+
+            // Start Drag Handle
+            if (isSelected)
+              Positioned(
+                left: -10,
+                top: 0,
+                bottom: 0,
+                width: 20,
+                child: GestureDetector(
+                  onHorizontalDragUpdate: (details) {
+                    _updateMotionBlockStart(index, details.delta.dx / _pixelsPerSecond);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.black, width: 0.5),
+                    ),
+                    child: const Icon(Icons.drag_indicator, size: 12, color: Colors.black),
+                  ),
+                ),
+              ),
+            
+            // End Drag Handle
+            if (isSelected)
+              Positioned(
+                right: -10,
+                top: 0,
+                bottom: 0,
+                width: 20,
+                child: GestureDetector(
+                  onHorizontalDragUpdate: (details) {
+                    _updateMotionBlockEnd(index, details.delta.dx / _pixelsPerSecond);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.black, width: 0.5),
+                    ),
+                    child: const Icon(Icons.drag_indicator, size: 12, color: Colors.black),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

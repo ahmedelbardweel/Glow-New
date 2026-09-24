@@ -15,12 +15,14 @@ import argparse
 import json
 import math
 import hashlib
+import copy
 from collections import Counter
 from pathlib import Path
 
 import numpy as np
 from port_rig_weights import ANCHORS, solve_weights, ease
 from port_face_rig import FACE_ANCHORS, build_face, expression
+from port_eye_rig import EYE_ANCHORS, EYES, TARGET_NAMES, eye_weights, build_lids
 from pygltflib import (
     Accessor,
     Animation,
@@ -35,6 +37,7 @@ from pygltflib import (
     Material,
     PbrMetallicRoughness,
     Primitive,
+    Mesh,
 )
 
 
@@ -170,11 +173,15 @@ def print_inspection(positions: np.ndarray, indices: np.ndarray) -> None:
 def prune_quantized_source_attributes(gltf: GLTF2) -> None:
     """Drop source packed attributes after their portable replacements exist."""
     references=[]
-    for primitive in gltf.meshes[0].primitives:
+    for primitive in [part for mesh in gltf.meshes for part in mesh.primitives]:
         references.append((primitive,'indices'))
-        for field in ('POSITION','NORMAL','TANGENT','TEXCOORD_0','JOINTS_0','WEIGHTS_0','_GLOW_SKIN_REGION'):
+        for field in ('POSITION','NORMAL','TANGENT','TEXCOORD_0','COLOR_0','JOINTS_0','WEIGHTS_0','_GLOW_SKIN_REGION'):
             if getattr(primitive.attributes,field,None) is not None:
                 references.append((primitive.attributes,field))
+        for attributes in primitive.targets or []:
+            for field in ('POSITION','NORMAL'):
+                if getattr(attributes,field,None) is not None:
+                    references.append((attributes,field))
     for skin in gltf.skins:
         references.append((skin,'inverseBindMatrices'))
     for animation in gltf.animations:
@@ -215,6 +222,8 @@ def make_skeleton(gltf: GLTF2, layout: dict[str, tuple[float, float, float]]) ->
         "Jaw": "Root",
         "MouthCornerLeft": "Root",
         "MouthCornerRight": "Root",
+        "EyeLeft": "Root",
+        "EyeRight": "Root",
     }
     indices: dict[str, int] = {}
     for name, parent in parents.items():
@@ -245,6 +254,8 @@ def append_animation(
     # gesture on a bone that the next clip does not otherwise animate.
     tracks = {bone: tracks.get(bone, [(0.0, 0.0, 0.0)]*frames)
               for bone in list(ANCHORS)[4:]}
+    for eye in EYE_ANCHORS:
+        tracks[eye]=[(0.0,0.0,0.0)]*frames
     for bone, eulers in tracks.items():
         if len(eulers) != frames:
             raise ValueError(f"{name}/{bone} has {len(eulers)} frames; expected {frames}.")
@@ -382,6 +393,8 @@ def rig(source: Path, destination: Path, inspect_only: bool = False) -> None:
     face=build_face(positions,normals,uvs,indices,joints,weights)
     positions,normals,uvs=(face[key] for key in ('positions','normals','uvs'))
     joints,weights=face['joints'],face['weights']
+    joints,weights=eye_weights(positions,joints,weights)
+    lids=build_lids(positions,uvs,face['indices'])
     primitive.indices=append_accessor(gltf,binary,face['indices'].reshape(-1),5123,'SCALAR',target=34963)
     position_accessor = append_accessor(gltf, binary, positions, 5126, "VEC3", target=34962, bounds=True)
     normal_accessor = append_accessor(gltf, binary, normals, 5126, "VEC3", target=34962)
@@ -407,7 +420,7 @@ def rig(source: Path, destination: Path, inspect_only: bool = False) -> None:
     source_node.translation = None
     source_node.rotation = None
     source_node.scale = None
-    layout = {**ANCHORS,**FACE_ANCHORS}
+    layout = {**ANCHORS,**FACE_ANCHORS,**EYE_ANCHORS}
     bones = make_skeleton(gltf, layout)
     inverse_binds = []
     # All bind-pose bones have identity rotation.  Their global translation is
@@ -437,6 +450,30 @@ def rig(source: Path, destination: Path, inspect_only: bool = False) -> None:
         gltf.meshes[0].primitives.append(Primitive(attributes=attrs,material=material,
             indices=append_accessor(gltf,binary,part['indices'].reshape(-1),5123,'SCALAR',target=34963)))
     gltf.animations = []
+    lid_joints=np.zeros((len(lids['positions']),4),np.uint16)
+    lid_weights=np.zeros((len(lids['positions']),4),np.float32);lid_weights[:,0]=1
+    lid_attrs=Attributes(
+        POSITION=append_accessor(gltf,binary,lids['positions'],5126,'VEC3',target=34962,bounds=True),
+        NORMAL=append_accessor(gltf,binary,lids['normals'],5126,'VEC3',target=34962),
+        TEXCOORD_0=append_accessor(gltf,binary,lids['uvs'],5126,'VEC2',target=34962),
+        COLOR_0=append_accessor(gltf,binary,lids['colors'],5126,'VEC3',target=34962),
+        JOINTS_0=append_accessor(gltf,binary,lid_joints,5123,'VEC4',target=34962),
+        WEIGHTS_0=append_accessor(gltf,binary,lid_weights,5126,'VEC4',target=34962))
+    setattr(lid_attrs,'_GLOW_SKIN_REGION',append_accessor(gltf,binary,np.ones(len(lid_joints),np.float32),5126,'SCALAR',target=34962))
+    lid_targets=[Attributes(
+        POSITION=append_accessor(gltf,binary,target['positions'],5126,'VEC3',target=34962,bounds=True),
+        NORMAL=append_accessor(gltf,binary,target['normals'],5126,'VEC3',target=34962)) for target in lids['targets']]
+    lid_material=copy.deepcopy(gltf.materials[0])
+    lid_material.name='EyeLidSkin'
+    # Smooth dome normals avoid unstable tangent reconstruction on the folded
+    # open strip. The source base color and roughness atlas remain shared.
+    lid_material.normalTexture=None
+    gltf.materials.append(lid_material)
+    gltf.meshes.append(Mesh(name='EyeLids',weights=[0.,0.,0.,0.],extras={'targetNames':TARGET_NAMES},primitives=[Primitive(
+        attributes=lid_attrs,material=len(gltf.materials)-1,targets=lid_targets,
+        indices=append_accessor(gltf,binary,lids['indices'].reshape(-1),5123,'SCALAR',target=34963))]))
+    gltf.scenes[gltf.scene or 0].nodes.append(len(gltf.nodes))
+    gltf.nodes.append(Node(name='EyeLids',mesh=len(gltf.meshes)-1,skin=source_node.skin))
     build_story_animations(gltf, binary, bones)
     prune_quantized_source_attributes(gltf)
 
@@ -453,11 +490,13 @@ def rig(source: Path, destination: Path, inspect_only: bool = False) -> None:
         "rig": "limbs-and-local-mouth",
         "source": source.name,
         "sourceSha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-        "rigVersion": 3,
+        "rigVersion": 4,
         "skinPalette": "localized-green-chroma-v1",
         "preserved": ["source-rest-surface", "source-textures", "source-material", "source-UVs", "hat", "glasses", "nose", "torso"],
         "animated": ["arms", "legs", "lips", "jaw"],
         "mouth": {key:face[key] for key in ('sourceVertexCount','surfaceVertexSources','addedTriangleSource','lipUpperIndices','lipLowerIndices','lipPathPositions','faceVertices')},
+        "eyes": {"regions":list(EYES),"bones":list(EYE_ANCHORS),"lidTargets":TARGET_NAMES,
+                 "gazeLimitRadians":.10,"sourceRestPreserved":True},
     }
     destination.parent.mkdir(parents=True, exist_ok=True)
     gltf.save_binary(str(destination))

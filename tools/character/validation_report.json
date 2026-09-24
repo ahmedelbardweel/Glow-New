@@ -2,7 +2,7 @@
   "uri": "glow_mascot.glb",
   "mimeType": "model/gltf-binary",
   "validatorVersion": "2.0.0-dev.3.10",
-  "validatedAt": "2026-09-23T06:42:29.994Z",
+  "validatedAt": "2026-09-24T07:35:03.073Z",
   "issues": {
     "numErrors": 0,
     "numWarnings": 1,
@@ -29,7 +29,7 @@
         "pointer": "/buffers/0",
         "mimeType": "application/gltf-buffer",
         "storage": "glb",
-        "byteLength": 5626728
+        "byteLength": 5908424
       },
       {
         "pointer": "/images/0",
@@ -66,17 +66,17 @@
       }
     ],
     "animationCount": 10,
-    "materialCount": 3,
-    "hasMorphTargets": false,
+    "materialCount": 4,
+    "hasMorphTargets": true,
     "hasSkins": true,
     "hasTextures": true,
     "hasDefaultScene": true,
-    "drawCallCount": 3,
-    "totalVertexCount": 56372,
-    "totalTriangleCount": 96908,
+    "drawCallCount": 4,
+    "totalVertexCount": 57848,
+    "totalTriangleCount": 99468,
     "maxUVs": 1,
     "maxInfluences": 4,
-    "maxAttributes": 6
+    "maxAttributes": 7
   },
   "sourceBaseline": {
     "file": "C:\\Users\\Ahmed\\AndroidStudioProjects\\glow_app\\tools\\character\\source\\port_frontal.glb",

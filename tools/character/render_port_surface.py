@@ -9,7 +9,7 @@ from pygltflib import GLTF2
 from rig_port_frontal import read_accessor
 
 
-def render(path, output, *, region=(-.22, .22, .41, .66), size=1000, grid=True):
+def render(path, output, *, region=(-.22, .22, .41, .66), size=1000, grid=True, blink=0., gaze=None):
     gltf = GLTF2().load_binary(str(path))
     prim = gltf.meshes[0].primitives[0]
     a = prim.attributes
@@ -18,6 +18,24 @@ def render(path, output, *, region=(-.22, .22, .41, .66), size=1000, grid=True):
     n = read_accessor(gltf, a.NORMAL).astype(float)
     uv = read_accessor(gltf, a.TEXCOORD_0).astype(float)
     tri = read_accessor(gltf, prim.indices).reshape(-1, 3).astype(int)
+    colors=np.ones_like(p)
+    if gaze is not None:
+        from check_port_rig import PoseEvaluator
+        from rig_port_frontal import quat
+        channels={(index,'rotation'):quat(gaze[1],gaze[0],0.) for index,node in enumerate(gltf.nodes) if node.name in ('EyeLeft','EyeRight')}
+        p=PoseEvaluator(gltf).pose(rotations=channels)
+    if blink>0:
+        lid=next(mesh for mesh in gltf.meshes if mesh.name=='EyeLids').primitives[0]
+        lp=read_accessor(gltf,lid.attributes.POSITION).astype(float)
+        ln=read_accessor(gltf,lid.attributes.NORMAL).astype(float)
+        values=[min(blink*2,2-blink*2),max(0,blink*2-1)]*2
+        for target,weight in zip(lid.targets,values):
+            lp+=weight*read_accessor(gltf,target['POSITION'])
+            ln+=weight*read_accessor(gltf,target['NORMAL'])
+        tri=np.concatenate((tri,read_accessor(gltf,lid.indices).reshape(-1,3)+len(p)))
+        p=np.concatenate((p,lp));n=np.concatenate((n,ln))
+        colors=np.concatenate((colors,read_accessor(gltf,lid.attributes.COLOR_0)))
+        uv=np.concatenate((uv,read_accessor(gltf,lid.attributes.TEXCOORD_0)))
     info = gltf.materials[prim.material].pbrMetallicRoughness.baseColorTexture
     transform = info.extensions.get('KHR_texture_transform', {})
     uv = uv*np.array(transform.get('scale', [1, 1]))+np.array(transform.get('offset', [0, 0]))
@@ -58,7 +76,8 @@ def render(path, output, *, region=(-.22, .22, .41, .66), size=1000, grid=True):
         normal /= np.maximum(np.linalg.norm(normal,axis=-1,keepdims=True),1e-8)
         light = np.array([-.3,.6,.85]); light/=np.linalg.norm(light)
         shade = .50+.50*np.maximum(normal@light,0)
-        color = np.clip(texture[ty,tx]*shade[:,:,None],0,255).astype(np.uint8)
+        sampled=texture[ty,tx].astype(float)
+        color = np.clip(sampled*shade[:,:,None]*(bary@colors[ids]),0,255).astype(np.uint8)
         pixels[ymin:ymax+1,xmin:xmax+1][mask]=color[mask]
         depth[ymin:ymax+1,xmin:xmax+1][mask]=zz[mask]
         world[ymin:ymax+1,xmin:xmax+1][mask]=(bary@p[ids])[mask]

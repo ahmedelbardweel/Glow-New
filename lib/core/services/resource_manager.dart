@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -11,9 +12,36 @@ class ResourceManager {
   final Set<String> _verifiedLocalPaths = <String>{};
 
   // Coalesce simultaneous download requests for the same URL
-  final Map<String, Future<String?>> _inFlightDownloads = <String, Future<String?>>{};
+  final Map<String, Future<String?>> _inFlightDownloads =
+      <String, Future<String?>>{};
 
   ResourceManager(this.cacheBox);
+
+  /// Remote uploads are prefetched with story media. Built-in identities are
+  /// bundled in the app and never enter the network/cache download path.
+  void cacheCharacterModels(String character, String? timelineJson) {
+    final models = <String>{character};
+    if (timelineJson != null && timelineJson.isNotEmpty) {
+      try {
+        final timeline = jsonDecode(timelineJson);
+        if (timeline is Map && timeline['blocks'] is List) {
+          for (final block in timeline['blocks']) {
+            if (block is Map && block['characterId'] is String) {
+              models.add(block['characterId'] as String);
+            }
+          }
+        }
+      } catch (_) {
+        // Malformed optional timeline data must not prevent the story syncing.
+      }
+    }
+    for (final model in models) {
+      final uri = Uri.tryParse(model.trim());
+      if (uri?.scheme == 'https' || uri?.scheme == 'http') {
+        downloadAndCacheInBackground(model, folder: 'models');
+      }
+    }
+  }
 
   Future<void> init() async {
     if (_baseDir == null) {
@@ -66,7 +94,10 @@ class ResourceManager {
   }
 
   /// Download and cache with in-flight deduplication to avoid redundant HTTP requests
-  Future<String?> downloadAndCacheFile(String url, {String folder = 'media'}) async {
+  Future<String?> downloadAndCacheFile(
+    String url, {
+    String folder = 'media',
+  }) async {
     final cleanUrl = url.trim();
     if (cleanUrl.isEmpty || !cleanUrl.startsWith('http')) return null;
 
@@ -100,7 +131,9 @@ class ResourceManager {
       final fileName = _generateFileName(cleanUrl, folder);
       final file = File('${subFolder.path}/$fileName');
 
-      final response = await http.get(Uri.parse(cleanUrl));
+      final response = await http
+          .get(Uri.parse(cleanUrl))
+          .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
         await file.writeAsBytes(response.bodyBytes);
         await cacheBox.put(cleanUrl, file.path);
@@ -121,7 +154,7 @@ class ResourceManager {
     if (cleanUrl.isEmpty || !cleanUrl.startsWith('http')) return;
 
     if (isFileCached(cleanUrl)) return;
-    
+
     // Don't wait, let it run in background
     downloadAndCacheFile(cleanUrl, folder: folder);
   }

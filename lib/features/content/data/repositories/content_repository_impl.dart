@@ -149,7 +149,8 @@ class ContentRepositoryImpl implements ContentRepository {
       // Background sync
       remoteDataSource.getStories(missionId).then((stories) async {
         await localDataSource.cacheStories(missionId, stories);
-        for (var s in stories) {
+          for (var s in stories) {
+            resourceManager.cacheCharacterModels(s.characterName, s.timelineData);
           if (s.audioUrl != null && s.audioUrl!.isNotEmpty) {
             resourceManager.downloadAndCacheInBackground(s.audioUrl!, folder: 'audio');
           }
@@ -182,16 +183,7 @@ class ContentRepositoryImpl implements ContentRepository {
   Future<Either<Failure, StoryEntity>> addStory(StoryEntity story, {File? audioFile, File? characterFile}) async {
     if (await networkInfo.isConnected) {
       try {
-        final model = StoryModel(
-          id: story.id,
-          missionId: story.missionId,
-          title: story.title,
-          content: story.content,
-          characterName: story.characterName,
-          imageUrl: story.imageUrl,
-          orderIndex: story.orderIndex,
-          audioUrl: story.audioUrl,
-        );
+        final model = StoryModel.fromEntity(story);
         final result = await remoteDataSource.addStory(model, audioFile: audioFile, characterFile: characterFile);
         final current = await localDataSource.getCachedStories(story.missionId);
         current.add(result);

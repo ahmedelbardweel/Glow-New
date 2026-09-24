@@ -66,9 +66,9 @@ def sample_rotation(times, values, time):
 
 
 class PoseEvaluator:
-    def __init__(self, gltf, primitive=0):
+    def __init__(self, gltf, primitive=0, mesh=0):
         self.gltf = gltf
-        attrs = gltf.meshes[0].primitives[primitive].attributes
+        attrs = gltf.meshes[mesh].primitives[primitive].attributes
         points=read_accessor(gltf,attrs.POSITION)
         self.rest = np.c_[points,np.ones(len(points))]
         self.joints = read_accessor(gltf, attrs.JOINTS_0).astype(int)
@@ -164,13 +164,13 @@ def check(source_path, rig_path):
             return model.binary_blob()[view.byteOffset:view.byteOffset+view.byteLength]
         assert payload(source,first)==payload(rig,second)
         image_hashes.append(hashlib.sha256(payload(source,first)).hexdigest())
-    evaluators=[PoseEvaluator(rig,index) for index in range(len(rig.meshes[0].primitives))]
+    evaluators=[PoseEvaluator(rig,index,mesh) for mesh,value in enumerate(rig.meshes) for index in range(len(value.primitives))]
     evaluator=evaluators[0]
     joints,weights=evaluator.joints,evaluator.weights
     for item in evaluators:
         assert np.isfinite(item.weights).all() and item.weights.min()>=0
         assert np.max(np.abs(item.weights.sum(1)-1))<1e-7
-        assert item.joints.max()<19 and item.joints.min()>=0
+        assert item.joints.max()<21 and item.joints.min()>=0
         assert np.all(item.joints[item.weights==0]==0)
         assert np.max(np.abs(item.pose()-item.rest[:,:3]))<1e-7
     _,representatives,inverse=np.unique(rest[:count],axis=0,return_index=True,return_inverse=True)
@@ -187,15 +187,18 @@ def check(source_path, rig_path):
     assert np.min(palette[y<.54])==1
     old_protected=((y>=.432)|((np.abs(x)<=.145)&(y>=.154))|(z<=-.155)|((z>=.116)&(y>=.154)))
     face_region=(y>.433)&(y<.539)&(np.abs(x)<.170)&(z>.163)
-    assert root_only[old_protected&~face_region].all(),'Face influence escaped its local region'
-    face_weights=((joints>=16)&(weights>0)).any(axis=1)
+    eye_region=(y>.556)&(y<.657)&(np.abs(x)>.065)&(np.abs(x)<.185)&(z>.195)
+    assert root_only[old_protected&~face_region&~eye_region].all(),'Facial influence escaped its local region'
+    face_weights=((joints>=16)&(joints<19)&(weights>0)).any(axis=1)
     assert face_region[face_weights].all()
-    assert len(rig.skins)==1 and len(rig.skins[0].joints)==19
+    eye_weights=((joints>=19)&(weights>0)).any(axis=1)
+    assert eye_region[eye_weights].all()
+    assert len(rig.skins)==1 and len(rig.skins[0].joints)==21
     expected={'Idle','Talk','Wave','Happy','Sad','Thinking','Victory','Walk','Smile','Laugh'}
     assert {a.name for a in rig.animations}==expected
     limb_nodes=set(rig.skins[0].joints[4:16])
     nodes={node.name:index for index,node in enumerate(rig.nodes)}
-    permitted={(node,'rotation') for node in limb_nodes}|{
+    permitted={(node,'rotation') for node in limb_nodes|{nodes['EyeLeft'],nodes['EyeRight']}}|{
         (nodes['Jaw'],'rotation'),(nodes['MouthCornerLeft'],'translation'),(nodes['MouthCornerRight'],'translation')}
     edges=np.unique(np.sort(np.concatenate([triangles[:,(0,1)],triangles[:,(1,2)],triangles[:,(2,0)]]),axis=1),axis=0)
     length=np.linalg.norm(rest[edges[:,0]]-rest[edges[:,1]],axis=1)
@@ -257,7 +260,8 @@ def check(source_path, rig_path):
                 originalNormalsAndUvsIdentical=True,sourceMaterialIdentical=True,
                 insertedLipVertices=len(rest)-count,refinedSurfaceTriangles=len(triangles),
                 maxOriginalPositionError=max_error,maxSurfaceAreaError=area_error,
-                bones=19,primitiveCount=len(evaluators),textureSha256=image_hashes,
+                bones=21,primitiveCount=len(evaluators),textureSha256=image_hashes,
+                eyeSurfaceVertices=int(eye_weights.sum()),
                 skinPaletteAttribute=True,protectedEyeVertices=int(eye_centers.sum()),
                 staticSurfaceVertices=int(root_only.sum()),facialSurfaceVertices=int(face_weights.sum()),
                 transitionFrames=transition_frames,clips=clips)
@@ -273,5 +277,5 @@ if __name__ == '__main__':
     encoded = json.dumps(report, indent=2, ensure_ascii=False)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(encoded+'\n', encoding='utf-8')
+        args.report.write_bytes((encoded+'\n').encode('utf-8'))
     print(json.dumps(report, indent=2))

@@ -35,6 +35,6 @@ class AppColors {
   static const Color onSurface = Color(0xFF1E1E1E);
 
   // Custom child-friendly colors
-  static const Color pink = Color(0xFFFF4081);
+  static const Color pink = Color(0xFFD9A9B2);
   static const Color orange = Color(0xFFFF9800);
 }

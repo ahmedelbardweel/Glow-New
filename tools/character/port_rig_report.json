@@ -2,7 +2,7 @@
   "source": "tools\\character\\source\\port_frontal.glb",
   "rig": "assets\\3d\\glow_mascot.glb",
   "sourceSha256": "5b316a34733e59fa7206568e0173745e6e310aab5053c156c8fbb7400fb71a84",
-  "rigSha256": "92fdfdfb830eb1ff64a9619bf3db12b0011a3efc11ce4aea02331229044c64eb",
+  "rigSha256": "c60209fae7183f655d7b7e9f486f41f7f2e3e817824f029639b53963179f7f17",
   "originalVertices": 55164,
   "originalTriangles": 94874,
   "originalSurfaceVerticesRetained": true,
@@ -13,16 +13,17 @@
   "refinedSurfaceTriangles": 95132,
   "maxOriginalPositionError": 2.9802079026808315e-08,
   "maxSurfaceAreaError": 1.8126667046167687e-09,
-  "bones": 19,
-  "primitiveCount": 3,
+  "bones": 21,
+  "primitiveCount": 4,
   "textureSha256": [
     "83105379db945d8af816196485989091e5debd1c5060dc6dcbd4f576cdf0c8d2",
     "81c4848ab800ecece38240929a2d1a7ce3633f9e84a49ca36b3986b9d7af7dde",
     "c7649c17186ad9f6ae4043ecdb67eaaefd43321113de4e6147f272e38d7307ce"
   ],
+  "eyeSurfaceVertices": 1121,
   "skinPaletteAttribute": true,
   "protectedEyeVertices": 1795,
-  "staticSurfaceVertices": 49400,
+  "staticSurfaceVertices": 48279,
   "facialSurfaceVertices": 745,
   "transitionFrames": 270,
   "clips": [
@@ -32,7 +33,7 @@
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
       "maxLipOpening": 4.175215667865268e-09,
-      "maxEdgeStretch": 1.0000147795149406
+      "maxEdgeStretch": 1.0000238093130047
     },
     {
       "name": "Talk",

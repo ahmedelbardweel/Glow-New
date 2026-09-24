@@ -126,6 +126,9 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
           top: false,
           child: LayoutBuilder(
             builder: (context, constraints) {
+              if (constraints.maxWidth <= 0 || constraints.maxHeight <= 0) {
+                return const SizedBox.shrink();
+              }
               final wide = constraints.maxWidth >= 900;
               return SingleChildScrollView(
                 padding: EdgeInsets.all(wide ? 28 : 16),

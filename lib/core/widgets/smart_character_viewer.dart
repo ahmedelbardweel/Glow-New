@@ -1,42 +1,15 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:three_js/three_js.dart' as three;
 import '../animation/story_motion.dart';
 import '../animation/character_skin_palette.dart';
+import '../animation/character_eye_animation.dart';
 import '../di/injection_container.dart';
 import '../services/resource_manager.dart';
+import '../services/character_asset_cache.dart';
 import '../utils/character_helper.dart';
-
-/// Keeps the packaged GLB in memory. Opening another story therefore does not
-/// read the same multi-megabyte asset from storage again.
-class _CharacterModelBytesCache {
-  static final Map<String, Future<Uint8List>> _assets = {};
-
-  static Future<Uint8List> loadAsset(String assetPath) {
-    return _assets.putIfAbsent(assetPath, () async {
-      final data = await rootBundle.load(assetPath);
-      final view = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      return Uint8List.fromList(view);
-    });
-  }
-}
-
-/// A failed native renderer is not retried by every card in the app. A manual
-/// retry resets this small circuit breaker after a device or GPU recovers.
-class _CharacterRendererHealth {
-  static Object? _lastFailure;
-
-  static Object? get lastFailure => _lastFailure;
-  static bool get isUnavailable => _lastFailure != null;
-
-  static void markUnavailable(Object error) => _lastFailure ??= error;
-  static void reset() => _lastFailure = null;
-}
 
 /// One skinned GLB with reusable animations and five material colors.
 /// Speaking uses a stylized cadence, not phoneme-based lip synchronization.
@@ -72,8 +45,8 @@ class SmartCharacterViewer extends StatelessWidget {
         );
         if (size.isEmpty) return const SizedBox.shrink();
         return _CharacterSurface(
-          // Color/scene updates retain the rig. A size change needs a new texture.
-          key: ValueKey('$source/${size.width.round()}/${size.height.round()}'),
+          // Layout, keyboard and palette changes retain the model and texture.
+          key: ValueKey(source),
           source: source,
           size: size,
           configuration: this,
@@ -104,6 +77,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   final _actions = <String, three.AnimationAction>{};
   final _bones = <three.Object3D>[];
   final _skinPalette = CharacterSkinPalette();
+  final _eyeAnimation = CharacterEyeAnimation();
   three.Object3D? _model;
   three.AnimationMixer? _mixer;
   three.AnimationAction? _activeAction;
@@ -126,6 +100,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   Timer? _loadTimeout;
   int _loadGeneration = 0;
   bool _compatibilityMode = false;
+  double _modelWidth = 3.5;
+  final _startup = Stopwatch();
+  static const _canvasSize = Size.square(512);
   SmartCharacterViewer get config => widget.configuration;
 
   @override
@@ -134,31 +111,41 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     WidgetsBinding.instance.addObserver(this);
     _plan = StoryMotionPlan.fromText(config.storyText);
     config.playbackPosition?.addListener(_onPosition);
-    _createView();
   }
 
   void _createView() {
-    if (_CharacterRendererHealth.isUnavailable) {
-      _error = _CharacterRendererHealth.lastFailure;
-      return;
-    }
     final generation = ++_loadGeneration;
+    _startup.reset();
+    _startup.start();
+    // Android's flutter_angle resize is a no-op. Keep one bounded square
+    // texture and project for the current display aspect instead of decoding
+    // the GLB and recreating the EGL context whenever the layout changes.
+    final pixels =
+        (widget.size.longestSide * MediaQuery.devicePixelRatioOf(context))
+            .clamp(512.0, _compatibilityMode ? 640.0 : 1024.0);
     final view = _GuardedThreeJS(
-      size: widget.size,
+      size: _canvasSize,
+      canRender: _canRender,
+      onFirstFrame: () {
+        if (!mounted || generation != _loadGeneration || _error != null) return;
+        _loadTimeout?.cancel();
+        _startup.stop();
+        if (kDebugMode)
+          debugPrint(
+            'Character first frame: ${_startup.elapsedMilliseconds} ms (compatibility=$_compatibilityMode)',
+          );
+        setState(() => _ready = true);
+      },
       settings: three.Settings(
         clearColor: 0xF4F7F5,
-        // Enable MSAA for smooth stylized cartoon edges
-        antialias: true,
+        antialias: !_compatibilityMode,
         enableShadowMap: false,
         toneMapping: three.NoToneMapping,
-        // SurfaceProducer API causes shader validation errors on many Android
-        // devices. Fall back to the older texture path on native platforms.
+        // Keep the known native texture path; fallback also disables MSAA.
         useSurfaceProducer: kIsWeb,
         stencil: false,
-        precision: three.Precision.highp, // higher precision for better quality
-        screenResolution: _compatibilityMode
-            ? 0.8
-            : (!kIsWeb && (Platform.isAndroid || Platform.isIOS) ? 1.0 : 2.0),
+        precision: three.Precision.highp,
+        screenResolution: pixels / _canvasSize.width,
       ),
       setup: () => _setup(generation),
       onError: (error, stack) {
@@ -167,7 +154,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       onSetupComplete: () {
         if (generation != _loadGeneration) return;
         _loadTimeout?.cancel();
-        if (mounted && _error == null) setState(() => _ready = true);
+        if (mounted && _error == null) setState(() {});
       },
     );
     _view = view;
@@ -179,13 +166,14 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       0.05,
       100,
     );
-    _loadTimeout = Timer(
-      Duration(seconds: _compatibilityMode ? 8 : 6),
-      () => _onError(
-        TimeoutException('Character renderer did not become ready quickly.'),
-        StackTrace.current,
-      ),
-    );
+    _loadTimeout = Timer(const Duration(seconds: 30), () {
+      if (generation == _loadGeneration) {
+        _onError(
+          TimeoutException('Character initialization timed out.'),
+          StackTrace.current,
+        );
+      }
+    });
   }
 
   void _onError(Object error, [StackTrace? stack]) {
@@ -197,7 +185,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       _restartRenderer();
       return;
     }
-    _CharacterRendererHealth.markUnavailable(error);
+    _view?.visible = false;
     setState(() => _error = error);
   }
 
@@ -206,9 +194,6 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     three.GLTFData? data;
     try {
       data = await _loadModel(loader);
-    } catch (e, stack) {
-      debugPrint('=== GLB LOAD ERROR ===\n$e\n$stack');
-      rethrow;
     } finally {
       loader.dispose();
     }
@@ -230,6 +215,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     });
     if (widget.source == CharacterHelper.sharedModelPath) {
       _skinPalette.attach(_model!);
+      _eyeAnimation.attach(_model!);
     }
     _recolor();
     _jaw = _model!.getObjectByName('Jaw');
@@ -243,7 +229,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     }
     _frameModel();
     _buildLighting();
-    _buildSkeleton();
+    if (config.showSkeleton) _buildSkeleton();
     _orbit = three.OrbitControls(view.camera, view.globalKey)
       ..enabled = config.interactive
       ..enablePan = false
@@ -261,25 +247,22 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     final uri = Uri.tryParse(source);
     if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
       if (uri?.scheme == 'file') return loader.fromPath(uri!.toFilePath());
-      return loader.fromBytes(
-        await _CharacterModelBytesCache.loadAsset(source),
-      );
+      return loader.fromBytes(await CharacterAssetCache.instance.load(source));
     }
 
     // Online uploads use the same verified file cache as stories and audio.
     // If the file was downloaded before, it opens immediately without a
     // network call. If this is a fresh device, the first download becomes the
     // offline copy for later sessions.
-    try {
+    if (sl.isRegistered<ResourceManager>()) {
       final manager = sl<ResourceManager>();
       final cachedPath = manager.getLocalFilePath(source);
       if (cachedPath != null) return loader.fromPath(cachedPath);
       final downloadedPath = await manager
           .downloadAndCacheFile(source, folder: 'models')
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 20));
       if (downloadedPath != null) return loader.fromPath(downloadedPath);
-    } catch (_) {
-      // The standalone studio and tests do not register the resource cache.
+      throw StateError('The custom model is not available offline yet.');
     }
     return loader.fromNetwork(uri).timeout(const Duration(seconds: 6));
   }
@@ -298,13 +281,22 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       -bounds.min.y * scale,
       -center.z * scale,
     );
+    _modelWidth = extent.x * scale;
+    _fitCamera();
+  }
+
+  void _fitCamera() {
     final aspect = widget.size.width / widget.size.height;
+    final camera = _view?.camera;
+    if (camera == null) return;
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
     final distance =
-        math.max(3.5, extent.x * scale / aspect) /
+        math.max(3.5, _modelWidth / aspect) /
         (2 * math.tan(38 * math.pi / 360)) *
         1.26;
-    _view?.camera.position.setValues(0.32, 2.06, distance);
-    _view?.camera.lookAt(three.Vector3(0, 1.78, 0));
+    camera.position.setValues(0.32, 2.06, distance);
+    camera.lookAt(three.Vector3(0, 1.78, 0));
   }
 
   void _buildLighting() {
@@ -350,6 +342,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         material.color
             .setRGB(color.r * shade, color.g * shade, color.b * shade)
             .convertSRGBToLinear();
+        material.needsUpdate = true;
       }
     });
   }
@@ -433,6 +426,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       _elapsed += dt;
       _selectMotion();
       _mixer?.update(dt);
+      _eyeAnimation.update(dt, config.motion ?? _plan.motionAt(_position));
       _speechBlend +=
           ((config.isSpeaking ? 1.0 : 0.0) - _speechBlend) *
           math.min(1.0, dt * 12);
@@ -458,11 +452,20 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _updateSkeleton();
   }
 
+  bool _canRender() {
+    if (!mounted || !_foreground || !_tickerEnabled || _error != null)
+      return false;
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize || !box.attached) return false;
+    final bounds = box.localToGlobal(Offset.zero) & box.size;
+    return bounds.overlaps(Offset.zero & MediaQuery.sizeOf(context));
+  }
+
   @override
   void didUpdateWidget(covariant _CharacterSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     final old = oldWidget.configuration;
-    debugPrint('SmartCharacterViewer didUpdateWidget: old=${old.characterName}, new=${config.characterName}');
+    if (oldWidget.size != widget.size) _fitCamera();
     if (old.characterName != config.characterName) _recolor();
     if (old.storyText != config.storyText) {
       _plan = StoryMotionPlan.fromText(config.storyText);
@@ -481,9 +484,11 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       _mouth?.scale.setValues(1, 1, 1);
     }
     _orbit?.enabled = config.interactive;
+    if (config.showSkeleton && _skeleton == null && _ready) _buildSkeleton();
     _skeleton?.visible = config.showSkeleton;
     _selectMotion();
-    _mixer?.update(0);
+    if (old.motion != config.motion || old.storyText != config.storyText)
+      _mixer?.update(0);
     _updateSkeleton();
   }
 
@@ -491,6 +496,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    if (_view == null && _error == null) _createView();
     _view?.visible = _foreground && _tickerEnabled && _error == null;
   }
 
@@ -510,7 +516,10 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 
   void _disposeRenderer() {
+    ++_loadGeneration;
+    _loadTimeout?.cancel();
     _skinPalette.dispose();
+    _eyeAnimation.dispose();
     _orbit?.dispose();
     _orbit = null;
     _mixer?.stopAllAction();
@@ -543,14 +552,12 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 
   void _retry() {
-    _CharacterRendererHealth.reset();
     _compatibilityMode = false;
     _restartRenderer();
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = CharacterHelper.getColor(config.characterName);
     return Semantics(
       label:
           'شخصية ${CharacterHelper.getCleanName(config.characterName)} متحركة',
@@ -559,21 +566,33 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         children: [
           // The platform texture must stay in the tree while it initializes;
           // the fallback is painted above it until the first rendered frame.
-          if (_view != null) _view!.build(),
+          if (_view != null)
+            RepaintBoundary(
+              child: FittedBox(
+                fit: BoxFit.fill,
+                child: SizedBox.fromSize(
+                  size: _canvasSize,
+                  child: _view!.build(),
+                ),
+              ),
+            ),
           if (_error != null)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  'حدث خطأ في تشغيل 3D على هذا الجهاز/المحاكي:\n$_error',
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                  'تعذّر عرض الشخصية الآن. أعد المحاولة.',
+                  style: const TextStyle(fontSize: 14),
                   textAlign: TextAlign.center,
-                  textDirection: TextDirection.ltr,
+                  textDirection: TextDirection.rtl,
                 ),
               ),
             ),
           if (!_ready && _error == null)
-            const SizedBox.shrink(),
+            const ColoredBox(
+              color: Color(0xFFF4F7F5),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
           if (_error != null)
             Align(
               alignment: Alignment.bottomCenter,
@@ -592,115 +611,6 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 }
 
-/// Fast, offline-safe visual shown while 3D initializes and on devices without
-/// a compatible graphics driver. It preserves the character identity instead
-/// of showing a dead-end error card.
-class _CharacterFallback extends StatelessWidget {
-  const _CharacterFallback({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => RepaintBoundary(
-    child: CustomPaint(
-      painter: _MascotFallbackPainter(color),
-      child: const SizedBox.expand(),
-    ),
-  );
-}
-
-class _MascotFallbackPainter extends CustomPainter {
-  _MascotFallbackPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const design = Size(260, 340);
-    final scale = math.min(
-      size.width / design.width,
-      size.height / design.height,
-    );
-    canvas
-      ..translate(
-        (size.width - design.width * scale) / 2,
-        (size.height - design.height * scale) / 2,
-      )
-      ..scale(scale);
-    final body = Paint()..color = color;
-    final shade = Paint()
-      ..color = Color.alphaBlend(Colors.black.withOpacity(.22), color);
-    final cream = Paint()..color = const Color(0xFFF4D999);
-    final hat = Paint()..color = const Color(0xFF454951);
-    final frame = Paint()
-      ..color = const Color(0xFF36473F)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5;
-    final eye = Paint()..color = const Color(0xFFD9F09E);
-    final pupil = Paint()..color = const Color(0xFF183B2B);
-
-    canvas.drawOval(const Rect.fromLTWH(82, 246, 42, 58), body);
-    canvas.drawOval(const Rect.fromLTWH(136, 246, 42, 58), body);
-    canvas.drawOval(const Rect.fromLTWH(68, 125, 124, 148), body);
-    canvas.drawOval(const Rect.fromLTWH(91, 145, 78, 112), cream);
-    canvas.drawOval(const Rect.fromLTWH(50, 151, 37, 91), shade);
-    canvas.drawOval(const Rect.fromLTWH(173, 151, 37, 91), shade);
-    canvas.drawOval(const Rect.fromLTWH(48, 47, 164, 130), body);
-    canvas.drawOval(const Rect.fromLTWH(72, 112, 116, 50), cream);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(54, 38, 152, 24),
-        const Radius.circular(13),
-      ),
-      hat,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(78, 14, 104, 42),
-        const Radius.circular(18),
-      ),
-      hat,
-    );
-    canvas.drawCircle(const Offset(94, 14), 13, hat);
-    canvas.drawCircle(const Offset(166, 14), 13, hat);
-
-    for (final center in const [Offset(103, 94), Offset(157, 94)]) {
-      canvas.drawCircle(center, 26, eye);
-      canvas.drawCircle(center, 26, frame);
-      canvas.drawCircle(Offset(center.dx, center.dy + 2), 9, pupil);
-      canvas.drawCircle(
-        Offset(center.dx - 3, center.dy - 4),
-        3,
-        Paint()..color = Colors.white,
-      );
-    }
-    canvas.drawLine(const Offset(129, 94), const Offset(131, 94), frame);
-    canvas.drawOval(const Rect.fromLTWH(115, 75, 30, 17), shade);
-    canvas.drawArc(
-      const Rect.fromLTWH(102, 125, 56, 22),
-      0,
-      math.pi,
-      false,
-      Paint()
-        ..color = const Color(0xFF7C2830)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
-
-    for (final x in [91.0, 103.0, 115.0, 145.0, 157.0, 169.0]) {
-      canvas.drawOval(Rect.fromLTWH(x, 220, 8, 17), body);
-    }
-    for (final x in [93.0, 104.0, 115.0, 147.0, 158.0, 169.0]) {
-      canvas.drawOval(Rect.fromLTWH(x, 285, 9, 13), body);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _MascotFallbackPainter oldDelegate) =>
-      oldDelegate.color != color;
-}
-
 /// Contains native initialization/render errors and safely disposes textures
 /// created after a route has already been closed.
 class _GuardedThreeJS extends three.ThreeJS {
@@ -710,11 +620,19 @@ class _GuardedThreeJS extends three.ThreeJS {
     required super.setup,
     required super.onSetupComplete,
     required this.onError,
+    required this.canRender,
+    required this.onFirstFrame,
   });
   final void Function(Object, StackTrace) onError;
+  final bool Function() canRender;
+  final VoidCallback onFirstFrame;
   bool _initializing = false;
   bool _closing = false;
   bool _failed = false;
+  bool _rendering = false;
+  bool _firstFrame = false;
+  bool _inViewport = true;
+  Duration _lastVisibilityCheck = const Duration(seconds: -1);
 
   @override
   Future<void> initPlatformState() async {
@@ -727,18 +645,34 @@ class _GuardedThreeJS extends three.ThreeJS {
       if (!_closing) onError(error, stack);
     } finally {
       _initializing = false;
-      if (_closing) _finishDispose();
+      if (_closing && !_rendering) _finishDispose();
     }
   }
 
   @override
   Future<void> animate(Duration duration) async {
-    if (_closing || _failed) return;
+    if (_closing || _failed || _rendering || !mounted) return;
+    if (duration - _lastVisibilityCheck >= const Duration(milliseconds: 200)) {
+      _lastVisibilityCheck = duration;
+      _inViewport = canRender();
+    }
+    if (!visible || !_inViewport) {
+      clock.getDelta(); // Do not jump forward after a hidden route resumes.
+      return;
+    }
+    _rendering = true;
     try {
       await super.animate(duration);
+      if (!_closing && !_firstFrame) {
+        _firstFrame = true;
+        onFirstFrame();
+      }
     } catch (error, stack) {
       _failed = true;
       if (!_closing) onError(error, stack);
+    } finally {
+      _rendering = false;
+      if (_closing && !_initializing) _finishDispose();
     }
   }
 
@@ -747,7 +681,7 @@ class _GuardedThreeJS extends three.ThreeJS {
     if (_closing) return;
     _closing = true;
     visible = false;
-    if (!_initializing) _finishDispose();
+    if (!_initializing && !_rendering) _finishDispose();
   }
 
   void _finishDispose() {

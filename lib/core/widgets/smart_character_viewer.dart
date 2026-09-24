@@ -138,13 +138,13 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       },
       settings: three.Settings(
         clearColor: 0xF4F7F5,
-        antialias: !_compatibilityMode,
+        antialias: kIsWeb, // MSAA often crashes mobile FBOs
         enableShadowMap: false,
         toneMapping: three.NoToneMapping,
         // Keep the known native texture path; fallback also disables MSAA.
         useSurfaceProducer: kIsWeb,
         stencil: false,
-        precision: three.Precision.highp,
+        precision: kIsWeb ? three.Precision.highp : three.Precision.mediump,
         screenResolution: pixels / _canvasSize.width,
       ),
       setup: () => _setup(generation),

@@ -36,6 +36,19 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   var _playing = true;
   var _speaking = false;
   var _skeleton = false;
+  var _showHat = true;
+  var _hatColor = const Color(0xFF2C2C2E);
+
+  static const _hatColors = <Color>[
+    Color(0xFF2C2C2E),
+    Color(0xFF1A1A1A),
+    Color(0xFF4A3728),
+    Color(0xFF8B4513),
+    Color(0xFFC0392B),
+    Color(0xFF277A59),
+    Color(0xFF2E86C1),
+    Color(0xFFF5F5F5),
+  ];
 
   @override
   void initState() {
@@ -204,6 +217,8 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 motion: _selectedMotion,
                 interactive: true,
                 showSkeleton: _skeleton,
+                showHat: _showHat,
+                hatColor: _hatColor,
               ),
               PositionedDirectional(
                 top: 18,
@@ -513,6 +528,58 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   style: TextStyle(color: _ink, fontSize: 13),
                 ),
               ),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                value: _showHat,
+                onChanged: (value) => setState(() => _showHat = value),
+                contentPadding: EdgeInsets.zero,
+                activeTrackColor: _accent,
+                title: const Text(
+                  'إظهار الطاقية',
+                  style: TextStyle(color: _ink, fontSize: 13),
+                ),
+                subtitle: const Text(
+                  'قبعة فيدورا مع أذنين',
+                  style: TextStyle(color: _muted, fontSize: 11),
+                ),
+              ),
+              if (_showHat) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'لون الطاقية',
+                  style: TextStyle(color: _ink, fontSize: 13),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _hatColors.map((color) {
+                    final selected = _hatColor.toARGB32() == color.toARGB32();
+                    return Semantics(
+                      button: true,
+                      selected: selected,
+                      label: 'لون الطاقية',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(22),
+                        onTap: () => setState(() => _hatColor = color),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          height: 36,
+                          width: 36,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: selected ? _ink : const Color(0xFFD0D8D0),
+                              width: selected ? 2.2 : 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ],
           ),
         ),

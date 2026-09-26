@@ -24,6 +24,8 @@ class SmartCharacterViewer extends StatelessWidget {
     this.motion,
     this.interactive = true,
     this.showSkeleton = false,
+    this.showHat = true,
+    this.hatColor = const Color(0xFF2C2C2E),
     this.onReady,
   });
   final String characterName;
@@ -34,6 +36,8 @@ class SmartCharacterViewer extends StatelessWidget {
   final CharacterMotion? motion;
   final bool interactive;
   final bool showSkeleton;
+  final bool showHat;
+  final Color hatColor;
   final VoidCallback? onReady;
 
   @override
@@ -50,6 +54,8 @@ class SmartCharacterViewer extends StatelessWidget {
         isSpeaking: isSpeaking,
         interactive: interactive,
         showSkeleton: showSkeleton,
+        showHat: showHat,
+        hatColor: hatColor,
         motion: motion,
         playbackPosition: playbackPosition,
         onReady: onReady,
@@ -339,22 +345,56 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 
   void _recolor() {
-    if (widget.source != CharacterHelper.sharedModelPath) return;
-    final color = CharacterHelper.getColor(config.characterName);
-    _skinPalette.setColor(
-      color,
-      originalGreen:
-          CharacterHelper.getColorKey(config.characterName) == 'port',
-    );
+    if (widget.source == CharacterHelper.sharedModelPath) {
+      final color = CharacterHelper.getColor(config.characterName);
+      _skinPalette.setColor(
+        color,
+        originalGreen:
+            CharacterHelper.getColorKey(config.characterName) == 'port',
+      );
+      _model?.traverse((object) {
+        final material = object.material;
+        if (material?.name == 'BodyColor' || material?.name == 'BodyDetail') {
+          final shade = material!.name == 'BodyDetail' ? 0.55 : 1.0;
+          material.color
+              .setRGB(color.r * shade, color.g * shade, color.b * shade)
+              .convertSRGBToLinear();
+          material.needsUpdate = true;
+        }
+      });
+    }
+    _applyHat();
+  }
+
+  void _applyHat() {
+    final hatColor = config.hatColor;
+    final skinColor = CharacterHelper.getColor(config.characterName);
     _model?.traverse((object) {
       final material = object.material;
-      if (material?.name == 'BodyColor' || material?.name == 'BodyDetail') {
-        final shade = material!.name == 'BodyDetail' ? 0.55 : 1.0;
-        material.color
-            .setRGB(color.r * shade, color.g * shade, color.b * shade)
-            .convertSRGBToLinear();
-        material.needsUpdate = true;
+      final name = material?.name;
+      if (name != 'Hat' &&
+          name != 'HatBand' &&
+          name != 'HatTrim' &&
+          name != 'HatSkin') {
+        return;
       }
+      object.visible = config.showHat;
+      if (!config.showHat || material == null) return;
+      if (name == 'HatSkin') {
+        material.color
+            .setRGB(skinColor.r, skinColor.g, skinColor.b)
+            .convertSRGBToLinear();
+      } else {
+        final shade = name == 'HatBand' ? 0.45 : 1.0;
+        // Textured hat: tint the felt with the studio hat color.
+        material.color
+            .setRGB(hatColor.r * shade, hatColor.g * shade, hatColor.b * shade)
+            .convertSRGBToLinear();
+      }
+      material.transparent = false;
+      material.opacity = 1.0;
+      material.depthWrite = true;
+      material.needsUpdate = true;
     });
   }
 
@@ -496,6 +536,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     final old = oldWidget.configuration;
     if (oldWidget.size != widget.size) _fitCamera();
     if (old.characterName != config.characterName) _recolor();
+    if (old.showHat != config.showHat || old.hatColor != config.hatColor) {
+      _applyHat();
+    }
     if (old.storyText != config.storyText) {
       _plan = StoryMotionPlan.fromText(config.storyText);
       _elapsed = 0;

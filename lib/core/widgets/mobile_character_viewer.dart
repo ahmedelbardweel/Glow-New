@@ -24,6 +24,8 @@ class MobileCharacterViewer extends StatefulWidget {
     required this.isSpeaking,
     required this.interactive,
     required this.showSkeleton,
+    this.showHat = true,
+    this.hatColor = const Color(0xFF2C2C2E),
     this.motion,
     this.playbackPosition,
     this.onReady,
@@ -31,6 +33,8 @@ class MobileCharacterViewer extends StatefulWidget {
 
   final String characterName, storyText;
   final bool isPlaying, isSpeaking, interactive, showSkeleton;
+  final bool showHat;
+  final Color hatColor;
   final CharacterMotion? motion;
   final ValueListenable<Duration>? playbackPosition;
   final VoidCallback? onReady;
@@ -189,6 +193,9 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
       'speaking': widget.isSpeaking,
       'interactive': widget.interactive,
       'skeleton': widget.showSkeleton,
+      'hat': widget.showHat,
+      'hatColor':
+          '#${(widget.hatColor.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
       'visible': _visible,
       'originalGreen':
           CharacterHelper.getColorKey(widget.characterName) == 'port',
@@ -288,6 +295,8 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
         oldWidget.isPlaying != widget.isPlaying ||
         oldWidget.isSpeaking != widget.isSpeaking ||
         oldWidget.showSkeleton != widget.showSkeleton ||
+        oldWidget.showHat != widget.showHat ||
+        oldWidget.hatColor != widget.hatColor ||
         oldWidget.interactive != widget.interactive ||
         oldWidget.playbackPosition != widget.playbackPosition) {
       _sendState();

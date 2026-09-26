@@ -36,10 +36,28 @@ def ease(a, b, value):
     return t*t*(3-2*t)
 
 
-def solve_weights(positions, triangles):
-    """Solve four pinned harmonic fields on the original surface adjacency."""
+def solve_weights(positions, triangles, cuts=()):
+    """Solve four pinned harmonic fields on the original surface adjacency.
+
+    ``cuts`` open each armpit crease: arm-side triangles use coincident copies
+    of the crease vertices, so no field diffuses across the opened seam.
+    """
     unique, inverse = np.unique(positions, axis=0, return_inverse=True)
+    inverse = inverse.ravel()
     tris = inverse[triangles.reshape(-1, 3)]
+    duplicates = {}
+    arm_members = {}
+    for cut in cuts:
+        for node in cut["pathNodes"]:
+            duplicates[node] = len(unique)+len(duplicates)
+        rows = tris[cut["armTriangles"]]
+        for node in cut["pathNodes"]:
+            rows[rows == node] = duplicates[node]
+        tris[cut["armTriangles"]] = rows
+        arm_members[cut["side"]] = np.array([duplicates.get(int(node), int(node))
+                                             for node in cut["armNodes"]])
+    if duplicates:
+        unique = np.concatenate([unique, unique[list(duplicates)]])
     edges = np.concatenate((tris[:, (0, 1)], tris[:, (1, 2)], tris[:, (2, 0)]))
     edges.sort(axis=1)
     edges = np.unique(edges, axis=0)
@@ -53,14 +71,29 @@ def solve_weights(positions, triangles):
     info = []
     for column, (side, arm) in enumerate(((1, True), (-1, True), (1, False), (-1, False))):
         lateral = x*side
-        if arm:
+        if arm and side in arm_members:
+            # With the crease open, the whole arm below the armpit is rigid
+            # and only the shoulder cap blends back into the body.
+            member = np.zeros(len(unique), dtype=bool)
+            member[arm_members[side]] = True
+            # The cut ends at the armpit apex; blending well below it on both
+            # sides spreads the shoulder turn instead of tearing at the tip.
+            cap = ((lateral > .145) & (y > .21) & (y < .455) & (z > -.155) & (z < .21)
+                   & ~((y >= .42) & (lateral < .18) & (z > .14))
+                   & ~((z >= .116) & (lateral <= .156)))
+            domain = member | cap
+            distal = member & (y < .19)
+        elif arm:
             # A sleeve-shaped domain around the hanging arm excludes the
             # front bib, tail and skull. Only its shoulder attachment is free
             # to blend into Root; the rest of the body is a Dirichlet boundary.
-            domain = ((lateral > .145) & (y > .095) & (y < .432)
-                      & (z > -.155) & (z < .116))
-            distal = domain & (lateral > .223) & (y < .282)
-            torso = (lateral < .182) & (y < .300)
+            # The visible arm continues forward of z=.116 and up through the
+            # shoulder. Keep the hat, cheeks and belly bib pinned to Root.
+            domain = ((lateral > .155) & (y > .095) & (y < .48)
+                      & (z > -.155) & (z < .21)
+                      & ~((y >= .42) & (lateral < .18) & (z > .14)))
+            distal = domain & (lateral > .210) & (y < .30)
+            torso = (lateral < .175) & (y < .28) & (z > .02)
             domain &= ~torso
         else:
             domain = ((lateral > .022) & (lateral < .218) & (y < .154)
@@ -146,8 +179,10 @@ def solve_weights(positions, triangles):
     ids[weights == 0] = 0
     # Pack exactly one Root entry per vertex with positive weight; zero
     # padding entries are legal glTF and intentionally remain exactly zero.
+    copies = {node: (ids[copy].astype(np.uint16), weights[copy]) for node, copy in duplicates.items()}
     return ids[inverse].astype(np.uint16), weights[inverse], {
         "weldedSolveVertices": len(unique), "sourceVertices": len(positions),
         "surfaceEdges": len(edges), "solvers": info,
         "sourceSeamsPreserved": True,
-    }
+        "openedArmpitVertices": len(duplicates),
+    }, copies

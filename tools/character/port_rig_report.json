@@ -2,19 +2,19 @@
   "source": "tools\\character\\source\\port_frontal.glb",
   "rig": "assets\\3d\\glow_mascot.glb",
   "sourceSha256": "5b316a34733e59fa7206568e0173745e6e310aab5053c156c8fbb7400fb71a84",
-  "rigSha256": "c60209fae7183f655d7b7e9f486f41f7f2e3e817824f029639b53963179f7f17",
+  "rigSha256": "e2109d1ebec1510feac0c920efedae517a47d1eaa8657897a8ea0662e73d974c",
   "originalVertices": 55164,
   "originalTriangles": 94874,
   "originalSurfaceVerticesRetained": true,
   "sourceTextureBytesIdentical": true,
   "originalNormalsAndUvsIdentical": true,
   "sourceMaterialIdentical": true,
-  "insertedLipVertices": 203,
-  "refinedSurfaceTriangles": 95132,
+  "insertedLipVertices": 534,
+  "refinedSurfaceTriangles": 95120,
   "maxOriginalPositionError": 2.9802079026808315e-08,
   "maxSurfaceAreaError": 1.8126667046167687e-09,
   "bones": 21,
-  "primitiveCount": 4,
+  "primitiveCount": 5,
   "textureSha256": [
     "83105379db945d8af816196485989091e5debd1c5060dc6dcbd4f576cdf0c8d2",
     "81c4848ab800ecece38240929a2d1a7ce3633f9e84a49ca36b3986b9d7af7dde",
@@ -23,8 +23,8 @@
   "eyeSurfaceVertices": 1121,
   "skinPaletteAttribute": true,
   "protectedEyeVertices": 1795,
-  "staticSurfaceVertices": 48279,
-  "facialSurfaceVertices": 745,
+  "staticSurfaceVertices": 48000,
+  "facialSurfaceVertices": 801,
   "transitionFrames": 270,
   "clips": [
     {
@@ -32,7 +32,7 @@
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 4.175215667865268e-09,
+      "maxLipOpening": 1.7291573194532253e-08,
       "maxEdgeStretch": 1.0000238093130047
     },
     {
@@ -40,72 +40,72 @@
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 0.021545303063366206,
-      "maxEdgeStretch": 1.8424315247783016
+      "maxLipOpening": 0.021709270056799828,
+      "maxEdgeStretch": 1.3695953803236538
     },
     {
       "name": "Wave",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 4.175215667865268e-09,
-      "maxEdgeStretch": 2.602764193946481
+      "maxLipOpening": 1.7291573194532253e-08,
+      "maxEdgeStretch": 3.581563032136363
     },
     {
       "name": "Happy",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 0.027332757158724946,
-      "maxEdgeStretch": 2.2425721096373166
+      "maxLipOpening": 0.02754076862184461,
+      "maxEdgeStretch": 1.8115255031037567
     },
     {
       "name": "Sad",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 4.175215667865268e-09,
-      "maxEdgeStretch": 1.8598480314852766
+      "maxLipOpening": 1.7291573194532253e-08,
+      "maxEdgeStretch": 2.6554882806024316
     },
     {
       "name": "Thinking",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 4.175215667865268e-09,
-      "maxEdgeStretch": 2.098867481879597
+      "maxLipOpening": 1.7291573194532253e-08,
+      "maxEdgeStretch": 1.4017247380074032
     },
     {
       "name": "Victory",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 4.175215667865268e-09,
-      "maxEdgeStretch": 2.5210174517653385
+      "maxLipOpening": 1.7291573194532253e-08,
+      "maxEdgeStretch": 3.7709589413897007
     },
     {
       "name": "Walk",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 4.175215667865268e-09,
-      "maxEdgeStretch": 2.0014072403821754
+      "maxLipOpening": 1.7291573194532253e-08,
+      "maxEdgeStretch": 1.8041992156595972
     },
     {
       "name": "Smile",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 4.175215667865268e-09,
-      "maxEdgeStretch": 1.3201869009188887
+      "maxLipOpening": 1.7291573194532253e-08,
+      "maxEdgeStretch": 1.3321879788856412
     },
     {
       "name": "Laugh",
       "sampledFrames": 25,
       "staticDisplacement": 0.0,
       "sourceUvSeamSeparation": 0.0,
-      "maxLipOpening": 0.03227649276537967,
-      "maxEdgeStretch": 1.8874922681923125
+      "maxLipOpening": 0.030032948814271012,
+      "maxEdgeStretch": 3.2039854925393065
     }
   ]
 }

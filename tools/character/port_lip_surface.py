@@ -7,13 +7,22 @@ from __future__ import annotations
 import numpy as np
 
 
-def split_lips(p,n,uv,triangles):
+def split_lips(p, n, uv, triangles, *, f=None, body_x=0., cut_x=.122, cut_z=.185,
+               cut_y_min=None, mouth_half=None):
     triangles=triangles.reshape(-1,3).astype(int)
     unique,inverse=np.unique(p,axis=0,return_inverse=True)
-    f=p[:,1]-(.4855+1.60*p[:,0]**2)
+    # Trace the lip seam at the painted green-to-cream boundary, not lower on
+    # the muzzle where the mouth read as a dropped oval hole.
+    if f is None:
+        f = p[:,1]-(.508+1.60*p[:,0]**2)
+    else:
+        f = np.asarray(f, dtype=np.float64 if p.dtype == np.float64 else np.float32)
+    front_smile = mouth_half is not None
     face_p=p[triangles]
     cut=((f[triangles].min(1)<0)&(f[triangles].max(1)>0)
-         &(face_p[:,:,2].min(1)>.185)&(np.abs(face_p[:,:,0].mean(1))<.122))
+         &(face_p[:,:,2].min(1)>cut_z)&(np.abs(face_p[:,:,0].mean(1)-body_x)<cut_x))
+    if cut_y_min is not None:
+        cut &= face_p[:, :, 1].min(1) > cut_y_min
     segments={};edge_points={};adjacent={}
     for fi in np.flatnonzero(cut):
         ids=triangles[fi];crossed=[]
@@ -23,32 +32,72 @@ def split_lips(p,n,uv,triangles):
                 continue
             key=tuple(sorted((int(inverse[a]),int(inverse[b]))))
             if key not in edge_points:
-                aa,bb=unique[list(key)]
-                fa=aa[1]-(.4855+1.60*aa[0]**2)
-                fb=bb[1]-(.4855+1.60*bb[0]**2)
-                t=fa/(fa-fb)
-                edge_points[key]=(aa*(1-t)+bb*t).astype(np.float32)
+                fa, fb = float(f[a]), float(f[b])
+                t=fa/(fa-fb) if abs(fa-fb) > 1e-12 else .5
+                edge_points[key]=(p[a]*(1-t)+p[b]*t).astype(np.float32)
             crossed.append(key)
         if len(crossed)!=2:
-            raise ValueError('Invalid contour crossing')
+            if front_smile and len(crossed)==1:
+                segments[fi]=crossed
+            elif front_smile:
+                continue
+            else:
+                raise ValueError('Invalid contour crossing')
+            continue
         segments[fi]=crossed
         a,b=crossed
         adjacent.setdefault(a,set()).add(b);adjacent.setdefault(b,set()).add(a)
-    center=min(edge_points,key=lambda key: abs(edge_points[key][0])+abs(edge_points[key][2]-.275))
-    component={center};pending=[center]
-    while pending:
-        for key in adjacent[pending.pop()]-component:
-            component.add(key);pending.append(key)
-    ends=[key for key in component if len(adjacent[key])==1]
-    if len(ends)!=2 or any(len(adjacent[key])>2 for key in component):
-        raise ValueError('Mouth contour must be one open manifold chain')
-    start=min(ends,key=lambda key:edge_points[key][0])
-    path=[start]
-    while True:
-        options=adjacent[path[-1]]-set(path)
-        if not options:break
-        path.append(next(iter(options)))
-    cut_faces={fi for fi,pair in segments.items() if pair[0] in component}
+    if not edge_points:
+        raise ValueError('No mouth contour crossings')
+    if front_smile:
+        center=max(edge_points,key=lambda key: edge_points[key][2]-.4*abs(edge_points[key][0]-body_x))
+
+        def walk(start, skip=None):
+            path=[start]
+            while True:
+                options=[key for key in adjacent.get(path[-1],set())
+                         if key!=skip and key not in path]
+                if not options:
+                    break
+                nxt=max(options,key=lambda key: edge_points[key][2])
+                point=edge_points[nxt]
+                if (point[2]<cut_z+.005 or abs(point[0]-body_x)>mouth_half+.006
+                        or (cut_y_min is not None and point[1]<cut_y_min+.008)):
+                    break
+                path.append(nxt)
+                if len(path)>80:
+                    break
+            return path
+
+        left=walk(center)
+        right=walk(center, skip=left[1] if len(left)>1 else None)
+        path=[]
+        for key in list(reversed(left[1:]))+[center]+right[1:]:
+            if key not in path:
+                path.append(key)
+        if len(path)<8:
+            raise ValueError(f'Mouth contour too short ({len(path)})')
+        component=set(path)
+    else:
+        center=min(edge_points,key=lambda key: abs(edge_points[key][0])+abs(edge_points[key][2]-.275))
+        component={center};pending=[center]
+        while pending:
+            for key in adjacent[pending.pop()]-component:
+                component.add(key);pending.append(key)
+        ends=[key for key in component if len(adjacent[key])==1]
+        if len(ends)!=2 or any(len(adjacent[key])>2 for key in component):
+            raise ValueError('Mouth contour must be one open manifold chain')
+        start=min(ends,key=lambda key:edge_points[key][0])
+        path=[start]
+        while True:
+            options=adjacent[path[-1]]-set(path)
+            if not options:break
+            path.append(next(iter(options)))
+    if front_smile:
+        cut_faces={fi for fi,pair in segments.items()
+                   if all(key in component for key in pair)}
+    else:
+        cut_faces={fi for fi,pair in segments.items() if pair[0] in component}
     pp=list(p);nn=list(n);uu=list(uv)
     # Each added vertex carries source barycentrics for independent QA.
     provenance=[];edge_cache={};lower_cache={};upper_by_key={};lower_by_key={}
@@ -64,8 +113,14 @@ def split_lips(p,n,uv,triangles):
         cache_key=tuple(sorted((int(a),int(b))))
         key=tuple(sorted((int(inverse[a]),int(inverse[b]))))
         if cache_key not in edge_cache:
-            a,b=cache_key;t=float(f[a]/(f[a]-f[b]))
-            edge_cache[cache_key]=add([a,b],[1-t,t],edge_points[key])
+            a,b=cache_key
+            target=edge_points[key]
+            ab=p[b]-p[a]
+            denom=float(np.dot(ab,ab))
+            # Project the welded seam onto this triangle edge so provenance
+            # positions match the stored barycentrics exactly.
+            t=float(np.clip(np.dot(target-p[a],ab)/denom,0,1)) if denom>1e-12 else 0.5
+            edge_cache[cache_key]=add([a,b],[1-t,t],target)
             upper_by_key.setdefault(key,edge_cache[cache_key])
         upper=edge_cache[cache_key]
         if not lower:return upper

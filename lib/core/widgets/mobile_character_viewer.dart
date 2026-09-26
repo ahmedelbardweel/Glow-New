@@ -26,12 +26,14 @@ class MobileCharacterViewer extends StatefulWidget {
     required this.showSkeleton,
     this.motion,
     this.playbackPosition,
+    this.onReady,
   });
 
   final String characterName, storyText;
   final bool isPlaying, isSpeaking, interactive, showSkeleton;
   final CharacterMotion? motion;
   final ValueListenable<Duration>? playbackPosition;
+  final VoidCallback? onReady;
 
   @override
   State<MobileCharacterViewer> createState() => _MobileCharacterViewerState();
@@ -97,6 +99,7 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
                   'Character mobile ready: ${_startup.elapsedMilliseconds}ms; ${payload['triangles']} triangles; ${payload['clips']}',
                 );
               setState(() => _ready = true);
+              widget.onReady?.call();
             case 'loaded':
               _timeout?.cancel();
             case 'error':

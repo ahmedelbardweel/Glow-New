@@ -161,6 +161,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       ..reset();
     _detachAudio();
     setState(() {
+      _isCharacterReady = false;
       _playRequested = true;
       _isPlaying = false;
       _hasAudio = false;
@@ -237,6 +238,8 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     if (_isCurrentScene(generation)) _startFallbackTimer(generation);
   }
 
+  bool _isCharacterReady = false;
+
   void _startFallbackTimer(int generation) {
     if (!_isCurrentScene(generation)) return;
     _detachAudio();
@@ -251,7 +254,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
               milliseconds: (_currentTimeline!.totalDuration * 1000).round(),
             )
           : const Duration(seconds: 10);
-      _isPlaying = _playRequested && _isAppActive;
+      _isPlaying = _playRequested && _isAppActive && _isCharacterReady;
     });
     if (_isPlaying) _fallbackClock.start();
     _positionNotifier.value = Duration.zero;
@@ -289,11 +292,11 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
   void _syncPlayback() {
     if (!mounted || _leaving) return;
-    final shouldPlay = _playRequested && _isAppActive;
+    final shouldPlay = _playRequested && _isAppActive && _isCharacterReady;
     if (_hasAudio) {
       if (!shouldPlay) setState(() => _isPlaying = false);
       _queueAudioCommand((player) async {
-        if (_playRequested && _isAppActive) {
+        if (shouldPlay) {
           if (_audioCompleted) {
             _nextStory();
           } else {
@@ -315,6 +318,12 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
   void _togglePlayPause() {
     setState(() => _playRequested = !_playRequested);
+    _syncPlayback();
+  }
+
+  void _onCharacterReady(int generation) {
+    if (!_isCurrentScene(generation)) return;
+    setState(() => _isCharacterReady = true);
     _syncPlayback();
   }
 
@@ -680,6 +689,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                                   playbackPosition:
                                                       _positionNotifier,
                                                   motion: activeMotion,
+                                                  onReady: () => _onCharacterReady(_sceneGeneration),
                                                 ),
                                               ),
                                             ),

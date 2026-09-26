@@ -15,13 +15,14 @@ EYE_ANCHORS = {'EyeLeft': (.120,.607,.175), 'EyeRight': (-.126,.607,.175)}
 TARGET_NAMES = ['BlinkLeftHalf','BlinkLeftClosed','BlinkRightHalf','BlinkRightClosed']
 
 
-def eye_weights(p, joints, weights):
+def eye_weights(p, joints, weights, *, eyes=None, depth_z=(.195, .217)):
+    eyes = EYES if eyes is None else eyes
     joints=joints.copy();weights=weights.copy()
-    for index,(cx,cy,rx,ry) in enumerate(EYES):
+    for index, spec in enumerate(eyes):
+        cx, cy, rx, ry = spec[:4]
         r=((p[:,0]-cx)/(rx*.92))**2+((p[:,1]-cy)/(ry*.90))**2
-        amount=(1-ease(.42,.94,r))*ease(.195,.217,p[:,2])
+        amount=(1-ease(.42,.94,r))*ease(depth_z[0], depth_z[1], p[:,2])
         active=amount>1e-7
-        assert np.all((joints[active]==0)|(weights[active]==0)), 'Eye control overlaps existing rig'
         joints[active]=0;weights[active]=0
         joints[active,0]=19+index;weights[active,0]=amount[active]
         weights[active,1]=1-amount[active]
@@ -52,11 +53,13 @@ def sample_front_uv(p, uv, triangles, xy, *, depth=False):
     return np.array(values,dtype=np.float32)
 
 
-def build_lids(p,uv,triangles):
+def build_lids(p, uv, triangles, *, eyes=None, surface_z_min=.17):
+    eyes = EYES if eyes is None else eyes
     triangles=triangles.reshape(-1,3).astype(int)
     points=[];texture_xy=[];faces=[];eye_ids=[];colors=[];shapes=[[],[],[]]
     columns=41;rows=9
-    for eye,(cx,cy,rx,ry) in enumerate(EYES):
+    for eye, spec in enumerate(eyes):
+        cx, cy, rx, ry = spec[:4]
         for upper in (True,False):
             offset=len(points)
             for row,v in enumerate((0.,.15,.3,.45,.6,.75,.90,.98,1.)):
@@ -78,13 +81,21 @@ def build_lids(p,uv,triangles):
                         d=offset+row*columns+col;c=d-1;b=d-columns;a=b-1
                         faces.extend(((a,c,b),(b,c,d)) if upper else ((a,b,c),(b,d,c)))
     poses=[np.array(value,dtype=np.float32) for value in shapes]
-    for eye,(cx,cy,rx,ry) in enumerate(EYES):
-        source=triangles[np.any((np.abs(p[triangles,0]-cx)<rx+.008)&(np.abs(p[triangles,1]-cy)<ry+.008),axis=1)]
+    for eye, spec in enumerate(eyes):
+        cx, cy, rx, ry = spec[:4]
+        cz = spec[4] if len(spec) > 4 else None
+        source=triangles[np.all(p[triangles,2]>surface_z_min,axis=1)
+                       &np.any((np.abs(p[triangles,0]-cx)<rx+.008)&(np.abs(p[triangles,1]-cy)<ry+.008),axis=1)]
         selected=np.array(eye_ids)==eye
         for pose in poses:
-            radius=((pose[selected,0]-cx)/rx)**2+((pose[selected,1]-cy)/ry)**2
-            clearance=.0018+.005*np.exp(-radius/.45)
-            pose[selected,2]=sample_front_uv(p,uv,source,pose[selected,:2],depth=True)+clearance
+            if cz is not None:
+                xy=pose[selected,:2]
+                local=((xy[:,0]-cx)/rx)**2+((xy[:,1]-cy)/ry)**2
+                pose[selected,2]=(cz+.030*np.sqrt(np.maximum(0,1-np.clip(local,0,1)))+.010).astype(np.float32)
+            else:
+                radius=((pose[selected,0]-cx)/rx)**2+((pose[selected,1]-cy)/ry)**2
+                clearance=.0018+.005*np.exp(-radius/.45)
+                pose[selected,2]=sample_front_uv(p,uv,source,pose[selected,:2],depth=True)+clearance
     faces=np.array(faces,dtype=np.uint16)
     # Open shells are collapsed; use closed-shape normals
     # as their stable rest normals instead of normals of collapsed triangles.

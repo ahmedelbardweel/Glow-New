@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 from port_rig_weights import ANCHORS, solve_weights, ease
+from port_arm_split import find_arm_cuts, apply_arm_cuts, build_armpit_walls, wall_texcoords, arm_open_targets
 from port_face_rig import FACE_ANCHORS, build_face, expression
 from port_eye_rig import EYE_ANCHORS, EYES, TARGET_NAMES, eye_weights, build_lids
 from pygltflib import (
@@ -227,6 +228,8 @@ def make_skeleton(gltf: GLTF2, layout: dict[str, tuple[float, float, float]]) ->
     }
     indices: dict[str, int] = {}
     for name, parent in parents.items():
+        if name not in layout:
+            continue
         position = np.array(layout[name], dtype=np.float32)
         local = position if parent is None else position-np.array(layout[parent], dtype=np.float32)
         indices[name] = len(gltf.nodes)
@@ -312,9 +315,9 @@ def build_story_animations(gltf: GLTF2, binary: bytearray, bones: dict[str, int]
         "RightForeArm": still(2.0),
     }, bones)
     append_animation(gltf, binary, "Wave", 2.4, {
-        "LeftUpperArm": frames(2.4, lambda u: (-.12, 0, .22)),
-        "LeftForeArm": frames(2.4, lambda u: (-.08, 0, .12+.12*sin(tau*2*u))),
-        "LeftHand": frames(2.4, lambda u: (0, .18*sin(tau*2*u), .18*sin(tau*2*u))),
+        # The arm swings as one piece from the shoulder. Bending the fused
+        # forearm or wrist separately pinches a ring into the sleeve.
+        "LeftUpperArm": frames(2.4, lambda u: (-.09, -.05, 2.05)),
     }, bones)
     append_animation(gltf, binary, "Happy", 2.0, {
         "LeftUpperArm": frames(2.0, lambda u: (-.08, 0, .20+.045*sin(tau*2*u))),
@@ -337,10 +340,10 @@ def build_story_animations(gltf: GLTF2, binary: bytearray, bones: dict[str, int]
         "RightUpperArm": frames(4.0, lambda _u: (-.04, 0, -.02)),
     }, bones)
     append_animation(gltf, binary, "Victory", 2.4, {
-        "LeftUpperArm": frames(2.4, lambda u: (-.08, 0, .28+.03*sin(tau*2*u))),
-        "RightUpperArm": frames(2.4, lambda u: (-.08, 0, -.28-.03*sin(tau*2*u))),
-        "LeftForeArm": frames(2.4, lambda _u: (.03, 0, .08)),
-        "RightForeArm": frames(2.4, lambda _u: (.03, 0, -.08)),
+        # Symmetric raised V, both arms swinging from the shoulder only; the
+        # opened armpit leaves no web between arm and flank.
+        "LeftUpperArm": frames(2.4, lambda u: (-.09, -.05, 2.05)),
+        "RightUpperArm": frames(2.4, lambda u: (-.09, .05, -2.05)),
     }, bones)
     append_animation(gltf, binary, "Walk", 1.2, {
         "LeftUpperLeg": frames(1.2, lambda u: (.34*sin(tau*u), 0, 0)),
@@ -356,8 +359,8 @@ def build_story_animations(gltf: GLTF2, binary: bytearray, bones: dict[str, int]
     }, bones)
     append_animation(gltf,binary,'Smile',4.0,{},bones)
     append_animation(gltf,binary,'Laugh',2.0,{
-        'LeftUpperArm':frames(2.0,lambda u:(-.06,0,.14+.025*sin(tau*2*u))),
-        'RightUpperArm':frames(2.0,lambda u:(-.06,0,-.14-.025*sin(tau*2*u))),
+        'LeftUpperArm':frames(2.0,lambda u:(-.09,-.05,1.55)),
+        'RightUpperArm':frames(2.0,lambda u:(-.09,.05,-1.55)),
     },bones)
 
 
@@ -389,11 +392,18 @@ def rig(source: Path, destination: Path, inspect_only: bool = False) -> None:
         return
 
     binary = bytearray(gltf.binary_blob())
-    joints, weights, weight_report = solve_weights(positions, indices)
+    cuts, weld_inverse = find_arm_cuts(positions, indices)
+    joints, weights, weight_report, copies = solve_weights(positions, indices, cuts)
     face=build_face(positions,normals,uvs,indices,joints,weights)
     positions,normals,uvs=(face[key] for key in ('positions','normals','uvs'))
     joints,weights=face['joints'],face['weights']
+    positions,normals,uvs,surface,joints,weights,arm_vertex=apply_arm_cuts(
+        positions,normals,uvs,face['indices'],joints,weights,face['surfaceVertexSources'],
+        cuts,weld_inverse,copies)
+    face['indices']=surface.astype(np.uint16)
     joints,weights=eye_weights(positions,joints,weights)
+    walls=build_armpit_walls(positions,normals,joints,weights,cuts,weld_inverse,arm_vertex,
+        wall_texcoords(gltf,positions,uvs,cuts,arm_vertex))
     lids=build_lids(positions,uvs,face['indices'])
     primitive.indices=append_accessor(gltf,binary,face['indices'].reshape(-1),5123,'SCALAR',target=34963)
     position_accessor = append_accessor(gltf, binary, positions, 5126, "VEC3", target=34962, bounds=True)
@@ -449,6 +459,38 @@ def rig(source: Path, destination: Path, inspect_only: bool = False) -> None:
             pbrMetallicRoughness=PbrMetallicRoughness(baseColorFactor=part['color'],metallicFactor=0.,roughnessFactor=.85)))
         gltf.meshes[0].primitives.append(Primitive(attributes=attrs,material=material,
             indices=append_accessor(gltf,binary,part['indices'].reshape(-1),5123,'SCALAR',target=34963)))
+    wall_material=copy.deepcopy(gltf.materials[0])
+    wall_material.name='ArmpitSkin'
+    # The walls sample one skin texel, so screen-space tangents from the
+    # normal map would degenerate; their own smooth normals shade them.
+    wall_material.normalTexture=None
+    wall_material.doubleSided=True
+    gltf.materials.append(wall_material)
+    wall_attrs=Attributes(
+        POSITION=append_accessor(gltf,binary,walls['positions'],5126,'VEC3',target=34962,bounds=True),
+        NORMAL=append_accessor(gltf,binary,walls['normals'],5126,'VEC3',target=34962),
+        TEXCOORD_0=append_accessor(gltf,binary,walls['uvs'],5126,'VEC2',target=34962),
+        JOINTS_0=append_accessor(gltf,binary,walls['joints'],5123,'VEC4',target=34962),
+        WEIGHTS_0=append_accessor(gltf,binary,walls['weights'],5126,'VEC4',target=34962))
+    setattr(wall_attrs,'_GLOW_SKIN_REGION',append_accessor(gltf,binary,np.ones(len(walls['positions']),np.float32),5126,'SCALAR',target=34962))
+    gltf.meshes[0].primitives.append(Primitive(attributes=wall_attrs,material=len(gltf.materials)-1,
+        indices=append_accessor(gltf,binary,walls['indices'].reshape(-1),5123,'SCALAR',target=34963)))
+    # glTF requires every primitive of the mesh to carry the same targets;
+    # the mouth interior parts get zero offsets.
+    sleeves=arm_open_targets(positions,face['indices'],cuts,weld_inverse,arm_vertex,walls,
+        {1:layout['LeftUpperArm'],-1:layout['RightUpperArm']})
+    body_mesh=gltf.meshes[0]
+    for sleeve in sleeves:
+        offsets=[(sleeve['body'],sleeve['bodyNormals'])]+[
+            (np.zeros((len(p['positions']),3),np.float32),)*2 for p in face['interior']]+[
+            (sleeve['wall'],sleeve['wallNormals'])]
+        for prim,(delta,normal) in zip(body_mesh.primitives,offsets):
+            prim.targets=list(prim.targets or [])+[Attributes(
+                POSITION=append_accessor(gltf,binary,delta,5126,'VEC3',target=34962,bounds=True),
+                NORMAL=append_accessor(gltf,binary,normal,5126,'VEC3',target=34962))]
+    body_mesh.weights=[0.]*len(sleeves)
+    body_mesh.extras={**(body_mesh.extras or {}),'targetNames':[s['name'] for s in sleeves]}
+    print('sleeve morph max push (m):',{s['name']:round(s['maxPush'],4) for s in sleeves})
     gltf.animations = []
     lid_joints=np.zeros((len(lids['positions']),4),np.uint16)
     lid_weights=np.zeros((len(lids['positions']),4),np.float32);lid_weights[:,0]=1

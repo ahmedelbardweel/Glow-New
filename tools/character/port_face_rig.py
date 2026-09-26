@@ -11,20 +11,22 @@ from port_rig_weights import ease
 from port_lip_surface import split_lips
 
 FACE_ANCHORS = {
-    'Jaw': (0., .485, .150),
-    'MouthCornerLeft': (.110, .505, .225),
-    'MouthCornerRight': (-.110, .505, .225),
+    'Jaw': (0., .508, .150),
+    'MouthCornerLeft': (.110, .523, .225),
+    'MouthCornerRight': (-.110, .523, .225),
 }
 FACE_JOINTS = (16, 17, 18)
 
 
 
 
-def corner_fields(p):
+def corner_fields(p, body_x=0., mouth_half=.104, mouth_y=.518, mouth_z=.229):
     values=[]
     for side in (1,-1):
-        r=((p[:,0]-side*.104)/.063)**2+((p[:,1]-.500)/.048)**2+((p[:,2]-.229)/.065)**2
-        values.append(.85*np.maximum(0,1-r)**2*(1-ease(.522,.538,p[:,1])))
+        cx = body_x+side*mouth_half
+        r=((p[:,0]-cx)/.063)**2+((p[:,1]-mouth_y)/.044)**2+((p[:,2]-mouth_z)/.065)**2
+        # Keep corner pull local to the muzzle; do not bleed onto green cheeks.
+        values.append(.85*np.maximum(0,1-r)**2*(1-ease(mouth_y, mouth_y+.014, p[:,1])))
     return np.array(values).T
 
 
@@ -54,10 +56,16 @@ def normals(p,triangles):
     return (n/np.maximum(np.linalg.norm(n,axis=1,keepdims=True),1e-10)).astype(np.float32)
 
 
-def build_face(p,n,uv,triangles,joints,weights):
+def build_face(p, n, uv, triangles, joints, weights, *, lip_field=None, body_x=0., mouth_half=.110,
+               cut_x=.122, cut_z=.185, mouth_corner_y=.518, mouth_corner_z=.229,
+               allow_limb_overlap=False):
     triangles=triangles.reshape(-1,3).astype(int)
     source_count=len(p)
-    surface=split_lips(p,n,uv,triangles)
+    f = lip_field(p) if callable(lip_field) else lip_field
+    lip_kw = dict(f=f, body_x=body_x, cut_x=cut_x, cut_z=cut_z)
+    if lip_field is not None:
+        lip_kw.update(cut_y_min=mouth_corner_y+.035, mouth_half=mouth_half)
+    surface=split_lips(p, n, uv, triangles, **lip_kw)
     p,n,uv=(surface[key] for key in ('positions','normals','uvs'))
     remapped=surface['indices']
     extra=np.zeros((len(p)-source_count,19));extra[:,0]=1
@@ -66,16 +74,20 @@ def build_face(p,n,uv,triangles,joints,weights):
     curve_points=np.array(surface['lipPathPositions'])
     order=np.argsort(curve_points[:,0])
     seam_y=np.interp(x,curve_points[order,0],curve_points[order,1])
-    lower=(y<seam_y)&(np.abs(x)<.110)&(z>.193)
+    lower=(y<seam_y)&(np.abs(x-body_x)<mouth_half)&(z>.193)
     lower[surface['upperCopies']]=False
     lower[surface['lowerCopies']]=True
-    jaw=(ease(.433,.478,y)*(1-ease(.077,.110,np.abs(x)))
+    jaw=(ease(.433,.478,y)*(1-ease(.077,.110,np.abs(x-body_x)))
          *ease(.193,.220,z)*lower)
-    corner=corner_fields(p)
+    corner=corner_fields(p, body_x=body_x, mouth_half=mouth_half,
+                         mouth_y=mouth_corner_y, mouth_z=mouth_corner_z)
     face_amount=corner.sum(axis=1)+jaw*(1-corner.sum(axis=1))
     active=face_amount>0
     if np.any(full[active,1:16]>1e-8):
-        raise ValueError('Face weights overlap limb weights')
+        if allow_limb_overlap:
+            full[active, 1:16] = 0
+        else:
+            raise ValueError('Face weights overlap limb weights')
     full[active]=0
     full[active,17:19]=corner[active]
     full[active,16]=jaw[active]*(1-corner[active].sum(axis=1))
@@ -106,7 +118,7 @@ def build_face(p,n,uv,triangles,joints,weights):
         for i in range(segments+1):
             angle=2*np.pi*i/segments
             tp.append((.051*np.sin(latitude)*np.cos(angle),
-                       .489+.0055*np.cos(latitude),
+                       .512+.0055*np.cos(latitude),
                        .242+.014*np.sin(latitude)*np.sin(angle)))
             if j and i:
                 d=j*(segments+1)+i;c=d-1;b=d-segments-1;a=b-1
@@ -130,16 +142,25 @@ def expression(name,u):
     """Jaw rotation, left corner displacement, right corner displacement."""
     pulse=.5-.5*np.cos(2*np.pi*2*u)
     smile=0.;sad=0.;opening=0.
+    # Laugh uses a wider smile envelope so the open jaw reads as laughter
+    # instead of a round scream hole with collapsed corners.
     if name in ('Smile','Wave','Victory'):
         smile={'Smile':.85,'Wave':.45,'Victory':.75}[name]
-    elif name in ('Happy','Laugh'):
+    elif name=='Happy':
         smile=.90
-        opening=(.11+.11*pulse) if name=='Happy' else (.13+.13*pulse)
+        opening=.11+.11*pulse
+    elif name=='Laugh':
+        smile=1.0
+        # Two clear "ha" beats: hold a smiling base, then open on the peaks.
+        opening=.08+.16*(pulse**1.35)
     elif name=='Sad':
         sad=1.
     elif name=='Talk':
         opening=.025+.16*(np.sin(np.pi*4*u)**2)*(.75+.25*np.cos(2*np.pi*u))
     vertical=.014*smile-.019*sad
     width=.006*smile-.002*sad
+    if name=='Laugh':
+        vertical=.019
+        width=.012
     left=(width,vertical,0.);right=(-width,vertical,0.)
     return (float(opening),0.,0.),left,right

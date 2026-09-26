@@ -6,8 +6,7 @@ import 'package:three_js/three_js.dart' as three;
 import '../animation/story_motion.dart';
 import '../animation/character_skin_palette.dart';
 import '../animation/character_eye_animation.dart';
-import '../di/injection_container.dart';
-import '../services/resource_manager.dart';
+import '../animation/character_sleeve_morph.dart';
 import '../services/character_asset_cache.dart';
 import '../utils/character_helper.dart';
 import 'mobile_character_viewer.dart';
@@ -25,6 +24,7 @@ class SmartCharacterViewer extends StatelessWidget {
     this.motion,
     this.interactive = true,
     this.showSkeleton = false,
+    this.onReady,
   });
   final String characterName;
   final String storyText;
@@ -34,6 +34,7 @@ class SmartCharacterViewer extends StatelessWidget {
   final CharacterMotion? motion;
   final bool interactive;
   final bool showSkeleton;
+  final VoidCallback? onReady;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +52,7 @@ class SmartCharacterViewer extends StatelessWidget {
         showSkeleton: showSkeleton,
         motion: motion,
         playbackPosition: playbackPosition,
+        onReady: onReady,
       );
     }
     return LayoutBuilder(
@@ -94,6 +96,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   final _bones = <three.Object3D>[];
   final _skinPalette = CharacterSkinPalette();
   final _eyeAnimation = CharacterEyeAnimation();
+  final _sleeveMorph = CharacterSleeveMorph();
   three.Object3D? _model;
   three.AnimationMixer? _mixer;
   three.AnimationAction? _activeAction;
@@ -151,6 +154,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
             'Character first frame: ${_startup.elapsedMilliseconds} ms (compatibility=$_compatibilityMode)',
           );
         setState(() => _ready = true);
+        widget.configuration.onReady?.call();
       },
       settings: three.Settings(
         clearColor: 0xF4F7F5,
@@ -232,6 +236,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     if (widget.source == CharacterHelper.sharedModelPath) {
       _skinPalette.attach(_model!);
       _eyeAnimation.attach(_model!);
+      _sleeveMorph.attach(_model!);
     }
     _recolor();
     _jaw = _model!.getObjectByName('Jaw');
@@ -256,6 +261,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     view.addAnimationEvent(_animate);
     _selectMotion();
     _mixer!.update(0);
+    _sleeveMorph.update();
   }
 
   Future<three.GLTFData?> _loadModel(three.GLTFLoader loader) async {
@@ -266,20 +272,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       return loader.fromBytes(await CharacterAssetCache.instance.load(source));
     }
 
-    // Online uploads use the same verified file cache as stories and audio.
-    // If the file was downloaded before, it opens immediately without a
-    // network call. If this is a fresh device, the first download becomes the
-    // offline copy for later sessions.
-    if (sl.isRegistered<ResourceManager>()) {
-      final manager = sl<ResourceManager>();
-      final cachedPath = manager.getLocalFilePath(source);
-      if (cachedPath != null) return loader.fromPath(cachedPath);
-      final downloadedPath = await manager
-          .downloadAndCacheFile(source, folder: 'models')
-          .timeout(const Duration(seconds: 20));
-      if (downloadedPath != null) return loader.fromPath(downloadedPath);
-      throw StateError('The custom model is not available offline yet.');
-    }
+    // Keep the viewer free of app DI so the studio entrypoint stays light on
+    // web. Remote story models go through CharacterAssetCache when bundled, or
+    // the network loader when the URI is already absolute.
     return loader.fromNetwork(uri).timeout(const Duration(seconds: 6));
   }
 
@@ -430,6 +425,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         action.time = _elapsed % action.clip.duration;
       }
       _mixer?.update(0);
+      _sleeveMorph.update();
     }
     _lastPosition = position;
   }
@@ -441,27 +437,44 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       final dt = delta.clamp(0.0, 0.08);
       _elapsed += dt;
       _selectMotion();
+      if (_jaw != null && _jawRest != null) {
+        _jaw!.quaternion.setFrom(_jawRest!);
+      }
       _mixer?.update(dt);
+      _sleeveMorph.update();
       _eyeAnimation.update(dt, config.motion ?? _plan.motionAt(_position));
       _speechBlend +=
           ((config.isSpeaking ? 1.0 : 0.0) - _speechBlend) *
           math.min(1.0, dt * 12);
-      if (_speechBlend > 0.001 && _jaw != null && _jawRest != null) {
+      final motion = config.motion ?? _plan.motionAt(_position);
+      // Held-open clips must set the jaw after the mixer. Idle and other
+      // clips have no Jaw track, so a cross-fade would otherwise leave the
+      // mouth closed after the rest reset above.
+      final heldOpening = switch (motion) {
+        CharacterMotion.happy => 0.52,
+        CharacterMotion.smile ||
+        CharacterMotion.wave ||
+        CharacterMotion.victory => 0.22,
+        CharacterMotion.sad => 0.0,
+        _ => null,
+      };
+      if (heldOpening != null && _jaw != null && _jawRest != null) {
+        _jawRotation.setFromAxisAngle(_jawAxis, heldOpening);
+        _jaw!.quaternion.setFrom(_jawRest!).multiply(_jawRotation);
+        _mouth?.scale.setValues(1, 1, 1);
+      } else if (_speechBlend > 0.001 && _jaw != null && _jawRest != null) {
         final t = _position.inMicroseconds / 1000000;
         final syllable = math.pow(math.sin(t * 10.7), 2).toDouble();
         final envelope = math.sin(t * 2.1) > -0.65 ? 1.0 : 0.15;
         final clipOpening =
             2 * math.atan2(_jaw!.quaternion.x, _jaw!.quaternion.w);
         final speechOpening =
-            (0.025 + syllable * envelope * 0.185) * _speechBlend;
+            (0.04 + syllable * envelope * 0.28) * _speechBlend;
         _jawRotation.setFromAxisAngle(
           _jawAxis,
           math.max(clipOpening, speechOpening),
         );
         _jaw!.quaternion.setFrom(_jawRest!).multiply(_jawRotation);
-        // The mouth now has a sculpted opening and a hinged jaw. A modest
-        // lip motion complements that geometry without stretching it across
-        // the face during speech.
         _mouth?.scale.setValues(1, 1 + syllable * envelope * 1.6, 1);
       }
     }
@@ -503,8 +516,10 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     if (config.showSkeleton && _skeleton == null && _ready) _buildSkeleton();
     _skeleton?.visible = config.showSkeleton;
     _selectMotion();
-    if (old.motion != config.motion || old.storyText != config.storyText)
+    if (old.motion != config.motion || old.storyText != config.storyText) {
       _mixer?.update(0);
+      _sleeveMorph.update();
+    }
     _updateSkeleton();
   }
 
@@ -536,6 +551,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _loadTimeout?.cancel();
     _skinPalette.dispose();
     _eyeAnimation.dispose();
+    _sleeveMorph.dispose();
     _orbit?.dispose();
     _orbit = null;
     _mixer?.stopAllAction();

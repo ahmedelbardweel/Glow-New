@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:hive_flutter/hive_flutter.dart';
@@ -178,11 +179,15 @@ class ChildActivityLogger {
     final pending = _readPending();
     if (pending.isEmpty) return;
     final kept = <Map<String, dynamic>>[];
-    for (final row in pending) {
+    for (var i = 0; i < pending.length; i++) {
       try {
-        await _client.from('child_activity').insert(row);
+        await _client
+            .from('child_activity')
+            .insert(pending[i])
+            .timeout(const Duration(seconds: 2));
       } catch (_) {
-        kept.add(row);
+        kept.addAll(pending.sublist(i));
+        break;
       }
     }
     await _box.put(_pendingKey, jsonEncode(kept));
@@ -197,7 +202,7 @@ class ChildActivityLogger {
       final row = draft.event(DateTime.now()).toRow(childId);
       final pending = _readPending()..add(row);
       await _box.put(_pendingKey, jsonEncode(pending));
-      await flush();
+      unawaited(flush());
     } catch (_) {}
   }
 

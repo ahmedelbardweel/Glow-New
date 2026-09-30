@@ -30,7 +30,6 @@ class ChildWorldMissionsScreen extends StatefulWidget {
 class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
   late ContentBloc _contentBloc;
   List<String> _completedMissionIds = [];
-  bool _isLoadingProgress = true;
 
   @override
   void initState() {
@@ -50,15 +49,12 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
       final result = await sl<ContentRepository>().getCompletedMissions(childId);
       if (mounted) {
         result.fold(
-          (_) => setState(() => _isLoadingProgress = false),
+          (_) {},
           (list) => setState(() {
             _completedMissionIds = list.map((p) => p.missionId).toList();
-            _isLoadingProgress = false;
           }),
         );
       }
-    } else {
-      if (mounted) setState(() => _isLoadingProgress = false);
     }
   }
 
@@ -126,9 +122,6 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
                   loading: () => const ShimmerLoading(),
                   error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
                   missionsLoaded: (missions) {
-                    if (_isLoadingProgress) {
-                      return const ShimmerLoading();
-                    }
                     if (missions.isEmpty) {
                       return const Center(child: Text('لا توجد مهام في هذا العالم بعد.', style: TextStyle(fontSize: 14, color: Colors.grey)));
                     }
@@ -159,17 +152,13 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
                               HapticFeedback.lightImpact();
                               ChildButtonVoice.press(mission.title, () async {
                                 if (!context.mounted) return;
-                                await sl<ChildActivityLogger>().openedMission(
+                                unawaited(sl<ChildActivityLogger>().openedMission(
                                   missionId: mission.id,
                                   title: mission.title,
                                   world: widget.world.title,
-                                );
-                                if (!context.mounted) return;
+                                ));
                                 await context.push('/child/story-viewer', extra: mission);
-                                if (mounted) {
-                                  setState(() => _isLoadingProgress = true);
-                                  _fetchProgress();
-                                }
+                                if (mounted) _fetchProgress();
                               }, single: true);
                             } : null,
                             child: Container(

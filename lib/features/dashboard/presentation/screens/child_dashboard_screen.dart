@@ -64,21 +64,23 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
       });
     }
 
-    final isConnected = await sl<NetworkInfo>().isConnected;
-    if (!isConnected) {
-      _syncService.syncState.value = const SyncStatusState(
-        status: SyncStatus.offline,
-        message: 'وضع عدم الاتصال (أوفلاين)',
-      );
-    }
-
     _contentBloc.add(const ContentEvent.getWorlds());
-    await _fetchProgress();
+    unawaited(_fetchProgress());
     if (childId != null) {
-      await sl<ChildActivityLogger>().entered();
+      unawaited(sl<ChildActivityLogger>().entered());
     }
+    unawaited(_showOfflineIfNeeded());
 
     _syncService.syncState.addListener(_onSyncStateChanged);
+  }
+
+  Future<void> _showOfflineIfNeeded() async {
+    final isConnected = await sl<NetworkInfo>().isConnected;
+    if (isConnected) return;
+    _syncService.syncState.value = const SyncStatusState(
+      status: SyncStatus.offline,
+      message: 'وضع عدم الاتصال (أوفلاين)',
+    );
   }
 
   void _onSyncStateChanged() {
@@ -233,7 +235,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                       onTap: () {
                         ChildButtonVoice.press('أوسمتي', () async {
                           if (!context.mounted) return;
-                          await sl<ChildActivityLogger>().openedBadges();
+                          unawaited(sl<ChildActivityLogger>().openedBadges());
                           if (!context.mounted) return;
                           await context.push('/child/badges');
                           _fetchProgress();
@@ -445,8 +447,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                                         HapticFeedback.lightImpact();
                                         ChildButtonVoice.press(world.title, () async {
                                           if (!context.mounted) return;
-                                          await sl<ChildActivityLogger>().openedWorld(world.title);
-                                          if (!context.mounted) return;
+                                          unawaited(sl<ChildActivityLogger>().openedWorld(world.title));
                                           await context.push(
                                             '/child/world-missions',
                                             extra: world,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/errors/failures.dart';
@@ -32,38 +33,35 @@ class ContentRepositoryImpl implements ContentRepository {
   @override
   Future<Either<Failure, List<WorldEntity>>> getWorlds({bool forceRefresh = false}) async {
     final cachedWorlds = await localDataSource.getCachedWorlds();
-
-    if (await networkInfo.isConnected) {
-      // Trigger background sync
-      remoteDataSource.getWorlds().then((worlds) async {
-        await localDataSource.cacheWorlds(worlds);
-        for (var w in worlds) {
-          if (w.imageUrl.isNotEmpty) {
-            resourceManager.downloadAndCacheInBackground(w.imageUrl, folder: 'images');
-          }
-        }
-      }).catchError((_) {});
-
-      if (!forceRefresh && cachedWorlds.isNotEmpty) {
-        return Right(cachedWorlds);
-      } else {
-        try {
-          final worlds = await remoteDataSource.getWorlds();
-          await localDataSource.cacheWorlds(worlds);
-          return Right(worlds);
-        } catch (e) {
-          if (cachedWorlds.isNotEmpty) {
-            return Right(cachedWorlds);
-          }
-          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
-        }
-      }
-    } else {
-      if (cachedWorlds.isNotEmpty) {
-        return Right(cachedWorlds);
-      }
+    if (!forceRefresh && cachedWorlds.isNotEmpty) {
+      unawaited(_refreshWorlds());
+      return Right(cachedWorlds);
+    }
+    if (!await networkInfo.isConnected) {
+      if (cachedWorlds.isNotEmpty) return Right(cachedWorlds);
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت ولا توجد بيانات محفوظة محلياً'));
     }
+    try {
+      final worlds = await remoteDataSource.getWorlds().timeout(const Duration(seconds: 4));
+      await localDataSource.cacheWorlds(worlds);
+      return Right(worlds);
+    } catch (e) {
+      if (cachedWorlds.isNotEmpty) return Right(cachedWorlds);
+      return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
+    }
+  }
+
+  Future<void> _refreshWorlds() async {
+    if (!await networkInfo.isConnected) return;
+    try {
+      final worlds = await remoteDataSource.getWorlds().timeout(const Duration(seconds: 6));
+      await localDataSource.cacheWorlds(worlds);
+      for (final world in worlds) {
+        if (world.imageUrl.isNotEmpty) {
+          resourceManager.downloadAndCacheInBackground(world.imageUrl, folder: 'images');
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -93,33 +91,30 @@ class ContentRepositoryImpl implements ContentRepository {
   @override
   Future<Either<Failure, List<MissionEntity>>> getMissions(String worldId, {bool forceRefresh = false}) async {
     final cachedMissions = await localDataSource.getCachedMissions(worldId);
-
-    if (await networkInfo.isConnected) {
-      // Trigger background sync
-      remoteDataSource.getMissions(worldId).then((missions) async {
-        await localDataSource.cacheMissions(worldId, missions);
-      }).catchError((_) {});
-
-      if (!forceRefresh && cachedMissions.isNotEmpty) {
-        return Right(cachedMissions);
-      } else {
-        try {
-          final missions = await remoteDataSource.getMissions(worldId);
-          await localDataSource.cacheMissions(worldId, missions);
-          return Right(missions);
-        } catch (e) {
-          if (cachedMissions.isNotEmpty) {
-            return Right(cachedMissions);
-          }
-          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
-        }
-      }
-    } else {
-      if (cachedMissions.isNotEmpty) {
-        return Right(cachedMissions);
-      }
+    if (!forceRefresh && cachedMissions.isNotEmpty) {
+      unawaited(_refreshMissions(worldId));
+      return Right(cachedMissions);
+    }
+    if (!await networkInfo.isConnected) {
+      if (cachedMissions.isNotEmpty) return Right(cachedMissions);
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت ولا توجد مهام محفوظة'));
     }
+    try {
+      final missions = await remoteDataSource.getMissions(worldId).timeout(const Duration(seconds: 4));
+      await localDataSource.cacheMissions(worldId, missions);
+      return Right(missions);
+    } catch (e) {
+      if (cachedMissions.isNotEmpty) return Right(cachedMissions);
+      return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
+    }
+  }
+
+  Future<void> _refreshMissions(String worldId) async {
+    if (!await networkInfo.isConnected) return;
+    try {
+      final missions = await remoteDataSource.getMissions(worldId).timeout(const Duration(seconds: 6));
+      await localDataSource.cacheMissions(worldId, missions);
+    } catch (_) {}
   }
 
   @override
@@ -150,42 +145,39 @@ class ContentRepositoryImpl implements ContentRepository {
   @override
   Future<Either<Failure, List<StoryEntity>>> getStories(String missionId, {bool forceRefresh = false}) async {
     final cachedStories = await localDataSource.getCachedStories(missionId);
-
-    if (await networkInfo.isConnected) {
-      // Background sync
-      remoteDataSource.getStories(missionId).then((stories) async {
-        await localDataSource.cacheStories(missionId, stories);
-          for (var s in stories) {
-            resourceManager.cacheCharacterModels(s.characterName, s.timelineData);
-          if (s.audioUrl != null && s.audioUrl!.isNotEmpty) {
-            resourceManager.downloadAndCacheInBackground(s.audioUrl!, folder: 'audio');
-          }
-          if (s.imageUrl.isNotEmpty) {
-            resourceManager.downloadAndCacheInBackground(s.imageUrl, folder: 'images');
-          }
-        }
-      }).catchError((_) {});
-
-      if (!forceRefresh && cachedStories.isNotEmpty) {
-        return Right(cachedStories);
-      } else {
-        try {
-          final stories = await remoteDataSource.getStories(missionId);
-          await localDataSource.cacheStories(missionId, stories);
-          return Right(stories);
-        } catch (e) {
-          if (cachedStories.isNotEmpty) {
-            return Right(cachedStories);
-          }
-          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
-        }
-      }
-    } else {
-      if (cachedStories.isNotEmpty) {
-        return Right(cachedStories);
-      }
+    if (!forceRefresh && cachedStories.isNotEmpty) {
+      unawaited(_refreshStories(missionId));
+      return Right(cachedStories);
+    }
+    if (!await networkInfo.isConnected) {
+      if (cachedStories.isNotEmpty) return Right(cachedStories);
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت ولا توجد قصص محفوظة'));
     }
+    try {
+      final stories = await remoteDataSource.getStories(missionId).timeout(const Duration(seconds: 4));
+      await localDataSource.cacheStories(missionId, stories);
+      return Right(stories);
+    } catch (e) {
+      if (cachedStories.isNotEmpty) return Right(cachedStories);
+      return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
+    }
+  }
+
+  Future<void> _refreshStories(String missionId) async {
+    if (!await networkInfo.isConnected) return;
+    try {
+      final stories = await remoteDataSource.getStories(missionId).timeout(const Duration(seconds: 6));
+      await localDataSource.cacheStories(missionId, stories);
+      for (final story in stories) {
+        resourceManager.cacheCharacterModels(story.characterName, story.timelineData);
+        if (story.audioUrl != null && story.audioUrl!.isNotEmpty) {
+          resourceManager.downloadAndCacheInBackground(story.audioUrl!, folder: 'audio');
+        }
+        if (story.imageUrl.isNotEmpty) {
+          resourceManager.downloadAndCacheInBackground(story.imageUrl, folder: 'images');
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -209,33 +201,30 @@ class ContentRepositoryImpl implements ContentRepository {
   @override
   Future<Either<Failure, List<QuestionEntity>>> getQuestions(String missionId, {bool forceRefresh = false}) async {
     final cachedQuestions = await localDataSource.getCachedQuestions(missionId);
-
-    if (await networkInfo.isConnected) {
-      // Background sync
-      remoteDataSource.getQuestions(missionId).then((questions) async {
-        await localDataSource.cacheQuestions(missionId, questions);
-      }).catchError((_) {});
-
-      if (!forceRefresh && cachedQuestions.isNotEmpty) {
-        return Right(cachedQuestions);
-      } else {
-        try {
-          final questions = await remoteDataSource.getQuestions(missionId);
-          await localDataSource.cacheQuestions(missionId, questions);
-          return Right(questions);
-        } catch (e) {
-          if (cachedQuestions.isNotEmpty) {
-            return Right(cachedQuestions);
-          }
-          return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
-        }
-      }
-    } else {
-      if (cachedQuestions.isNotEmpty) {
-        return Right(cachedQuestions);
-      }
+    if (!forceRefresh && cachedQuestions.isNotEmpty) {
+      unawaited(_refreshQuestions(missionId));
+      return Right(cachedQuestions);
+    }
+    if (!await networkInfo.isConnected) {
+      if (cachedQuestions.isNotEmpty) return Right(cachedQuestions);
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت ولا توجد أسئلة محفوظة'));
     }
+    try {
+      final questions = await remoteDataSource.getQuestions(missionId).timeout(const Duration(seconds: 4));
+      await localDataSource.cacheQuestions(missionId, questions);
+      return Right(questions);
+    } catch (e) {
+      if (cachedQuestions.isNotEmpty) return Right(cachedQuestions);
+      return const Left(ServerFailure('تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت.'));
+    }
+  }
+
+  Future<void> _refreshQuestions(String missionId) async {
+    if (!await networkInfo.isConnected) return;
+    try {
+      final questions = await remoteDataSource.getQuestions(missionId).timeout(const Duration(seconds: 6));
+      await localDataSource.cacheQuestions(missionId, questions);
+    } catch (_) {}
   }
 
   @override
@@ -298,36 +287,36 @@ class ContentRepositoryImpl implements ContentRepository {
   @override
   Future<Either<Failure, List<ChildProgressEntity>>> getCompletedMissions(String childId) async {
     final cachedProgress = await localDataSource.getCachedChildProgress(childId);
-
-    if (await networkInfo.isConnected) {
-      // Background sync
-      remoteDataSource.getCompletedMissions(childId).then((progressList) async {
-        final local = await localDataSource.getCachedChildProgress(childId);
-        final remoteIds = progressList.map((item) => item.missionId).toSet();
-        final kept = local.where((item) => !remoteIds.contains(item.missionId));
-        await localDataSource.cacheChildProgress(childId, [
-          ...progressList,
-          ...kept,
-        ]);
-      }).catchError((_) {});
-
-      if (cachedProgress.isNotEmpty) {
-        return Right(cachedProgress);
-      } else {
-        try {
-          final progressList = await remoteDataSource.getCompletedMissions(childId);
-          await localDataSource.cacheChildProgress(childId, progressList);
-          return Right(progressList);
-        } catch (e) {
-          if (cachedProgress.isNotEmpty) {
-            return Right(cachedProgress);
-          }
-          return Left(ServerFailure(e.toString()));
-        }
-      }
-    } else {
+    if (cachedProgress.isNotEmpty) {
+      unawaited(_refreshProgress(childId));
       return Right(cachedProgress);
     }
+    if (!await networkInfo.isConnected) return Right(cachedProgress);
+    try {
+      final progressList = await remoteDataSource
+          .getCompletedMissions(childId)
+          .timeout(const Duration(seconds: 4));
+      await localDataSource.cacheChildProgress(childId, progressList);
+      return Right(progressList);
+    } catch (_) {
+      return Right(cachedProgress);
+    }
+  }
+
+  Future<void> _refreshProgress(String childId) async {
+    if (!await networkInfo.isConnected) return;
+    try {
+      final progressList = await remoteDataSource
+          .getCompletedMissions(childId)
+          .timeout(const Duration(seconds: 6));
+      final local = await localDataSource.getCachedChildProgress(childId);
+      final remoteIds = progressList.map((item) => item.missionId).toSet();
+      final kept = local.where((item) => !remoteIds.contains(item.missionId));
+      await localDataSource.cacheChildProgress(childId, [
+        ...progressList,
+        ...kept,
+      ]);
+    } catch (_) {}
   }
 
   @override

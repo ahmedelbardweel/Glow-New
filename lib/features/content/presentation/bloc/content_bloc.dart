@@ -90,7 +90,6 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
         },
         getMissions: (e) async {
           if (e.forceRefresh) emit(const ContentState.loading());
-          else emit(const ContentState.loading()); // could optimize this, but loading is fine if fast
           final result = await getMissions(GetMissionsParams(e.worldId, forceRefresh: e.forceRefresh));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
@@ -126,7 +125,6 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
         },
         getStories: (e) async {
           if (e.forceRefresh) emit(const ContentState.loading());
-          else emit(const ContentState.loading());
           final result = await getStories(GetStoriesParams(e.missionId, forceRefresh: e.forceRefresh));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),
@@ -159,7 +157,6 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
         },
         getQuestions: (e) async {
           if (e.forceRefresh) emit(const ContentState.loading());
-          else emit(const ContentState.loading());
           final result = await getQuestions(GetQuestionsParams(e.missionId, forceRefresh: e.forceRefresh));
           result.fold(
             (failure) => emit(ContentState.error(failure.message)),

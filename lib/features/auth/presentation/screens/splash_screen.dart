@@ -13,6 +13,7 @@ import '../../../../core/utils/device_id_helper.dart';
 import '../../data/child_account_service.dart';
 import '../../data/datasources/auth_local_data_source.dart';
 import '../../data/models/child_profile_model.dart';
+import '../../data/parent_google_auth.dart';
 import '../../../content/data/services/sync_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -48,6 +49,15 @@ class _SplashScreenState extends State<SplashScreen> {
         _go('/parent-dashboard');
       }
       return;
+    }
+
+    final googleSession = Supabase.instance.client.auth.currentSession;
+    if (googleSession != null && ParentGoogleAuth.isGoogleUser(googleSession.user)) {
+      try {
+        await ParentGoogleAuth.rememberAsParent(googleSession);
+        if (mounted) _go('/parent-dashboard');
+        return;
+      } catch (_) {}
     }
 
     final restored = await sl<ChildAccountService>().restoreLastChild();

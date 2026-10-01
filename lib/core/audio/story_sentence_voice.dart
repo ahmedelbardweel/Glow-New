@@ -12,20 +12,34 @@ class StorySentenceVoice {
   static const _apiKey =
       'sk_70ad200afdaeee4ef1fb1a42d9a9af9ca69ec2d01c8e617f';
 
-  static const voices = <String, String>{
-    'fort': 'IKne3meq5aSn9XLyUdCD',
-    'lort': 'pFZP5JQG7iQjIQuC4Bku',
-    'mort': 'FGY2WhTYpPnrIDTdsKH5',
-    'port': 'Xb7hH8MSUJpSbSDYk0k2',
-    'qort': 'cgSgspJ2msm6clMCkdW9',
-  };
-
-  static const _pitch = <String, double>{
-    'fort': 1.18,
-    'lort': 1.10,
-    'mort': 1.15,
-    'port': 1.08,
-    'qort': 1.12,
+  static const _voices = <String, _Voice>{
+    'fort': _Voice('IKne3meq5aSn9XLyUdCD', pitch: 1.24),
+    'lort': _Voice('pFZP5JQG7iQjIQuC4Bku', pitch: 1.16),
+    'mort': _Voice('FGY2WhTYpPnrIDTdsKH5', pitch: 1.21),
+    'port': _Voice(
+      'Xb7hH8MSUJpSbSDYk0k2',
+      speed: 1.14,
+      stability: 0.50,
+      similarity: 0.84,
+      style: 0.73,
+      speakerBoost: true,
+    ),
+    'qort': _Voice(
+      'cgSgspJ2msm6clMCkdW9',
+      speed: 1.04,
+      stability: 0.60,
+      similarity: 0.96,
+      style: 0.63,
+      speakerBoost: true,
+    ),
+    'sort': _Voice(
+      'CBDgRB8OyxYGowoi5iXR',
+      speed: 0.87,
+      stability: 0.63,
+      similarity: 1.0,
+      style: 0.94,
+      speakerBoost: true,
+    ),
   };
 
   static const _sampleRate = 22050;
@@ -34,31 +48,19 @@ class StorySentenceVoice {
     required String characterId,
     required String text,
   }) {
-    return _render(
-      voiceId: voices[characterId] ?? voices['qort']!,
-      pitch: (_pitch[characterId] ?? 1.12) + 0.06,
-      text: text,
-    );
+    return _render(_voices[characterId] ?? _voices['qort']!, text);
   }
 
   /// One soft child narrator for buttons and field speech.
   static Future<({File file, double seconds})> speakNarrator(String text) {
-    return _render(
-      voiceId: 'pFZP5JQG7iQjIQuC4Bku',
-      pitch: 1.24,
-      text: text,
-    );
+    return _render(const _Voice('pFZP5JQG7iQjIQuC4Bku', pitch: 1.24), text);
   }
 
-  static Future<({File file, double seconds})> _render({
-    required String voiceId,
-    required double pitch,
-    required String text,
-  }) async {
+  static Future<({File file, double seconds})> _render(_Voice voice, String text) async {
     final response = await http
         .post(
           Uri.parse(
-            'https://api.elevenlabs.io/v1/text-to-speech/$voiceId?output_format=pcm_22050',
+            'https://api.elevenlabs.io/v1/text-to-speech/${voice.id}?output_format=pcm_22050',
           ),
           headers: {
             'xi-api-key': _apiKey,
@@ -69,12 +71,12 @@ class StorySentenceVoice {
             'text': text,
             'model_id': 'eleven_multilingual_v2',
             'voice_settings': {
-              'stability': 0.8,
-              'similarity_boost': 0.62,
-              'style': 0.0,
-              'use_speaker_boost': false,
+              'stability': voice.stability,
+              'similarity_boost': voice.similarity,
+              'style': voice.style,
+              'use_speaker_boost': voice.speakerBoost,
             },
-            'speed': 0.84,
+            'speed': voice.speed,
           }),
         )
         .timeout(const Duration(seconds: 30));
@@ -83,7 +85,7 @@ class StorySentenceVoice {
       throw Exception('تعذر توليد الصوت');
     }
 
-    final pcm = _childTone(response.bodyBytes, pitch);
+    final pcm = _childTone(response.bodyBytes, voice.pitch);
     final dir = await getTemporaryDirectory();
     final file = File(
       '${dir.path}/glow_line_${DateTime.now().microsecondsSinceEpoch}.wav',
@@ -189,4 +191,24 @@ class StorySentenceVoice {
         (value >> 16) & 0xff,
         (value >> 24) & 0xff,
       ];
+}
+
+class _Voice {
+  const _Voice(
+    this.id, {
+    this.speed = 0.84,
+    this.stability = 0.8,
+    this.similarity = 0.62,
+    this.style = 0.0,
+    this.speakerBoost = false,
+    this.pitch = 1.0,
+  });
+
+  final String id;
+  final double speed;
+  final double stability;
+  final double similarity;
+  final double style;
+  final bool speakerBoost;
+  final double pitch;
 }

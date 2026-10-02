@@ -739,6 +739,8 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         return 'اكتب نص المشهد أولاً';
       case 'jwt':
         return 'تعذر تجهيز المشهد. سجّل الدخول من جديد ثم أعد المحاولة';
+      case 'quota':
+        return 'خلص رصيد Gemini. جدّد المفتاح من الإعدادات';
       case 'gemini_failed':
       case 'bad_response':
       case 'timeout':

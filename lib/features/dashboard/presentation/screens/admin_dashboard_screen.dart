@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/config/admin_api_keys.dart';
+import '../../../../core/config/eleven_credit.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -14,6 +16,7 @@ import '../../../../core/widgets/offline_aware_image.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
 import '../../../organization/presentation/widgets/create_organization_sheet.dart';
 import '../../../organization/presentation/widgets/staff_settings_sheet.dart';
+import '../widgets/admin_api_keys_sheet.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -30,6 +33,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     super.initState();
     _contentBloc = sl<ContentBloc>();
     _contentBloc.add(const ContentEvent.getWorlds());
+  }
+
+  String _apiKeysSubtitle(ElevenCredit credit) {
+    final parts = <String>[];
+    if (credit.state == ElevenCreditState.ready) {
+      parts.add('Eleven المتبقي ${groupDigits(credit.remaining)}');
+    } else if (credit.exhausted || credit.state == ElevenCreditState.invalid) {
+      parts.add('Eleven ${credit.label}');
+    }
+    if (AdminApiKeys.geminiExhausted) parts.add('Gemini خلص الرصيد');
+    if (parts.isEmpty) return 'غيّر مفتاح Gemini أو Eleven لما يخلص الرصيد';
+    return parts.join(' · ');
   }
 
   @override
@@ -50,10 +65,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             IconButton(
               tooltip: 'الإعدادات',
               icon: const Icon(Icons.more_vert),
-              onPressed: () {
+              onPressed: () async {
+                final credit = await ElevenCredit.load();
+                if (!context.mounted) return;
                 showStaffSettingsSheet(
                   context,
                   settings: [
+                    StaffSetting(
+                      title: 'مفاتيح الصوت والمونتاج',
+                      subtitle: _apiKeysSubtitle(credit),
+                      onTap: (sheetContext) async {
+                        Navigator.of(sheetContext).pop();
+                        if (!context.mounted) return;
+                        await showAdminApiKeysSheet(context);
+                      },
+                    ),
                     StaffSetting(
                       title: 'إنشاء حساب منظمة',
                       subtitle: 'اسم وبريد وكلمة مرور. المنظمة تدخل بهما لاحقاً',

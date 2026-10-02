@@ -5,12 +5,18 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import '../config/admin_api_keys.dart';
+
 /// One fixed ElevenLabs voice per character, so every line keeps that tone.
 class StorySentenceVoice {
   StorySentenceVoice._();
 
-  static const _apiKey =
+  static const _builtInKey =
       'sk_70ad200afdaeee4ef1fb1a42d9a9af9ca69ec2d01c8e617f';
+
+  static String get _apiKey => AdminApiKeys.eleven ?? _builtInKey;
+
+  static String get activeApiKey => _apiKey;
 
   static const _voices = <String, _Voice>{
     'fort': _Voice('IKne3meq5aSn9XLyUdCD', pitch: 1.24),

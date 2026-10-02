@@ -16,6 +16,11 @@ abstract class AuthRepository {
     required String childCode,
   });
 
+  Future<Either<Failure, UserEntity>> loginParent({
+    required String email,
+    required String password,
+  });
+
   Future<Either<Failure, UserEntity>> loginAdmin({
     required String email,
     required String password,

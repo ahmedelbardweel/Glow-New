@@ -14,15 +14,45 @@ class ParentGoogleAuth {
   static const redirectTo = 'glow://parent-auth';
 
   /// Null means the parent closed the Google page.
-  static Future<Session?> signIn(BuildContext context) {
-    return Navigator.of(context).push<Session>(
-      PageRouteBuilder<Session>(
+  static Future<Session?> signIn(BuildContext context) async {
+    final url = await Navigator.of(context).push<String>(
+      PageRouteBuilder<String>(
         opaque: true,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
-        pageBuilder: (_, _, _) => const ParentGoogleSignInPage(),
+        pageBuilder: (_, _, _) => const ParentGoogleSignInPage(
+          authorizationUrl: authorizationUrl,
+        ),
       ),
     );
+    if (url == null || url.isEmpty) return null;
+    final result = await sl<SupabaseClient>().auth.getSessionFromUrl(
+      Uri.parse(url),
+    );
+    return result.session;
+  }
+
+  static Future<String> authorizationUrl() async {
+    final response = await sl<SupabaseClient>().auth.getOAuthSignInUrl(
+      provider: OAuthProvider.google,
+      redirectTo: redirectTo,
+    );
+    return response.url;
+  }
+
+  static Session? googleSessionOrNull() {
+    final session = sl<SupabaseClient>().auth.currentSession;
+    if (session == null || !isGoogleUser(session.user)) return null;
+    return session;
+  }
+
+  static Stream<void> get googleSignIns {
+    return sl<SupabaseClient>().auth.onAuthStateChange.where((data) {
+      final session = data.session;
+      return data.event == AuthChangeEvent.signedIn &&
+          session != null &&
+          isGoogleUser(session.user);
+    }).map((_) {});
   }
 
   static bool isGoogleUser(User user) {
@@ -42,7 +72,7 @@ class ParentGoogleAuth {
   }
 
   static Future<void> _rejectStaff(User user) async {
-    final client = Supabase.instance.client;
+    final client = sl<SupabaseClient>();
     final admin = await _roleOf(client, user.id);
     if (admin == 'admin') {
       await client.auth.signOut();

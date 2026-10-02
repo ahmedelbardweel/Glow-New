@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../core/services/resource_manager.dart';
 import '../../domain/entities/world_entity.dart';
@@ -81,7 +82,7 @@ class ContentRepositoryImpl implements ContentRepository {
         await localDataSource.cacheWorlds(current);
         return Right(result);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -135,7 +136,7 @@ class ContentRepositoryImpl implements ContentRepository {
         await localDataSource.cacheMissions(mission.worldId, current);
         return Right(result);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -191,7 +192,7 @@ class ContentRepositoryImpl implements ContentRepository {
         await localDataSource.cacheStories(story.missionId, current);
         return Right(result);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -243,7 +244,7 @@ class ContentRepositoryImpl implements ContentRepository {
       await localDataSource.cacheQuestions(question.missionId, current);
       return Right(addedQuestion);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userMessage(e)));
     }
   }
 
@@ -280,7 +281,7 @@ class ContentRepositoryImpl implements ContentRepository {
 
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userMessage(e)));
     }
   }
 
@@ -326,7 +327,7 @@ class ContentRepositoryImpl implements ContentRepository {
         final result = await remoteDataSource.updateWorld(WorldModel.fromEntity(world));
         return Right(result);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -340,7 +341,7 @@ class ContentRepositoryImpl implements ContentRepository {
         await remoteDataSource.deleteWorld(id);
         return const Right(null);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -354,7 +355,7 @@ class ContentRepositoryImpl implements ContentRepository {
         final result = await remoteDataSource.updateMission(MissionModel.fromEntity(mission));
         return Right(result);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -368,7 +369,7 @@ class ContentRepositoryImpl implements ContentRepository {
         await remoteDataSource.deleteMission(id);
         return const Right(null);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -386,7 +387,7 @@ class ContentRepositoryImpl implements ContentRepository {
         );
         return Right(result);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -400,7 +401,7 @@ class ContentRepositoryImpl implements ContentRepository {
         await remoteDataSource.deleteStory(id);
         return const Right(null);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -414,7 +415,7 @@ class ContentRepositoryImpl implements ContentRepository {
         final result = await remoteDataSource.updateQuestion(QuestionModel.fromEntity(question));
         return Right(result);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));
@@ -428,7 +429,7 @@ class ContentRepositoryImpl implements ContentRepository {
         await remoteDataSource.deleteQuestion(id);
         return const Right(null);
       } catch (e) {
-        return Left(ServerFailure(e.toString()));
+        return Left(ServerFailure(userMessage(e)));
       }
     } else {
       return const Left(ServerFailure('لا يوجد اتصال بالإنترنت'));

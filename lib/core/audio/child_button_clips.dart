@@ -36,4 +36,6 @@ const childButtonClips = <String, String>{
   "هو العلم الضعفاء": "voice/child/35640e76ca86.mp3",
   "هو عالم الاقوياء": "voice/child/fcc1fc532f54.mp3",
   "هو عالم ليس له معنى": "voice/child/f2a8bbae6d1c.mp3",
+  "إجابة خاطئة، حاول مرة أخرى": "voice/child/4132498a00aa.mp3",
+  "إجابة صحيحة، أحسنت": "voice/child/6201f3c5bc73.mp3",
 };

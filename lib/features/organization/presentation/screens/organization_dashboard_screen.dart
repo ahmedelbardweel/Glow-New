@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/widgets/email_code_sheet.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import '../../data/organization_service.dart';
@@ -17,7 +19,7 @@ class OrganizationDashboardScreen extends StatefulWidget {
 }
 
 class _OrganizationDashboardScreenState extends State<OrganizationDashboardScreen> {
-  final _service = OrganizationService(Supabase.instance.client);
+  final _service = sl<OrganizationService>();
   var _loading = true;
   String _name = '';
   List<OrgTeacher> _teachers = const [];
@@ -43,7 +45,7 @@ class _OrganizationDashboardScreenState extends State<OrganizationDashboardScree
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر جلب المنظمة: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر فتح المنظمة. حاول مرة أخرى.'))),
       );
     }
   }
@@ -75,6 +77,8 @@ class _OrganizationDashboardScreenState extends State<OrganizationDashboardScree
       builder: (formContext) => _AddTeacherSheet(
         onSubmit: (name, email, password) async {
           await _service.addTeacher(name: name, email: email, password: password);
+          if (!formContext.mounted) return;
+          await confirmCreatedEmail(formContext, email);
           if (formContext.mounted) Navigator.of(formContext).pop(true);
         },
       ),
@@ -165,7 +169,7 @@ class _TeacherClassScreen extends StatefulWidget {
 }
 
 class _TeacherClassScreenState extends State<_TeacherClassScreen> {
-  final _service = OrganizationService(Supabase.instance.client);
+  final _service = sl<OrganizationService>();
   var _loading = true;
   List<OrgStudent> _students = const [];
 
@@ -190,6 +194,8 @@ class _TeacherClassScreenState extends State<_TeacherClassScreen> {
               builder: (formContext) => _AddTeacherSheet(
                 onSubmit: (name, email, password) async {
                   await _service.addTeacher(name: name, email: email, password: password);
+                  if (!formContext.mounted) return;
+                  await confirmCreatedEmail(formContext, email);
                   if (formContext.mounted) Navigator.of(formContext).pop(true);
                 },
               ),
@@ -219,7 +225,7 @@ class _TeacherClassScreenState extends State<_TeacherClassScreen> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر جلب الطلاب: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر جلب الطلاب. حاول مرة أخرى.'))),
       );
     }
   }
@@ -322,7 +328,7 @@ class _AddTeacherSheetState extends State<_AddTeacherSheet> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إضافة المعلم: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر إضافة المعلم. حاول مرة أخرى.'))),
       );
     }
   }

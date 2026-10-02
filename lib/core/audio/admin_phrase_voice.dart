@@ -1,8 +1,9 @@
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../di/injection_container.dart';
+import '../storage/media_store.dart';
 import 'story_sentence_voice.dart';
 
 /// One soft child voice for admin text fields, stored so the child can hear it.
@@ -22,23 +23,23 @@ class AdminPhraseVoice {
 
   static String urlFor(String text) {
     final id = fileId(text);
-    return Supabase.instance.client.storage
-        .from(_bucket)
-        .getPublicUrl('phrase_$id.wav');
+    return sl<MediaStore>().publicUrl(
+      bucket: _bucket,
+      path: 'phrase_$id.wav',
+    );
   }
 
   static Future<File> speak(String text) async {
     final clip = await StorySentenceVoice.speakNarrator(text.trim());
     final id = fileId(text);
     try {
-      await Supabase.instance.client.storage.from(_bucket).upload(
-            'phrase_$id.wav',
-            clip.file,
-            fileOptions: const FileOptions(
-              contentType: 'audio/wav',
-              upsert: true,
-            ),
-          );
+      await sl<MediaStore>().uploadPublic(
+        bucket: _bucket,
+        path: 'phrase_$id.wav',
+        file: clip.file,
+        contentType: 'audio/wav',
+        upsert: true,
+      );
     } catch (_) {}
     return clip.file;
   }

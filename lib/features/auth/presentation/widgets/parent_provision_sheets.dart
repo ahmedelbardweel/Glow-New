@@ -2,9 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_qr_scanner.dart';
@@ -67,7 +67,7 @@ Future<void> claimParentChildAccount(
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pop();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('تعذر إضافة الحساب: $error')),
+      SnackBar(content: Text(userMessage(error, fallback: 'تعذر إضافة الحساب. حاول مرة أخرى.'))),
     );
   }
 }
@@ -103,7 +103,7 @@ class _CreateChildFormState extends State<_CreateChildForm> {
     }
     setState(() => _busy = true);
     try {
-      final login = await ParentProvisionedChild(Supabase.instance.client).create(
+      final login = await sl<ParentProvisionedChild>().create(
         name: _name.text.trim(),
         age: age,
       );
@@ -113,7 +113,7 @@ class _CreateChildFormState extends State<_CreateChildForm> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إنشاء الحساب: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر إنشاء الحساب. حاول مرة أخرى.'))),
       );
     }
   }

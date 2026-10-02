@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
+import '../../../../core/errors/failures.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/usecases/world_usecases.dart';
 import '../../domain/usecases/mission_usecases.dart';
@@ -51,16 +56,17 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
     on<ContentEvent>((event, emit) async {
       await event.map(
         getWorlds: (e) async {
-          final isAlreadyLoaded = state.maybeWhen(
+          final keep = state.maybeWhen(
             worldsLoaded: (_) => true,
             orElse: () => false,
           );
-          if (!isAlreadyLoaded || e.forceRefresh) {
-            emit(const ContentState.loading());
-          }
-          final result = await getWorlds(GetWorldsParams(forceRefresh: e.forceRefresh));
+          final result = await _keepOrWait(
+            emit,
+            getWorlds(GetWorldsParams(forceRefresh: e.forceRefresh)),
+            keep: keep,
+          );
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (worlds) => emit(ContentState.worldsLoaded(worlds)),
           );
         },
@@ -68,7 +74,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await addWorld(e.world);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (world) => emit(ContentState.worldAdded(world)),
           );
         },
@@ -76,7 +82,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await updateWorld(e.world);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => add(const ContentEvent.getWorlds()),
           );
         },
@@ -84,15 +90,22 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await deleteWorld(e.id);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => add(const ContentEvent.getWorlds()),
           );
         },
         getMissions: (e) async {
-          if (e.forceRefresh) emit(const ContentState.loading());
-          final result = await getMissions(GetMissionsParams(e.worldId, forceRefresh: e.forceRefresh));
+          final keep = state.maybeWhen(
+            missionsLoaded: (_) => true,
+            orElse: () => false,
+          );
+          final result = await _keepOrWait(
+            emit,
+            getMissions(GetMissionsParams(e.worldId, forceRefresh: e.forceRefresh)),
+            keep: keep,
+          );
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (missions) => emit(ContentState.missionsLoaded(missions)),
           );
         },
@@ -100,7 +113,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await addMission(e.mission);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (mission) => emit(ContentState.missionAdded(mission)),
           );
         },
@@ -108,7 +121,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await updateMission(e.mission);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => add(ContentEvent.getMissions(e.mission.worldId)),
           );
         },
@@ -119,15 +132,22 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await deleteMission(e.id);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => emit(const ContentState.initial()), // UI should listen to this and refresh
           );
         },
         getStories: (e) async {
-          if (e.forceRefresh) emit(const ContentState.loading());
-          final result = await getStories(GetStoriesParams(e.missionId, forceRefresh: e.forceRefresh));
+          final keep = state.maybeWhen(
+            storiesLoaded: (_) => true,
+            orElse: () => false,
+          );
+          final result = await _keepOrWait(
+            emit,
+            getStories(GetStoriesParams(e.missionId, forceRefresh: e.forceRefresh)),
+            keep: keep,
+          );
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (stories) => emit(ContentState.storiesLoaded(stories)),
           );
         },
@@ -135,7 +155,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await addStory(AddStoryParams(e.story, audioFile: e.audioFile, characterFile: e.characterFile));
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (story) => emit(ContentState.storyAdded(story)),
           );
         },
@@ -143,7 +163,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await updateStory(AddStoryParams(e.story, audioFile: e.audioFile, characterFile: e.characterFile));
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => add(ContentEvent.getStories(e.story.missionId)),
           );
         },
@@ -151,15 +171,22 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await deleteStory(e.id);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => emit(const ContentState.initial()),
           );
         },
         getQuestions: (e) async {
-          if (e.forceRefresh) emit(const ContentState.loading());
-          final result = await getQuestions(GetQuestionsParams(e.missionId, forceRefresh: e.forceRefresh));
+          final keep = state.maybeWhen(
+            questionsLoaded: (_) => true,
+            orElse: () => false,
+          );
+          final result = await _keepOrWait(
+            emit,
+            getQuestions(GetQuestionsParams(e.missionId, forceRefresh: e.forceRefresh)),
+            keep: keep,
+          );
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (questions) => emit(ContentState.questionsLoaded(questions)),
           );
         },
@@ -167,7 +194,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await addQuestion(e.question);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (question) => emit(ContentState.questionAdded(question)),
           );
         },
@@ -175,7 +202,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await updateQuestion(e.question);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => add(ContentEvent.getQuestions(e.question.missionId)),
           );
         },
@@ -183,7 +210,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await deleteQuestion(e.id);
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => emit(const ContentState.initial()),
           );
         },
@@ -191,19 +218,43 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           emit(const ContentState.loading());
           final result = await completeMission(CompleteMissionParams(e.missionId, e.childId));
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (_) => emit(const ContentState.missionCompleted()),
           );
         },
         getCompletedMissions: (e) async {
-          emit(const ContentState.loading());
-          final result = await getCompletedMissions(e.childId);
+          final keep = state.maybeWhen(
+            completedMissionsLoaded: (_) => true,
+            orElse: () => false,
+          );
+          final result = await _keepOrWait(
+            emit,
+            getCompletedMissions(e.childId),
+            keep: keep,
+          );
           result.fold(
-            (failure) => emit(ContentState.error(failure.message)),
+            (failure) => emit(ContentState.error(userMessage(failure.message))),
             (progressList) => emit(ContentState.completedMissionsLoaded(progressList)),
           );
         },
       );
     });
+  }
+
+  static const _shimmerDelay = Duration(milliseconds: 160);
+
+  /// Keeps a list that is already on screen. The shimmer waits briefly so a
+  /// cached answer can appear without covering the page.
+  Future<Either<Failure, T>> _keepOrWait<T>(
+    Emitter<ContentState> emit,
+    Future<Either<Failure, T>> pending, {
+    required bool keep,
+  }) async {
+    if (keep) return pending;
+    var settled = false;
+    unawaited(pending.whenComplete(() => settled = true));
+    await Future<void>.delayed(_shimmerDelay);
+    if (!settled && !isClosed) emit(const ContentState.loading());
+    return pending;
   }
 }

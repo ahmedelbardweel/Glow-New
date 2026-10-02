@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/widgets/email_code_sheet.dart';
 import '../../data/organization_service.dart';
 
 class OrganizationAuthScreen extends StatefulWidget {
@@ -33,11 +35,13 @@ class _OrganizationAuthScreenState extends State<OrganizationAuthScreen> {
     }
     setState(() => _busy = true);
     try {
-      final role = await OrganizationService(Supabase.instance.client).signIn(email, password);
+      final role = await sl<OrganizationService>().signIn(email, password);
+      if (!mounted) return;
+      if (!await confirmOwnEmail(context, email)) return;
       if (!mounted) return;
       context.go(role == 'teacher' ? '/teacher-dashboard' : '/organization-dashboard');
     } catch (error) {
-      _message('تعذر الدخول: $error');
+      _message(userMessage(error, fallback: 'تعذر الدخول. حاول مرة أخرى.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -51,9 +55,26 @@ class _OrganizationAuthScreenState extends State<OrganizationAuthScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Scaffold(
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/role-selection');
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'رجوع',
+          icon: const BackButtonIcon(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/role-selection');
+            }
+          },
+        ),
         title: Text(
           'دخول المنظمة',
           style: textTheme.titleLarge?.copyWith(
@@ -88,9 +109,10 @@ class _OrganizationAuthScreenState extends State<OrganizationAuthScreen> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _busy ? null : _submit,
-            child: Text(_busy ? 'جارٍ الدخول' : 'دخول'),
+            child: Text(_busy ? 'جارٍ الدخول' : 'تسجيل الدخول'),
           ),
         ],
+      ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/errors/user_message.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
@@ -98,7 +99,7 @@ class _ChildOnboardingScreenState extends State<ChildOnboardingScreen> {
           error: (message) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text(message)));
+            ).showSnackBar(SnackBar(content: Text(userMessage(message))));
           },
           orElse: () {},
         );

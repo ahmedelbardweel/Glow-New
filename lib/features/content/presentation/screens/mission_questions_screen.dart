@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../content/domain/entities/mission_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
@@ -49,7 +50,7 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
           builder: (context, state) {
             return state.maybeWhen(
               loading: () => const ShimmerLoading(),
-              error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
+              error: (msg) => Center(child: Text(userMessage(msg), textAlign: TextAlign.center, style: const TextStyle(color: Colors.red))),
               questionsLoaded: (questions) {
                 if (questions.isEmpty) {
                   return const Center(child: Text('لا توجد أسئلة مضافة في هذه المهمة حتى الآن.'));

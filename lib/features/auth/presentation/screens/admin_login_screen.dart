@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/errors/user_message.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../bloc/auth_bloc.dart';
@@ -25,20 +26,37 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/role-selection');
+      },
+      child: Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'رجوع',
+          icon: const BackButtonIcon(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/role-selection');
+            }
+          },
+        ),
         title: const Text('دخول الإدارة'),
         centerTitle: true,
       ),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           state.maybeWhen(
-            adminLoggedIn: (user) {
+            adminLoggedIn: (_) {
               context.go('/admin-dashboard');
             },
             error: (message) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(message)),
+                SnackBar(content: Text(userMessage(message))),
               );
             },
             orElse: () {},
@@ -113,6 +131,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

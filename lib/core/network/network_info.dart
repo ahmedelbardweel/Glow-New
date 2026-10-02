@@ -41,11 +41,11 @@ class NetworkInfoImpl implements NetworkInfo {
           result == ConnectivityResult.vpn ||
           result == ConnectivityResult.other,
     );
-    if (!hasRadio) return false;
+    if (hasRadio) return true;
 
     try {
       return await connectionChecker.hasConnection.timeout(
-        const Duration(milliseconds: 900),
+        const Duration(seconds: 2),
       );
     } catch (_) {
       return false;

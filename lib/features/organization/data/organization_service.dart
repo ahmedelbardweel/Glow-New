@@ -59,8 +59,19 @@ class OrganizationService {
     required String password,
   }) async {
     final refresh = _client.auth.currentSession?.refreshToken;
+    final sessionUser = _client.auth.currentUser;
     final admin = await sl<AuthLocalDataSource>().getLastUser();
-    if (refresh == null) throw Exception('جلسة الأدمن انتهت');
+    if (refresh == null || sessionUser == null) {
+      throw Exception('جلسة الأدمن انتهت');
+    }
+    final row = await _client
+        .from('users')
+        .select('role')
+        .eq('id', sessionUser.id)
+        .maybeSingle();
+    if (row == null || row['role'] != 'admin') {
+      throw Exception('إنشاء المنظمة من حساب الإدارة فقط.');
+    }
     try {
       final created = await _signInOrUp(email: email, password: password);
       if (_client.auth.currentUser?.id != created.id) {
@@ -86,7 +97,10 @@ class OrganizationService {
     final user = response.user;
     if (user == null) throw Exception('تعذر الدخول');
     final role = await _roleOf(user.id);
-    if (role == null) throw Exception('هذا الحساب ليس منظمة ولا معلماً');
+    if (role == null) {
+      await _client.auth.signOut();
+      throw Exception('هذا الحساب ليس منظمة ولا معلماً');
+    }
     await _remember(user.id, email, role);
     return role;
   }
@@ -100,6 +114,14 @@ class OrganizationService {
     final orgId = _client.auth.currentUser?.id;
     if (refresh == null || orgId == null) {
       throw Exception('جلسة المنظمة انتهت');
+    }
+    final org = await _client
+        .from('organizations')
+        .select('id')
+        .eq('id', orgId)
+        .maybeSingle();
+    if (org == null) {
+      throw Exception('إضافة المعلم من حساب المنظمة فقط.');
     }
     try {
       final created = await _signInOrUp(email: email, password: password);

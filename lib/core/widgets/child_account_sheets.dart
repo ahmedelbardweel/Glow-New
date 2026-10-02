@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../audio/child_button_voice.dart';
+import '../errors/user_message.dart';
 import '../di/injection_container.dart';
 import '../theme/app_colors.dart';
 import '../../features/auth/data/child_account_service.dart';
@@ -144,7 +145,7 @@ Future<bool> _activate(BuildContext context, DeviceChildAccount account) async {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('تعذر فتح الحساب: $error')));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error, fallback: 'تعذر فتح الحساب. حاول مرة أخرى.'))));
     }
     return false;
   } finally {

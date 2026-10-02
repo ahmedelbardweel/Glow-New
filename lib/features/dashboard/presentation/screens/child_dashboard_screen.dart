@@ -6,8 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
+import '../../../../core/session/app_session.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
@@ -57,7 +58,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
   Future<void> _initChildAndSync() async {
     final cachedChild = await sl<AuthLocalDataSource>().getLastChild();
     final childId =
-        cachedChild?.id ?? Supabase.instance.client.auth.currentUser?.id;
+        cachedChild?.id ?? sl<AppSession>().userId;
     if (mounted && childId != null) {
       setState(() {
         _childId = childId;
@@ -102,7 +103,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
     if (_childId == null) {
       final cachedChild = await sl<AuthLocalDataSource>().getLastChild();
       _childId =
-          cachedChild?.id ?? Supabase.instance.client.auth.currentUser?.id;
+          cachedChild?.id ?? sl<AppSession>().userId;
     }
 
     if (_childId != null) {
@@ -340,7 +341,8 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                       loading: () => const ShimmerLoading(),
                       error: (msg) => Center(
                         child: Text(
-                          'خطأ: $msg',
+                          userMessage(msg),
+                          textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.red),
                         ),
                       ),
@@ -405,6 +407,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                                   horizontal: 16,
                                   vertical: 16,
                                 ),
+                                itemExtent: 224,
                                 cacheExtent: 500,
                                 physics: const AlwaysScrollableScrollPhysics(
                                   parent: BouncingScrollPhysics(),

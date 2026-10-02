@@ -6,6 +6,7 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/role_selection_screen.dart';
 import '../../features/auth/presentation/screens/child_onboarding_screen.dart';
 import '../../features/auth/presentation/screens/parent_auth_screen.dart';
+import '../../features/auth/presentation/screens/parent_register_screen.dart';
 import '../../features/auth/presentation/screens/admin_login_screen.dart';
 import '../../features/dashboard/presentation/screens/child_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/parent_dashboard_screen.dart';
@@ -145,6 +146,10 @@ class AppRouter {
       GoRoute(
         path: '/parent-auth',
         builder: (context, state) => const ParentAuthScreen(),
+      ),
+      GoRoute(
+        path: '/parent-register',
+        builder: (context, state) => const ParentRegisterScreen(),
       ),
       GoRoute(
         path: '/organization-auth',

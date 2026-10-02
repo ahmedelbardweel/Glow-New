@@ -178,10 +178,6 @@ String _cameraMessage(MobileScannerException error) {
     case MobileScannerErrorCode.controllerAlreadyInitialized:
     case MobileScannerErrorCode.controllerDisposed:
     case MobileScannerErrorCode.controllerUninitialized:
-      final detail = error.errorDetails?.message;
-      if (detail != null && detail.isNotEmpty) {
-        return 'تعذر فتح الكاميرا. $detail';
-      }
       return 'تعذر فتح الكاميرا. أعد المحاولة، وتأكد أن إذن الكاميرا مفعّل.';
   }
 }

@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
+import '../../../../core/session/app_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/world_entity.dart';
 import '../bloc/content_bloc.dart';
@@ -43,7 +44,7 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
 
   Future<void> _fetchProgress() async {
     final cachedChild = await sl<AuthLocalDataSource>().getLastChild();
-    final childId = cachedChild?.id ?? Supabase.instance.client.auth.currentUser?.id;
+    final childId = cachedChild?.id ?? sl<AppSession>().userId;
 
     if (childId != null) {
       final result = await sl<ContentRepository>().getCompletedMissions(childId);
@@ -120,7 +121,7 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
               builder: (context, state) {
                 return state.maybeWhen(
                   loading: () => const ShimmerLoading(),
-                  error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
+                  error: (msg) => Center(child: Text(userMessage(msg), textAlign: TextAlign.center, style: const TextStyle(color: Colors.red))),
                   missionsLoaded: (missions) {
                     if (missions.isEmpty) {
                       return const Center(child: Text('لا توجد مهام في هذا العالم بعد.', style: TextStyle(fontSize: 14, color: Colors.grey)));

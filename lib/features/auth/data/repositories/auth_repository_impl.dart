@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:get_it/get_it.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/network/network_info.dart';
 import '../child_account_service.dart';
 import '../../domain/entities/child_profile_entity.dart';
@@ -34,7 +35,7 @@ class AuthRepositoryImpl implements AuthRepository {
       );
       return Right(childProfile);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userMessage(e)));
     }
   }
 
@@ -44,25 +45,39 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
     required String childCode,
   }) async {
-    if (await networkInfo.isConnected) {
-      try {
-        final user = await remoteDataSource.registerParent(
-          email: email,
-          password: password,
-          childCode: childCode,
-        );
-        await localDataSource.cacheUser(user);
-        return Right(user);
-      } catch (e) {
-        return Left(ServerFailure(e.toString()));
-      }
-    } else {
-      // Offline fallback
-      final cachedUser = await localDataSource.getLastUser();
-      if (cachedUser != null && cachedUser.email == email && cachedUser.role == 'parent') {
-        return Right(cachedUser);
-      }
-      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت ولا بيانات محفوظة'));
+    if (!await networkInfo.isConnected) {
+      return const Left(ServerFailure('إنشاء الحساب يحتاج اتصالاً بالإنترنت.'));
+    }
+    try {
+      final user = await remoteDataSource.registerParent(
+        email: email,
+        password: password,
+        childCode: childCode,
+      );
+      await localDataSource.cacheUser(user);
+      return Right(user);
+    } catch (e) {
+      return Left(ServerFailure(userMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserEntity>> loginParent({
+    required String email,
+    required String password,
+  }) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(ServerFailure('دخول ولي الأمر يحتاج اتصالاً بالإنترنت.'));
+    }
+    try {
+      final user = await remoteDataSource.loginParent(
+        email: email,
+        password: password,
+      );
+      await localDataSource.cacheUser(user);
+      return Right(user);
+    } catch (e) {
+      return Left(ServerFailure(userMessage(e)));
     }
   }
 
@@ -71,24 +86,20 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
     required String password,
   }) async {
-    if (await networkInfo.isConnected) {
-      try {
-        final user = await remoteDataSource.loginAdmin(
-          email: email,
-          password: password,
-        );
-        await localDataSource.cacheUser(user);
-        return Right(user);
-      } catch (e) {
-        return Left(ServerFailure(e.toString()));
-      }
-    } else {
-      // Offline fallback for admin login
-      final cachedUser = await localDataSource.getLastUser();
-      if (cachedUser != null && cachedUser.email == email && cachedUser.role == 'admin') {
-        return Right(cachedUser);
-      }
-      return const Left(ServerFailure('لا يوجد اتصال بالإنترنت، ولم نجد بيانات سابقة للدخول'));
+    if (!await networkInfo.isConnected) {
+      return const Left(
+        ServerFailure('دخول الإدارة يحتاج اتصالاً بالإنترنت.'),
+      );
+    }
+    try {
+      final user = await remoteDataSource.loginAdmin(
+        email: email,
+        password: password,
+      );
+      await localDataSource.cacheUser(user);
+      return Right(user);
+    } catch (e) {
+      return Left(ServerFailure(userMessage(e)));
     }
   }
 }

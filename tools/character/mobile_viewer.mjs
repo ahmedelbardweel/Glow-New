@@ -415,7 +415,7 @@ try {
   document.body.appendChild(renderer.domElement);
   renderer.domElement.addEventListener('webglcontextlost', event => { event.preventDefault(); fail(new Error('Graphics context lost')); });
   scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(38, 1, .05, 100);
-  controls = new OrbitControls(camera, renderer.domElement); controls.enablePan = false; controls.enableZoom = false; controls.enableDamping = true; controls.minDistance = 3; controls.maxDistance = 16; controls.target.set(0, 1.78, 0);
+  controls = new OrbitControls(camera, renderer.domElement); controls.enablePan = false; controls.enableZoom = true; controls.enableDamping = true; controls.minDistance = 3; controls.maxDistance = 16; controls.target.set(0, 1.78, 0);
   controls.addEventListener('change', () => { if (!state.playing) { draw(); schedule(); } });
   scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x8d8270, .85));
   const key = new THREE.DirectionalLight(0xfff2dc, 1.85); key.position.set(-3, 6, 6); scene.add(key);

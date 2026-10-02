@@ -3,15 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
 import '../../../content/presentation/bloc/content_event.dart';
 import '../../../content/presentation/bloc/content_state.dart';
-import '../../../../core/utils/logout_helper.dart';
 import '../../../../core/utils/admin_actions_bottom_sheet.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../../core/widgets/offline_aware_image.dart';
+import '../../../auth/data/datasources/auth_local_data_source.dart';
 import '../../../organization/presentation/widgets/create_organization_sheet.dart';
+import '../../../organization/presentation/widgets/staff_settings_sheet.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -46,11 +48,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           centerTitle: false,
           actions: [
             IconButton(
+              tooltip: 'الإعدادات',
               icon: const Icon(Icons.more_vert),
-              onPressed: () => showLogoutBottomSheet(
-                context,
-                onCreateOrganization: () => showCreateOrganizationSheet(context),
-              ),
+              onPressed: () {
+                showStaffSettingsSheet(
+                  context,
+                  settings: [
+                    StaffSetting(
+                      title: 'إنشاء حساب منظمة',
+                      subtitle: 'اسم وبريد وكلمة مرور. المنظمة تدخل بهما لاحقاً',
+                      onTap: (sheetContext) async {
+                        Navigator.of(sheetContext).pop();
+                        if (!context.mounted) return;
+                        await showCreateOrganizationSheet(context);
+                      },
+                    ),
+                  ],
+                  onLogout: () async {
+                    await sl<AuthLocalDataSource>().clearCache();
+                    if (context.mounted) context.go('/role-selection');
+                  },
+                );
+              },
             ),
           ],
         ),
@@ -58,7 +77,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           builder: (context, state) {
             return state.maybeWhen(
               loading: () => const ShimmerLoading(),
-              error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
+              error: (msg) => Center(child: Text(userMessage(msg), style: const TextStyle(color: Colors.red))),
               worldsLoaded: (worlds) {
                 if (worlds.isEmpty) {
                   return const Center(child: Text('لا توجد عوالم مضافة حتى الآن. أضف عالمك الأول!'));
@@ -71,6 +90,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
+                    cacheExtent: 500,
                     itemCount: worlds.length,
                     itemBuilder: (context, index) {
                       final world = worlds[index];

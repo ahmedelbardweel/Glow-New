@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
+import '../../../../core/session/app_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/mission_entity.dart';
 import '../bloc/content_bloc.dart';
@@ -65,7 +68,7 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
     );
 
     if (isCorrect) {
-      // Show Success Snack
+      unawaited(ChildButtonVoice.speakLines(const ['إجابة صحيحة، أحسنت']));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('إجابة صحيحة! أحسنت 🌟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -92,7 +95,7 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
               stars: widget.mission.starsReward,
             );
             sl<AuthLocalDataSource>().getLastChild().then((cachedChild) {
-              final childId = cachedChild?.id ?? Supabase.instance.client.auth.currentUser?.id;
+              final childId = cachedChild?.id ?? sl<AppSession>().userId;
               if (childId != null) {
                 _contentBloc.add(ContentEvent.completeMission(widget.mission.id, childId));
               }
@@ -104,7 +107,12 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
         }
       });
     } else {
-      // Show Error Snack
+      unawaited(
+        ChildButtonVoice.speakLines([
+          'إجابة خاطئة، حاول مرة أخرى',
+          if (correct.isNotEmpty) correct,
+        ]),
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('إجابة خاطئة، حاول مرة أخرى! 💪'),
@@ -164,7 +172,7 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
               builder: (context, state) {
                 return state.maybeWhen(
                   loading: () => const ShimmerLoading(type: ShimmerType.card),
-                  error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
+                  error: (msg) => Center(child: Text(userMessage(msg), textAlign: TextAlign.center, style: const TextStyle(color: Colors.red))),
                   questionsLoaded: (questions) {
                     if (questions.isEmpty) {
                       return const Center(child: Text('لا توجد تحديات حالياً.', style: TextStyle(fontSize: 14, color: Colors.grey)));

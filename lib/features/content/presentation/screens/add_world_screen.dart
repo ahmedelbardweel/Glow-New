@@ -4,8 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
+import '../../../../core/storage/media_store.dart';
 import '../../../../core/widgets/admin_voice_field.dart';
 import '../../../content/domain/entities/world_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
@@ -70,14 +71,12 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
       _ => 'image/jpeg',
     };
     final name = 'world_${DateTime.now().millisecondsSinceEpoch}.$ext';
-    await Supabase.instance.client.storage.from('story_characters').upload(
-          name,
-          file,
-          fileOptions: FileOptions(contentType: type),
-        );
-    return Supabase.instance.client.storage
-        .from('story_characters')
-        .getPublicUrl(name);
+    return sl<MediaStore>().uploadPublic(
+      bucket: 'story_characters',
+      path: name,
+      file: file,
+      contentType: type,
+    );
   }
 
   Future<void> _submit() async {
@@ -131,7 +130,7 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
                 context.pop(true);
               },
               error: (msg) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userMessage(msg))));
               },
               orElse: () {},
             );

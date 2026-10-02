@@ -1,7 +1,7 @@
 import 'package:Glow/core/di/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../auth/presentation/widgets/parent_link_sheets.dart';
 import '../../../auth/presentation/widgets/parent_provision_sheets.dart';
 import '../../../auth/presentation/widgets/parent_settings_sheet.dart';
@@ -10,6 +10,9 @@ import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
 import '../../../content/domain/repositories/content_repository.dart';
 import '../../../content/domain/entities/child_progress_entity.dart';
+import '../../../../core/session/app_session.dart';
+import '../../domain/entities/linked_child.dart';
+import '../../domain/repositories/parent_children_repository.dart';
 import 'parent_reports_screen.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
@@ -19,23 +22,9 @@ class ParentDashboardScreen extends StatefulWidget {
   State<ParentDashboardScreen> createState() => _ParentDashboardScreenState();
 }
 
-class _LinkedChild {
-  const _LinkedChild({
-    required this.id,
-    required this.name,
-    required this.age,
-    required this.code,
-  });
-
-  final String id;
-  final String name;
-  final int age;
-  final String code;
-}
-
 class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   bool _isLoading = true;
-  List<_LinkedChild> _children = [];
+  List<LinkedChild> _children = [];
   String? _childId;
   String? _childName;
 
@@ -55,27 +44,15 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final parentId = Supabase.instance.client.auth.currentUser?.id;
+      final parentId = sl<AppSession>().userId;
 
       if (parentId != null) {
-        final childrenData = await Supabase.instance.client
-            .from('children_profiles')
-            .select()
-            .eq('parent_id', parentId);
-
-        final linked = <_LinkedChild>[
-          for (final row in childrenData)
-            _LinkedChild(
-              id: row['id'] as String,
-              name: (row['name'] as String?) ?? '',
-              age: (row['age'] as num?)?.toInt() ?? 0,
-              code: (row['child_code'] as String?) ?? '',
-            ),
-        ]..sort((a, b) => a.name.compareTo(b.name));
+        final linked = await sl<ParentChildrenRepository>().listForCurrentParent();
+        linked.sort((a, b) => a.name.compareTo(b.name));
 
         final savedId = await sl<AuthLocalDataSource>().getParentSelectedChild();
         final wantedCode = preferCode?.trim();
-        _LinkedChild? selected;
+        LinkedChild? selected;
         for (final child in linked) {
           if (wantedCode != null &&
               wantedCode.isNotEmpty &&
@@ -97,17 +74,12 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
         _children = linked;
         _childId = selected?.id;
         _childName = selected?.name;
+        _totalStars = 0;
+        _totalBadges = 0;
+        _totalMissions = 0;
+        _recentProgress = [];
         if (selected != null) {
           await sl<AuthLocalDataSource>().cacheParentSelectedChild(selected.id);
-        }
-
-        if (mounted) {
-          setState(() {
-            _totalStars = 0;
-            _totalBadges = 0;
-            _totalMissions = 0;
-            _recentProgress = [];
-          });
         }
       }
 
@@ -135,15 +107,12 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
             // Sort by recent
             progressList.sort((a, b) => b.completedAt.compareTo(a.completedAt));
 
-            setState(() {
-              // Only override stats if progressList actually has data
-              if (progressList.isNotEmpty) {
-                _totalStars = stars;
-                _totalBadges = badges;
-              }
-              _totalMissions = progressList.length;
-              _recentProgress = progressList;
-            });
+            if (progressList.isNotEmpty) {
+              _totalStars = stars;
+              _totalBadges = badges;
+            }
+            _totalMissions = progressList.length;
+            _recentProgress = progressList;
           },
         );
       }
@@ -151,7 +120,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
       debugPrint("Parent Dashboard Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text('خطأ في جلب البيانات: $e')),
+           SnackBar(content: Text(userMessage(e, fallback: 'تعذر جلب البيانات. حاول مرة أخرى.'))),
         );
       }
     } finally {
@@ -168,15 +137,11 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final parentId = Supabase.instance.client.auth.currentUser?.id;
-      if (parentId == null) {
+      final linked = await sl<ParentChildrenRepository>().link(code);
+      if (!linked) {
         if (mounted) setState(() => _isLoading = false);
         return false;
       }
-      await Supabase.instance.client.rpc('link_parent_to_child', params: {
-        'p_parent_id': parentId,
-        'p_child_code': code,
-      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

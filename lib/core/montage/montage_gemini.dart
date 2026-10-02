@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../di/injection_container.dart';
+
 class MontageGeminiException implements Exception {
   const MontageGeminiException(this.code, [this.detail = '']);
 
@@ -14,7 +16,7 @@ class MontageGeminiException implements Exception {
 /// in the Supabase function, never in the app.
 class MontageGemini {
   Future<Map<String, dynamic>> plan(List<Map<String, dynamic>> sentences) async {
-    final client = Supabase.instance.client;
+    final client = sl<SupabaseClient>();
     if (client.auth.currentSession == null) {
       throw const MontageGeminiException('signed_out');
     }

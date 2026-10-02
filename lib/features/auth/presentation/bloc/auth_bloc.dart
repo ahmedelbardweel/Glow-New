@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../domain/usecases/login_admin_usecase.dart';
 import '../../domain/usecases/register_child_usecase.dart';
 import '../../domain/usecases/register_parent_usecase.dart';
@@ -25,7 +26,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             avatarUrl: e.avatarUrl,
           ));
           result.fold(
-            (failure) => emit(AuthState.error(failure.message)),
+            (failure) => emit(AuthState.error(userMessage(failure.message))),
             (child) => emit(AuthState.childRegistered(child)),
           );
         },
@@ -37,7 +38,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             childCode: e.childCode,
           ));
           result.fold(
-            (failure) => emit(AuthState.error(failure.message)),
+            (failure) => emit(AuthState.error(userMessage(failure.message))),
             (user) => emit(AuthState.parentRegistered(user)),
           );
         },
@@ -48,7 +49,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             password: e.password,
           ));
           result.fold(
-            (failure) => emit(AuthState.error(failure.message)),
+            (failure) => emit(AuthState.error(userMessage(failure.message))),
             (user) => emit(AuthState.adminLoggedIn(user)),
           );
         },

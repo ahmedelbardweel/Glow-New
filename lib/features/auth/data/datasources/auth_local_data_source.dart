@@ -12,6 +12,7 @@ abstract class AuthLocalDataSource {
   Future<String?> getParentSelectedChild();
   Future<void> clearCache();
   Future<void> forgetUser();
+  Future<void> forgetChild();
   Future<void> saveParentChildLogin({
     required String childId,
     required String email,
@@ -83,6 +84,11 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   @override
   Future<void> forgetUser() async {
     await box.delete(CACHED_USER);
+  }
+
+  @override
+  Future<void> forgetChild() async {
+    await box.delete(CACHED_CHILD);
   }
 
   @override

@@ -1,18 +1,16 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/audio/child_button_clips.dart';
 import '../../../../core/audio/child_button_voice.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/network/network_info.dart';
-import '../../../../core/utils/device_id_helper.dart';
 import '../../data/child_account_service.dart';
 import '../../data/datasources/auth_local_data_source.dart';
-import '../../data/models/child_profile_model.dart';
 import '../../data/parent_google_auth.dart';
 import '../../../content/data/services/sync_service.dart';
 
@@ -25,6 +23,12 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _showButton = false;
+  final Completer<void> _logoDone = Completer<void>();
+
+  Future<void> _holdForLogo() async {
+    await _logoDone.future;
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+  }
 
   @override
   void initState() {
@@ -51,8 +55,8 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    final googleSession = Supabase.instance.client.auth.currentSession;
-    if (googleSession != null && ParentGoogleAuth.isGoogleUser(googleSession.user)) {
+    final googleSession = ParentGoogleAuth.googleSessionOrNull();
+    if (googleSession != null) {
       try {
         await ParentGoogleAuth.rememberAsParent(googleSession);
         if (mounted) _go('/parent-dashboard');
@@ -92,32 +96,14 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     try {
-      final deviceId = await DeviceIdHelper.getDeviceId();
-      final email = DeviceIdHelper.generateDeviceEmail(deviceId);
-      final password = DeviceIdHelper.generateDevicePassword(deviceId);
-
-      final supabase = Supabase.instance.client;
-      final response = await supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-
-      if (response.user != null) {
-        final data = await supabase
-            .from('children_profiles')
-            .select()
-            .eq('id', response.user!.id)
-            .maybeSingle();
-
-        if (data != null) {
-          final child = ChildProfileModel.fromJson(data);
-          await sl<ChildAccountService>().rememberExisting(child: child, slot: '');
-          await _syncChildIfNeeded(child.id);
-          sl<SyncService>().prefetchCachedStoryAudio();
-          if (mounted) {
-            _go('/child-dashboard');
-            return;
-          }
+      final child = await sl<ChildAccountService>().signInKnownDevice();
+      if (child != null) {
+        await sl<ChildAccountService>().rememberExisting(child: child, slot: '');
+        await _syncChildIfNeeded(child.id);
+        sl<SyncService>().prefetchCachedStoryAudio();
+        if (mounted) {
+          _go('/child-dashboard');
+          return;
         }
       }
     } catch (_) {
@@ -128,14 +114,20 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _go(String route) async {
+    await _holdForLogo();
+    if (!mounted) return;
     await _sayAppName();
     if (!mounted) return;
     context.go(route);
   }
 
   void _revealStartButton() {
-    setState(() => _showButton = true);
-    unawaited(_welcomeFirstVisit());
+    unawaited(() async {
+      await _holdForLogo();
+      if (!mounted) return;
+      setState(() => _showButton = true);
+      unawaited(_welcomeFirstVisit());
+    }());
   }
 
   /// Every splash says the app name from a bundled clip.
@@ -166,6 +158,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final overhang = MediaQuery.viewPaddingOf(context).top + 16;
     return Scaffold(
       body: Stack(
         children: [
@@ -173,10 +166,16 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Spacer(),
-                  Image.asset('assets/images/logo.png', width: double.infinity),
-                  const Spacer(),
+                  Expanded(
+                    child: _HangingLogo(
+                      overhang: overhang,
+                      onFinished: () {
+                        if (!_logoDone.isCompleted) _logoDone.complete();
+                      },
+                    ),
+                  ),
                   AnimatedOpacity(
                     opacity: _showButton ? 1 : 0,
                     duration: const Duration(milliseconds: 420),
@@ -211,6 +210,259 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Logo canvas the cut pieces were taken from.
+const double _logoCanvasW = 1280;
+const double _logoCanvasH = 853;
+
+class _LogoPiece {
+  const _LogoPiece(this.asset, this.x, this.y, this.w, this.h);
+
+  final String asset;
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+}
+
+const _letters = <_LogoPiece>[
+  _LogoPiece('assets/images/logo_g.png', 159, 219, 273, 284),
+  _LogoPiece('assets/images/logo_l.png', 442, 266, 150, 224),
+  _LogoPiece('assets/images/logo_o.png', 582, 143, 298, 360),
+  _LogoPiece('assets/images/logo_w.png', 849, 291, 272, 200),
+];
+
+const _line = _LogoPiece('assets/images/logo_line.png', 403, 474, 470, 93);
+const _caption = _LogoPiece('assets/images/logo_text.png', 239, 588, 801, 65);
+
+/// Letters drop from the top center into their logo places, then the line
+/// fades in and the caption rises. Motion is paint-only so it stays smooth.
+class _HangingLogo extends StatefulWidget {
+  const _HangingLogo({required this.overhang, required this.onFinished});
+
+  /// Distance from this box to the top of the screen, so the thread
+  /// starts above the safe area.
+  final double overhang;
+  final VoidCallback onFinished;
+
+  @override
+  State<_HangingLogo> createState() => _HangingLogoState();
+}
+
+class _HangingLogoState extends State<_HangingLogo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _play;
+  late final List<CurvedAnimation> _letterT;
+  late final CurvedAnimation _lineT;
+  late final CurvedAnimation _captionT;
+  var _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _play = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3400),
+    );
+    _letterT = [
+      for (var i = 0; i < _letters.length; i++)
+        CurvedAnimation(
+          parent: _play,
+          curve: Interval(i * 0.08, i * 0.08 + 0.36, curve: Curves.easeOutCubic),
+        ),
+    ];
+    _lineT = CurvedAnimation(
+      parent: _play,
+      curve: const Interval(0.70, 0.86, curve: Curves.easeOut),
+    );
+    _captionT = CurvedAnimation(
+      parent: _play,
+      curve: const Interval(0.86, 1, curve: Curves.easeOutCubic),
+    );
+    _play.addStatusListener((status) {
+      if (status == AnimationStatus.completed) widget.onFinished();
+    });
+  }
+
+  void _playOnce(List<ImageProvider> frames) {
+    if (_started) return;
+    _started = true;
+    unawaited(() async {
+      await Future.wait([
+        for (final frame in frames) precacheImage(frame, context),
+      ]);
+      if (mounted) _play.forward();
+    }());
+  }
+
+  @override
+  void dispose() {
+    for (final animation in _letterT) {
+      animation.dispose();
+    }
+    _lineT.dispose();
+    _captionT.dispose();
+    _play.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: SizedBox.expand(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxW = constraints.maxWidth;
+            final maxH = constraints.maxHeight;
+            if (maxW <= 0 || maxH <= 0) return const SizedBox.shrink();
+            final scale = math.min(maxW / _logoCanvasW, maxH / _logoCanvasH);
+            final logoTop = (maxH - _logoCanvasH * scale) / 2;
+            final logoLeft = (maxW - _logoCanvasW * scale) / 2;
+            final anchorX = maxW / 2;
+            final dpr = MediaQuery.devicePixelRatioOf(context);
+            final frames = <ImageProvider>[
+              for (final piece in [..._letters, _line, _caption])
+                ResizeImage(
+                  AssetImage(piece.asset),
+                  width: math.max(1, (piece.w * scale * dpr).round()),
+                  height: math.max(1, (piece.h * scale * dpr).round()),
+                ),
+            ];
+            _playOnce(frames);
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (var i = 0; i < _letters.length; i++)
+                  _placed(
+                    piece: _letters[i],
+                    scale: scale,
+                    logoLeft: logoLeft,
+                    logoTop: logoTop,
+                    child: _slide(
+                      animation: _letterT[i],
+                      piece: _letters[i],
+                      scale: scale,
+                      logoLeft: logoLeft,
+                      logoTop: logoTop,
+                      anchorX: anchorX,
+                      fromTop: -widget.overhang,
+                    ),
+                  ),
+                _placed(
+                  piece: _line,
+                  scale: scale,
+                  logoLeft: logoLeft,
+                  logoTop: logoTop,
+                  child: _fadeRise(
+                    animation: _lineT,
+                    rise: 10,
+                    piece: _line,
+                    scale: scale,
+                  ),
+                ),
+                _placed(
+                  piece: _caption,
+                  scale: scale,
+                  logoLeft: logoLeft,
+                  logoTop: logoTop,
+                  child: _fadeRise(
+                    animation: _captionT,
+                    rise: _caption.h * scale,
+                    piece: _caption,
+                    scale: scale,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _placed({
+    required _LogoPiece piece,
+    required double scale,
+    required double logoLeft,
+    required double logoTop,
+    required Widget child,
+  }) {
+    return Positioned(
+      left: logoLeft + piece.x * scale,
+      top: logoTop + piece.y * scale,
+      width: piece.w * scale,
+      height: piece.h * scale,
+      child: child,
+    );
+  }
+
+  Widget _slide({
+    required Animation<double> animation,
+    required _LogoPiece piece,
+    required double scale,
+    required double logoLeft,
+    required double logoTop,
+    required double anchorX,
+    required double fromTop,
+  }) {
+    final width = piece.w * scale;
+    final height = piece.h * scale;
+    final restLeft = logoLeft + piece.x * scale;
+    final begin = Offset(anchorX - width / 2 - restLeft, fromTop - height - (logoTop + piece.y * scale));
+    return AnimatedBuilder(
+      animation: animation,
+      child: _bitmap(piece, width, height),
+      builder: (context, child) {
+        final t = animation.value;
+        return Transform.translate(
+          offset: Offset(begin.dx * (1 - t), begin.dy * (1 - t)),
+          child: child,
+        );
+      },
+    );
+  }
+
+  Widget _fadeRise({
+    required Animation<double> animation,
+    required double rise,
+    required _LogoPiece piece,
+    required double scale,
+  }) {
+    return AnimatedBuilder(
+      animation: animation,
+      child: _bitmap(piece, piece.w * scale, piece.h * scale),
+      builder: (context, child) {
+        final t = animation.value;
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, rise * (1 - t)),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _bitmap(_LogoPiece piece, double width, double height) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return RepaintBoundary(
+      child: Image(
+        image: ResizeImage(
+          AssetImage(piece.asset),
+          width: math.max(1, (width * dpr).round()),
+          height: math.max(1, (height * dpr).round()),
+        ),
+        width: width,
+        height: height,
+        fit: BoxFit.fill,
+        filterQuality: FilterQuality.low,
+        gaplessPlayback: true,
       ),
     );
   }

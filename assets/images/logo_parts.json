@@ -1,0 +1,49 @@
+{
+  "source": "assets/images/logo.png",
+  "width": 1280,
+  "height": 853,
+  "parts": {
+    "g": {
+      "file": "logo_g.png",
+      "x": 159,
+      "y": 219,
+      "width": 273,
+      "height": 284
+    },
+    "l": {
+      "file": "logo_l.png",
+      "x": 442,
+      "y": 266,
+      "width": 150,
+      "height": 224
+    },
+    "o": {
+      "file": "logo_o.png",
+      "x": 582,
+      "y": 143,
+      "width": 298,
+      "height": 360
+    },
+    "w": {
+      "file": "logo_w.png",
+      "x": 849,
+      "y": 291,
+      "width": 272,
+      "height": 200
+    },
+    "line": {
+      "file": "logo_line.png",
+      "x": 403,
+      "y": 474,
+      "width": 470,
+      "height": 93
+    },
+    "text": {
+      "file": "logo_text.png",
+      "x": 239,
+      "y": 588,
+      "width": 801,
+      "height": 65
+    }
+  }
+}

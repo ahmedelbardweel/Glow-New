@@ -6,8 +6,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
+import '../../../../core/session/app_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
@@ -23,7 +25,7 @@ class TeacherDashboardScreen extends StatefulWidget {
 }
 
 class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
-  final _service = OrganizationService(Supabase.instance.client);
+  final _service = sl<OrganizationService>();
   var _loading = true;
   String _name = '';
   List<OrgStudent> _students = const [];
@@ -39,7 +41,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     setState(() => _loading = true);
     try {
       final name = await _service.teacherName();
-      final teacherId = Supabase.instance.client.auth.currentUser?.id ?? '';
+      final teacherId = sl<AppSession>().userId ?? '';
       final students = teacherId.isEmpty ? <OrgStudent>[] : await _service.studentsOf(teacherId);
       final waiting = await _service.pendingInvites();
       if (!mounted) return;
@@ -53,7 +55,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر جلب الصف: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر فتح الصف. حاول مرة أخرى.'))),
       );
     }
   }
@@ -229,7 +231,7 @@ class _AddStudentSheetState extends State<_AddStudentSheet> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إنشاء الطالب: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر إنشاء الطالب. حاول مرة أخرى.'))),
       );
     }
   }
@@ -312,7 +314,7 @@ class _StudentQrState extends State<_StudentQr> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تنزيل الرمز: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر تنزيل الرمز. حاول مرة أخرى.'))),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

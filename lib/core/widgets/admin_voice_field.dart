@@ -13,6 +13,7 @@ class AdminVoiceField extends StatefulWidget {
     this.maxLines = 1,
     this.validator,
     this.keyboardType,
+    this.beside,
   });
 
   final TextEditingController controller;
@@ -20,6 +21,7 @@ class AdminVoiceField extends StatefulWidget {
   final int maxLines;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
+  final Widget? beside;
 
   @override
   State<AdminVoiceField> createState() => _AdminVoiceFieldState();
@@ -69,6 +71,10 @@ class _AdminVoiceFieldState extends State<AdminVoiceField> {
             decoration: InputDecoration(hintText: widget.hint),
           ),
         ),
+        if (widget.beside != null) ...[
+          const SizedBox(width: 8),
+          widget.beside!,
+        ],
         const SizedBox(width: 8),
         FilledButton.tonal(
           onPressed: _busy ? null : _speak,

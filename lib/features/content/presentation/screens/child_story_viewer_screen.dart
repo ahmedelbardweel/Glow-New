@@ -14,6 +14,7 @@ import '../bloc/content_bloc.dart';
 import '../bloc/content_event.dart';
 import '../bloc/content_state.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../dashboard/data/child_activity.dart';
 import '../../../../core/utils/character_helper.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
@@ -153,7 +154,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     _audioSubscriptions.addAll([
       player.onDurationChanged.listen((duration) {
         if (_isCurrentScene(generation) && duration > Duration.zero) {
-          setState(() => _totalDuration = duration);
+          _totalDuration = duration;
         }
       }, onError: (Object error) {
         debugPrint('Story duration failed: $error');
@@ -653,7 +654,8 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                   loading: () => const ShimmerLoading(type: ShimmerType.card),
                   error: (msg) => _messageWithBack(
                     Text(
-                      'خطأ: $msg',
+                      userMessage(msg),
+                      textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.red),
                     ),
                   ),
@@ -863,84 +865,84 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                         borderRadius: BorderRadius.circular(
                                           AppColors.border_radius,
                                         ),
-                                        child: Stack(
+                                        child: Column(
                                           children: [
-                                            // 3D Character Viewer (Full area)
-                                            Positioned.fill(
-                                              child: RepaintBoundary(
-                                                child: ValueListenableBuilder<Duration>(
-                                                  valueListenable: _positionNotifier,
-                                                  builder: (context, pos, child) {
-                                                    final seconds = pos.inMilliseconds / 1000.0;
-                                                    final pose = _currentTimeline?.poseAt(seconds) ?? StoryTransitionPose.rest;
-                                                    return StoryTransitionFrame(pose: pose, child: child!);
-                                                  },
-                                                  child: SmartCharacterViewer(
-                                                  characterName: activeChar,
-                                                  storyText:
-                                                      '${story.title}\n${story.content}',
-                                                  isPlaying: _isPlaying,
-                                                  isSpeaking:
-                                                      _hasAudio && _isPlaying,
-                                                  playbackPosition:
-                                                      _positionNotifier,
-                                                  motion: activeMotion,
-                                                  showHat: showHat,
-                                                  hatColor: hatColor,
-                                                  showGlasses: showGlasses,
-                                                  showMuscles: showMuscles,
-                                                  cameraFit: 1.45,
-                                                  onReady: () => _onCharacterReady(_sceneGeneration),
-                                                  ),
+                                            Expanded(
+                                              child: ClipRect(
+                                                child: Stack(
+                                                  children: [
+                                                    Positioned.fill(
+                                                      child: RepaintBoundary(
+                                                        child: ValueListenableBuilder<Duration>(
+                                                          valueListenable: _positionNotifier,
+                                                          builder: (context, pos, child) {
+                                                            final seconds = pos.inMilliseconds / 1000.0;
+                                                            final pose = _currentTimeline?.poseAt(seconds) ?? StoryTransitionPose.rest;
+                                                            return StoryTransitionFrame(pose: pose, child: child!);
+                                                          },
+                                                          child: SmartCharacterViewer(
+                                                            characterName: activeChar,
+                                                            storyText: '${story.title}\n${story.content}',
+                                                            isPlaying: _isPlaying,
+                                                            isSpeaking: _hasAudio && _isPlaying,
+                                                            playbackPosition: _positionNotifier,
+                                                            motion: activeMotion,
+                                                            showHat: showHat,
+                                                            hatColor: hatColor,
+                                                            showGlasses: showGlasses,
+                                                            showMuscles: showMuscles,
+                                                            cameraFit: 1.45,
+                                                            onReady: () => _onCharacterReady(_sceneGeneration),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (story.content.trim().isNotEmpty)
+                                                      Positioned(
+                                                        left: 10,
+                                                        right: 10,
+                                                        bottom: 10,
+                                                        child: _SpeechCaption(
+                                                          text: story.content,
+                                                          position: _positionNotifier,
+                                                          duration: _totalDuration,
+                                                        ),
+                                                      ),
+                                                    Positioned(
+                                                      top: 16,
+                                                      left: 0,
+                                                      right: 0,
+                                                      child: Center(
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: 16,
+                                                            vertical: 8,
+                                                          ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.transparent,
+                                                            border: Border.all(
+                                                              color: AppColors.inputBorder,
+                                                              width: 1.5,
+                                                            ),
+                                                            borderRadius: BorderRadius.circular(
+                                                              AppColors.border_radius,
+                                                            ),
+                                                          ),
+                                                          child: Text(
+                                                            CharacterHelper.getCleanName(activeChar),
+                                                            style: const TextStyle(
+                                                              color: AppColors.secondary,
+                                                              fontSize: 16,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                             ),
-
-                                            // Character Name (Top Center)
-                                            Positioned(
-                                              top: 16,
-                                              left: 0,
-                                              right: 0,
-                                              child: Center(
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 16,
-                                                    vertical: 8,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.transparent,
-                                                    border: Border.all(
-                                                      color: AppColors.inputBorder,
-                                                      width: 1.5,
-                                                    ),
-                                                    borderRadius: BorderRadius.circular(
-                                                      AppColors.border_radius,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    CharacterHelper.getCleanName(activeChar),
-                                                    style: const TextStyle(
-                                                      color: AppColors.secondary,
-                                                      fontSize: 16,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-
-                                            if (story.content.trim().isNotEmpty)
-                                              Positioned(
-                                                left: 10,
-                                                right: 10,
-                                                bottom: 10,
-                                                child: _SpeechCaption(
-                                                  text: story.content,
-                                                  position: _positionNotifier,
-                                                  duration: _totalDuration,
-                                                ),
-                                              ),
-
                                           ],
                                         ),
                                       ),
@@ -1159,8 +1161,8 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
   }
 }
 
-/// Fixed caption inside the player. Scroll follows speech position and
-/// ignores most audio ticks so the 3D view is not rebuilt.
+/// Caption as wide as the player. Height follows the text up to the
+/// previous fixed size, then the words scroll with the speech.
 class _SpeechCaption extends StatefulWidget {
   const _SpeechCaption({
     required this.text,
@@ -1178,8 +1180,9 @@ class _SpeechCaption extends StatefulWidget {
 
 class _SpeechCaptionState extends State<_SpeechCaption> {
   final ScrollController _scroll = ScrollController();
-  var _lastStep = -1;
   var _followAt = 0;
+
+  static const _maxHeight = 88.0;
 
   static const _style = TextStyle(
     color: AppColors.secondary,
@@ -1202,7 +1205,6 @@ class _SpeechCaptionState extends State<_SpeechCaption> {
       widget.position.addListener(_followSpeech);
     }
     if (oldWidget.text != widget.text) {
-      _lastStep = -1;
       if (_scroll.hasClients) _scroll.jumpTo(0);
     }
   }
@@ -1222,36 +1224,50 @@ class _SpeechCaptionState extends State<_SpeechCaption> {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now < _followAt) return;
     final progress = (widget.position.value.inMilliseconds / total).clamp(0.0, 1.0);
-    final step = (progress * 24).floor();
-    if (step == _lastStep) return;
-    _lastStep = step;
-    _followAt = now + 200;
+    _followAt = now + 80;
     final target = max * progress;
-    if ((_scroll.offset - target).abs() < 6) return;
+    if ((_scroll.offset - target).abs() < 1) return;
     _scroll.jumpTo(target);
+  }
+
+  double _heightFor(double width) {
+    const horizontalPad = 24.0;
+    const verticalPad = 16.0;
+    final painter = TextPainter(
+      text: TextSpan(text: widget.text, style: _style),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.rtl,
+    )..layout(maxWidth: (width - horizontalPad).clamp(0, double.infinity));
+    final wanted = painter.height + verticalPad;
+    if (wanted < _maxHeight) return wanted;
+    return _maxHeight;
   }
 
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: Container(
-        height: 88,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border.all(color: AppColors.inputBorder, width: 1.5),
-          borderRadius: BorderRadius.circular(AppColors.border_radius),
-        ),
-        child: SingleChildScrollView(
-          controller: _scroll,
-          physics: const ClampingScrollPhysics(),
-          child: Text(
-            widget.text,
-            style: _style,
-            textAlign: TextAlign.center,
-            textDirection: TextDirection.rtl,
-          ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Container(
+            height: _heightFor(constraints.maxWidth),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.inputBorder, width: 1.5),
+              borderRadius: BorderRadius.circular(AppColors.border_radius),
+            ),
+            child: SingleChildScrollView(
+              controller: _scroll,
+              physics: const ClampingScrollPhysics(),
+              child: Text(
+                widget.text,
+                style: _style,
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.rtl,
+              ),
+            ),
+          );
+        },
       ),
     );
   }

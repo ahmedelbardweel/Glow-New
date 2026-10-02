@@ -8,6 +8,7 @@ import '../di/injection_container.dart';
 import '../services/resource_manager.dart';
 import 'admin_phrase_voice.dart';
 import 'child_button_clips.dart';
+import 'story_sentence_voice.dart';
 
 /// Plays a clip bundled in the app, then runs the button action.
 /// Nothing is downloaded at runtime.
@@ -63,7 +64,47 @@ class ChildButtonVoice {
     } catch (_) {}
   }
 
-  /// Plays bundled clips one after another. A later [press] stops the sequence.
+  /// Plays each line. A bundled clip is used when it exists. Otherwise the
+  /// line is spoken and saved so the child still hears it.
+  static Future<void> speakLines(List<String> phrases) async {
+    final id = ++_playId;
+    final lines = [
+      for (final phrase in phrases)
+        if (phrase.trim().isNotEmpty) phrase.trim(),
+    ];
+    if (lines.isEmpty) return;
+    speaking.value = true;
+    try {
+      await _ensureContext();
+      for (final phrase in lines) {
+        if (id != _playId) return;
+        final local = _localSource(phrase);
+        if (local != null) {
+          await _playSource(
+            local,
+            id,
+            phrase,
+            maxWait: const Duration(seconds: 12),
+          );
+        } else {
+          final clip = await StorySentenceVoice.speakNarrator(phrase);
+          if (id != _playId) return;
+          await _playSource(
+            DeviceFileSource(clip.file.path),
+            id,
+            clip.file.path,
+            maxWait: Duration(milliseconds: (clip.seconds * 1000).ceil() + 250),
+          );
+        }
+        if (id != _playId) return;
+        await Future<void>.delayed(const Duration(milliseconds: 280));
+      }
+    } catch (_) {
+    } finally {
+      if (id == _playId) speaking.value = false;
+    }
+  }
+
   static Future<void> playSequence(List<String> phrases) async {
     final id = ++_playId;
     final sources = [
@@ -143,8 +184,9 @@ class ChildButtonVoice {
   static Future<void> _playSource(
     Source source,
     int id,
-    String cacheKey,
-  ) async {
+    String cacheKey, {
+    Duration maxWait = const Duration(seconds: 4),
+  }) async {
     if (id != _playId) return;
     await _player.play(source).timeout(const Duration(seconds: 2));
     if (id != _playId) return;
@@ -156,7 +198,7 @@ class ChildButtonVoice {
             .timeout(const Duration(milliseconds: 400));
         if (duration != null &&
             duration > Duration.zero &&
-            duration <= const Duration(seconds: 4)) {
+            duration <= maxWait) {
           _durations[cacheKey] = duration;
         } else {
           duration = null;
@@ -166,8 +208,8 @@ class ChildButtonVoice {
     var wait = duration == null || duration <= Duration.zero
         ? const Duration(milliseconds: 900)
         : duration;
-    if (wait > const Duration(seconds: 4)) {
-      wait = const Duration(seconds: 4);
+    if (wait > maxWait) {
+      wait = maxWait;
     }
     final end = DateTime.now().add(wait);
     while (id == _playId && DateTime.now().isBefore(end)) {

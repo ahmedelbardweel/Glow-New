@@ -189,7 +189,7 @@ class StoryJumpBlock {
     if (!isPlaying(time)) return StoryTransitionPose.rest;
     final phase = ((time - startTime) % 0.7) / 0.7;
     final hop = math.sin(phase * math.pi);
-    return StoryTransitionPose(jump: -hop * 0.2);
+    return StoryTransitionPose(jump: -hop * 0.04);
   }
 
   factory StoryJumpBlock.fromJson(Map<String, dynamic> json) {

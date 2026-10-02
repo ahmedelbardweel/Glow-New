@@ -8,8 +8,12 @@ import 'package:internet_connection_checker/internet_connection_checker.dart';
 
 import '../../core/network/network_info.dart';
 import '../../core/services/resource_manager.dart';
+import '../../core/session/app_session.dart';
+import '../../core/storage/media_store.dart';
 import '../../features/auth/data/account_transfer.dart';
 import '../../features/auth/data/child_account_service.dart';
+import '../../features/auth/data/email_login_code.dart';
+import '../../features/auth/data/parent_provisioned_child.dart';
 import '../../features/auth/data/datasources/auth_remote_data_source.dart';
 import '../../features/auth/data/datasources/auth_local_data_source.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
@@ -24,6 +28,9 @@ import '../../features/content/data/datasources/content_local_data_source.dart';
 import '../../features/content/data/repositories/content_repository_impl.dart';
 import '../../features/content/data/services/sync_service.dart';
 import '../../features/dashboard/data/child_activity.dart';
+import '../../features/dashboard/data/parent_children_repository_impl.dart';
+import '../../features/dashboard/domain/repositories/parent_children_repository.dart';
+import '../../features/organization/data/organization_service.dart';
 import '../../features/content/domain/repositories/content_repository.dart';
 import '../../features/content/domain/usecases/world_usecases.dart';
 import '../../features/content/domain/usecases/mission_usecases.dart';
@@ -41,7 +48,16 @@ Future<void> init() async {
   const secureStorage = FlutterSecureStorage();
   sl.registerLazySingleton(() => secureStorage);
 
+  // Swap the cloud client here. Screens never construct it.
   sl.registerLazySingleton(() => Supabase.instance.client);
+  sl.registerLazySingleton<AppSession>(() => SupabaseAppSession(sl()));
+  sl.registerLazySingleton<MediaStore>(() => SupabaseMediaStore(sl()));
+  sl.registerLazySingleton(() => OrganizationService(sl()));
+  sl.registerLazySingleton(() => ParentProvisionedChild(sl()));
+  sl.registerLazySingleton(() => EmailLoginCode(sl()));
+  sl.registerLazySingleton<ParentChildrenRepository>(
+    () => SupabaseParentChildrenRepository(sl(), sl()),
+  );
   
   final authBox = Hive.box('auth');
   sl.registerLazySingleton(() => authBox);

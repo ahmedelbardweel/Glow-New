@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../data/organization_service.dart';
@@ -55,9 +56,10 @@ class _CreateOrganizationFormState extends State<_CreateOrganizationForm> {
     }
     setState(() => _busy = true);
     try {
-      await OrganizationService(Supabase.instance.client).createOrganizationAccount(
+      final email = _email.text.trim();
+      await sl<OrganizationService>().createOrganizationAccount(
         name: _name.text.trim(),
-        email: _email.text.trim(),
+        email: email,
         password: _password.text.trim(),
       );
       if (!mounted) return;
@@ -66,7 +68,7 @@ class _CreateOrganizationFormState extends State<_CreateOrganizationForm> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إنشاء المنظمة: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر إنشاء المنظمة. حاول مرة أخرى.'))),
       );
     }
   }

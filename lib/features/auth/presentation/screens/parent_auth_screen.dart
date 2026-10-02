@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart' hide State;
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/parent_google_auth.dart';
-import '../bloc/auth_bloc.dart';
-import '../bloc/auth_event.dart';
-import '../bloc/auth_state.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../widgets/email_code_sheet.dart';
 
 class ParentAuthScreen extends StatefulWidget {
   const ParentAuthScreen({super.key});
@@ -23,13 +23,14 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> with WidgetsBinding
   StreamSubscription<dynamic>? _authSub;
   var _awaitingGoogle = false;
   var _googleBusy = false;
+  var _busy = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      unawaited(_onAuth(data));
+    _authSub = ParentGoogleAuth.googleSignIns.listen((_) {
+      unawaited(_onAuth());
     });
   }
 
@@ -54,23 +55,65 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> with WidgetsBinding
     });
   }
 
-  Future<void> _onAuth(dynamic data) async {
+  Future<void> _onAuth() async {
     if (!_awaitingGoogle) return;
-    final session = data.session;
-    if (data.event != AuthChangeEvent.signedIn || session == null) return;
-    if (!ParentGoogleAuth.isGoogleUser(session.user)) return;
+    final session = ParentGoogleAuth.googleSessionOrNull();
+    if (session == null) return;
     _awaitingGoogle = false;
     try {
+      final email = session.user.email ?? '';
+      if (!await confirmOwnEmail(context, email)) {
+        if (mounted) setState(() => _googleBusy = false);
+        return;
+      }
+      if (!mounted) return;
       await ParentGoogleAuth.rememberAsParent(session);
       if (!mounted) return;
+      setState(() => _googleBusy = false);
       context.go('/parent-dashboard');
     } catch (error) {
       if (!mounted) return;
       setState(() => _googleBusy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(userMessage(error, fallback: 'تعذر الدخول. حاول مرة أخرى.')),
+        ),
       );
     }
+  }
+
+  Future<void> _enterParent(String email) async {
+    final ok = await confirmOwnEmail(context, email);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) return;
+    context.go('/parent-dashboard');
+  }
+
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الرجاء تعبئة البريد وكلمة المرور')),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    final result = await sl<AuthRepository>().loginParent(
+      email: email,
+      password: password,
+    );
+    if (!mounted) return;
+    result.fold(
+      (failure) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(userMessage(failure.message))),
+        );
+      },
+      (user) => unawaited(_enterParent(user.email)),
+    );
   }
 
   Future<void> _google() async {
@@ -87,6 +130,12 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> with WidgetsBinding
         return;
       }
       _awaitingGoogle = false;
+      final email = session.user.email ?? '';
+      if (!await confirmOwnEmail(context, email)) {
+        if (mounted) setState(() => _googleBusy = false);
+        return;
+      }
+      if (!mounted) return;
       await ParentGoogleAuth.rememberAsParent(session);
       if (!mounted) return;
       context.go('/parent-dashboard');
@@ -97,39 +146,38 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> with WidgetsBinding
         _googleBusy = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(userMessage(error, fallback: 'تعذر الدخول. حاول مرة أخرى.')),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/role-selection');
+      },
+      child: Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'رجوع',
+          icon: const BackButtonIcon(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/role-selection');
+            }
+          },
+        ),
         title: const Text('دخول ولي الأمر'),
         centerTitle: true,
       ),
-      body: BlocConsumer<AuthBloc, AuthState>(
-        listener: (context, state) {
-          state.maybeWhen(
-            parentRegistered: (user) {
-              context.go('/parent-dashboard');
-            },
-            error: (message) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(message)),
-              );
-            },
-            orElse: () {},
-          );
-        },
-        builder: (context, state) {
-          final isLoading = state.maybeWhen(
-            loading: () => true,
-            orElse: () => false,
-          );
-
-          return SingleChildScrollView(
+      body: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,36 +203,27 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> with WidgetsBinding
                 ),
                 const SizedBox(height: 32),
                 FilledButton(
-                  onPressed: isLoading ? null : () {
-                    final email = _emailController.text.trim();
-                    final password = _passwordController.text.trim();
-
-                    if (email.isEmpty || password.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('الرجاء تعبئة البريد وكلمة المرور')),
-                      );
-                      return;
-                    }
-
-                    context.read<AuthBloc>().add(AuthEvent.registerParent(
-                      email: email,
-                      password: password,
-                      childCode: '',
-                    ));
-                  },
+                  onPressed: _busy || _googleBusy ? null : _login,
                   style: FilledButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.secondary,
                     foregroundColor: Theme.of(context).colorScheme.onSecondary,
                   ),
-                  child: isLoading
+                  child: _busy
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('تسجيل ومتابعة'),
+                      : const Text('تسجيل الدخول'),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _busy || _googleBusy
+                      ? null
+                      : () => context.push('/parent-register'),
+                  child: const Text('إنشاء حساب ولي أمر'),
+                ),
+                const SizedBox(height: 8),
                 const Text('أو', textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 OutlinedButton(
-                  onPressed: isLoading || _googleBusy ? null : _google,
+                  onPressed: _busy || _googleBusy ? null : _google,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.secondary,
                     side: const BorderSide(color: AppColors.inputBorder),
@@ -203,8 +242,7 @@ class _ParentAuthScreenState extends State<ParentAuthScreen> with WidgetsBinding
                 ),
               ],
             ),
-          );
-        },
+          ),
       ),
     );
   }

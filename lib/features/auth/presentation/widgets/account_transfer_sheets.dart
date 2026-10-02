@@ -4,9 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/session/app_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_qr_scanner.dart';
@@ -101,7 +101,7 @@ class _TransferQrState extends State<_TransferQr> {
       if (!claimed || _leaving) return;
       _leaving = true;
       _poll?.cancel();
-      await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+      await sl<AppSession>().signOutLocal();
       final left = await sl<ChildAccountService>().forget(ticket.childId);
       if (!mounted) return;
       widget.onMoved(left != null);

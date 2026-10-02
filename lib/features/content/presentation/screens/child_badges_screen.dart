@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
+import '../../../../core/session/app_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../bloc/content_bloc.dart';
 import '../bloc/content_event.dart';
@@ -30,7 +31,7 @@ class _ChildBadgesScreenState extends State<ChildBadgesScreen> {
 
   Future<void> _loadBadges() async {
     final cachedChild = await sl<AuthLocalDataSource>().getLastChild();
-    final childId = cachedChild?.id ?? Supabase.instance.client.auth.currentUser?.id;
+    final childId = cachedChild?.id ?? sl<AppSession>().userId;
     if (childId != null) {
       _contentBloc.add(ContentEvent.getCompletedMissions(childId));
     }
@@ -87,7 +88,7 @@ class _ChildBadgesScreenState extends State<ChildBadgesScreen> {
               builder: (context, state) {
                 return state.maybeWhen(
                   loading: () => const ShimmerLoading(type: ShimmerType.grid),
-                  error: (msg) => Center(child: Text('خطأ: $msg', style: const TextStyle(color: Colors.red))),
+                  error: (msg) => Center(child: Text(userMessage(msg), textAlign: TextAlign.center, style: const TextStyle(color: Colors.red))),
                   completedMissionsLoaded: (progressList) {
                     if (progressList.isEmpty) {
                       return Center(

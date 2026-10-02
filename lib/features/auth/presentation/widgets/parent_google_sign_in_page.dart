@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class ParentGoogleSignInPage extends StatefulWidget {
-  const ParentGoogleSignInPage({super.key});
+  const ParentGoogleSignInPage({super.key, required this.authorizationUrl});
+
+  final Future<String> Function() authorizationUrl;
 
   @override
   State<ParentGoogleSignInPage> createState() => _ParentGoogleSignInPageState();
@@ -17,6 +20,7 @@ class ParentGoogleSignInPage extends StatefulWidget {
 class _ParentGoogleSignInPageState extends State<ParentGoogleSignInPage> {
   WebViewController? _controller;
   var _done = false;
+  var _pageLoading = true;
 
   static const _androidAgent =
       'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36';
@@ -30,10 +34,7 @@ class _ParentGoogleSignInPageState extends State<ParentGoogleSignInPage> {
   }
 
   Future<void> _open() async {
-    final response = await Supabase.instance.client.auth.getOAuthSignInUrl(
-      provider: OAuthProvider.google,
-      redirectTo: 'glow://parent-auth',
-    );
+    final url = await widget.authorizationUrl();
     if (!mounted) return;
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -41,6 +42,12 @@ class _ParentGoogleSignInPageState extends State<ParentGoogleSignInPage> {
       ..setUserAgent(Platform.isIOS ? _iosAgent : _androidAgent)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onPageStarted: (_) {
+            if (mounted) setState(() => _pageLoading = true);
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => _pageLoading = false);
+          },
           onNavigationRequest: (request) {
             if (_isCallback(request.url)) {
               unawaited(_finish(request.url));
@@ -58,7 +65,7 @@ class _ParentGoogleSignInPageState extends State<ParentGoogleSignInPage> {
           },
         ),
       )
-      ..loadRequest(Uri.parse(response.url));
+      ..loadRequest(Uri.parse(url));
     setState(() => _controller = controller);
   }
 
@@ -71,13 +78,14 @@ class _ParentGoogleSignInPageState extends State<ParentGoogleSignInPage> {
     if (_done) return;
     _done = true;
     try {
-      final result = await Supabase.instance.client.auth.getSessionFromUrl(Uri.parse(url));
       if (!mounted) return;
-      Navigator.of(context).pop(result.session);
+      Navigator.of(context).pop(url);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(userMessage(error, fallback: 'تعذر فتح صفحة جوجل. حاول مرة أخرى.')),
+        ),
       );
       Navigator.of(context).pop();
     }
@@ -93,9 +101,51 @@ class _ParentGoogleSignInPageState extends State<ParentGoogleSignInPage> {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.secondary,
       ),
-      body: controller == null
-          ? const SizedBox.expand()
-          : WebViewWidget(controller: controller),
+      body: Stack(
+        children: [
+          if (controller != null) WebViewWidget(controller: controller),
+          if (controller == null || _pageLoading) const _GooglePageLoader(),
+        ],
+      ),
+    );
+  }
+}
+
+class _GooglePageLoader extends StatelessWidget {
+  const _GooglePageLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppColors.surface,
+      child: Center(
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey.shade300,
+          highlightColor: Colors.grey.shade100,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: 148,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

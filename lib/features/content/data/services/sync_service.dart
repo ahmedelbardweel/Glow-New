@@ -6,6 +6,7 @@ import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/audio/admin_phrase_voice.dart';
 import '../../../../core/audio/child_button_clips.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../core/services/resource_manager.dart';
 import '../datasources/content_local_data_source.dart';
@@ -198,7 +199,7 @@ class SyncService {
         } catch (e) {
           syncState.value = SyncStatusState(
             status: SyncStatus.error,
-            message: 'تعذر رفع الإنجازات لسوبابيز. تأكد من إعدادات الأمان (RLS):\n$e',
+            message: userMessage(e, fallback: 'تعذر حفظ الإنجاز. حاول مرة أخرى.'),
           );
           _isSyncRunning = false;
           return;
@@ -273,7 +274,7 @@ class SyncService {
     } catch (e) {
       syncState.value = SyncStatusState(
         status: SyncStatus.error,
-        message: 'حدث خطأ أثناء المزامنة: $e',
+        message: userMessage(e, fallback: 'تعذر تحديث المحتوى. حاول مرة أخرى.'),
       );
     } finally {
       _isSyncRunning = false;

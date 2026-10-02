@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../../core/widgets/admin_voice_field.dart';
 import '../../../content/domain/entities/world_entity.dart';
 import '../../../content/domain/entities/mission_entity.dart';
@@ -86,7 +87,7 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
                 }
               },
               error: (msg) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userMessage(msg))));
               },
               orElse: () {},
             );

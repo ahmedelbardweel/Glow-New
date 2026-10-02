@@ -54,7 +54,7 @@ class RoleSelectionScreen extends StatelessWidget {
               color: Theme.of(context).colorScheme.secondary,
               onTap: () {
                 HapticFeedback.lightImpact();
-                context.go('/parent-auth');
+                context.push('/parent-auth');
               },
             ),
             const SizedBox(height: 10),
@@ -65,7 +65,7 @@ class RoleSelectionScreen extends StatelessWidget {
               color: Theme.of(context).colorScheme.secondary,
               onTap: () {
                 HapticFeedback.lightImpact();
-                context.go('/organization-auth');
+                context.push('/organization-auth');
               },
             ),
             const SizedBox(height: 10),
@@ -87,7 +87,7 @@ class RoleSelectionScreen extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary,
               onTap: () {
                 HapticFeedback.lightImpact();
-                context.go('/admin-login');
+                context.push('/admin-login');
               },
             ),
           ],

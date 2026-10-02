@@ -85,6 +85,7 @@ class ChildAccountService {
   Future<ChildProfileModel?> restoreLastChild() async {
     await adoptCached();
     if (await _networkInfo.isConnected) {
+      await dropMissingRemote();
       final pending = _read().where((account) => !account.linkedRemotely);
       if (pending.isNotEmpty) {
         await publishPending();
@@ -99,10 +100,31 @@ class ChildAccountService {
     return profile;
   }
 
+  /// Silent sign-in for a child already created on this phone.
+  Future<ChildProfileModel?> signInKnownDevice() async {
+    final deviceId = await DeviceIdHelper.getDeviceId();
+    final email = DeviceIdHelper.generateDeviceEmail(deviceId);
+    final password = DeviceIdHelper.generateDevicePassword(deviceId);
+    final response = await _supabase.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+    final user = response.user;
+    if (user == null) return null;
+    final data = await _supabase
+        .from('children_profiles')
+        .select()
+        .eq('id', user.id)
+        .maybeSingle();
+    if (data == null) return null;
+    return ChildProfileModel.fromJson(data);
+  }
+
   /// Accounts to show when the child role is chosen.
   Future<List<DeviceChildAccount>> accountsForPicker() async {
     await adoptCached();
     if (await _networkInfo.isConnected) {
+      await dropMissingRemote();
       await publishPending();
       await pullFromServer();
     }
@@ -244,6 +266,60 @@ class ChildAccountService {
       }
     }
     await _signInActive();
+  }
+
+  /// Drops phone copies whose Supabase login or profile is gone.
+  Future<void> dropMissingRemote() async {
+    if (!await _networkInfo.isConnected) return;
+    final gone = <String>[];
+    for (final account in List<DeviceChildAccount>.from(_read())) {
+      if (account.isLocalOnly) continue;
+      try {
+        if (!await _profileStillThere(account)) gone.add(account.id);
+      } catch (error) {
+        debugPrint('keep local child ${account.id}: $error');
+      }
+    }
+    if (gone.isEmpty) return;
+    final next = _read().where((item) => !gone.contains(item.id)).toList();
+    await _persist(next);
+    final active = activeId;
+    if (active != null && gone.contains(active)) {
+      if (next.isEmpty) {
+        await _box.delete(_activeKey);
+      } else {
+        await _box.put(_activeKey, next.first.id);
+      }
+    }
+    final cached = await _local.getLastChild();
+    if (next.isEmpty) {
+      await _local.forgetChild();
+      return;
+    }
+    if (cached != null && gone.contains(cached.id)) {
+      await _local.cacheChild((_active() ?? next.first).toProfile());
+    }
+  }
+
+  Future<bool> _profileStillThere(DeviceChildAccount account) async {
+    try {
+      await _signIn(account);
+    } on AuthException catch (error) {
+      final message = error.message.toLowerCase();
+      if (message.contains('invalid') || message.contains('not found')) {
+        return false;
+      }
+      rethrow;
+    }
+    final id = _supabase.auth.currentUser?.id ?? account.id;
+    final row = await _supabase
+        .from('children_profiles')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle();
+    if (row != null) return true;
+    await _supabase.auth.signOut();
+    return false;
   }
 
   Future<void> pullFromServer() async {

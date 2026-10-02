@@ -7,9 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
+import '../../../../core/session/app_session.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
@@ -37,14 +38,14 @@ Future<void> startStudentJoin(BuildContext context) async {
     if (!await sl<NetworkInfo>().isConnected) {
       throw Exception('يحتاج الطالب اتصالاً بالإنترنت عند أول دخول');
     }
-    final service = OrganizationService(Supabase.instance.client);
+    final service = sl<OrganizationService>();
     final preview = await service.previewInvite(raw);
     final profile = await sl<ChildAccountService>().register(
       name: preview.name,
       age: preview.age,
       avatarUrl: 'fort_frontal.glb',
     );
-    if (Supabase.instance.client.auth.currentUser?.id != profile.id) {
+    if (sl<AppSession>().userId != profile.id) {
       throw Exception('تعذر فتح حساب الطالب');
     }
     await service.claimInvite(raw);
@@ -57,7 +58,7 @@ Future<void> startStudentJoin(BuildContext context) async {
     if (context.mounted) {
       Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تسجيل الطالب: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر تسجيل الطالب. حاول مرة أخرى.'))),
       );
     }
   }
@@ -109,7 +110,7 @@ class _StudentScannerState extends State<_StudentScanner> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر قراءة الصورة: $error')),
+        SnackBar(content: Text(userMessage(error, fallback: 'تعذر قراءة الصورة. حاول مرة أخرى.'))),
       );
       await _camera.resume();
     } finally {

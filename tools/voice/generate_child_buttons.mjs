@@ -47,6 +47,8 @@ const staticPhrases = [
   'تشغيل الصوت',
   'رجوع',
   'انطلق',
+  'إجابة خاطئة، حاول مرة أخرى',
+  'إجابة صحيحة، أحسنت',
 ];
 
 async function supabaseRows(table, select) {

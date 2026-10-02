@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/errors/user_message.dart';
 import '../../../content/domain/entities/mission_entity.dart';
 import '../../../content/domain/entities/story_entity.dart';
 import '../../../content/presentation/bloc/content_bloc.dart';
@@ -731,13 +732,13 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   String _montageMessage(String code) {
     switch (code) {
       case 'signed_out':
-        return 'سجّل الدخول حتى يقرأ جيمني السكربت';
+        return 'سجّل الدخول أولاً ثم أعد المحاولة';
       case 'missing_key':
-        return 'أضف مفتاح جيمني في سوبابيز';
+        return 'تعذر تجهيز المشهد الآن. حاول لاحقاً';
       case 'empty_script':
-        return 'السكربت فاضي';
+        return 'اكتب نص المشهد أولاً';
       case 'jwt':
-        return 'في إعدادات الدالة أوقف Verify JWT ثم احفظ';
+        return 'تعذر تجهيز المشهد. سجّل الدخول من جديد ثم أعد المحاولة';
       case 'gemini_failed':
       case 'bad_response':
       case 'timeout':
@@ -913,7 +914,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
               error: (msg) {
                 ScaffoldMessenger.of(
                   context,
-                ).showSnackBar(SnackBar(content: Text('خطأ: $msg')));
+                ).showSnackBar(SnackBar(content: Text(userMessage(msg))));
               },
               orElse: () {},
             );
@@ -940,21 +941,14 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                             : ListView(
                                 children: [
                                   if (_step == 0) ...[
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: AdminVoiceField(
-                                            controller: _titleController,
-                                            hint: 'عنوان القصة',
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        IconButton.filledTonal(
-                                          onPressed: _addLine,
-                                          icon: const Icon(Icons.add),
-                                          tooltip: 'إضافة جملة',
-                                        ),
-                                      ],
+                                    AdminVoiceField(
+                                      controller: _titleController,
+                                      hint: 'عنوان القصة',
+                                      beside: IconButton.filledTonal(
+                                        onPressed: _addLine,
+                                        icon: const Icon(Icons.add),
+                                        tooltip: 'إضافة جملة',
+                                      ),
                                     ),
                                     const SizedBox(height: 16),
                                     Row(

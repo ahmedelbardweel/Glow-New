@@ -272,7 +272,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _orbit = three.OrbitControls(view.camera, view.globalKey)
       ..enabled = config.interactive
       ..enablePan = false
-      ..enableZoom = false
+      ..enableZoom = true
       ..enableDamping = true
       ..minDistance = 3
       ..maxDistance = 16;

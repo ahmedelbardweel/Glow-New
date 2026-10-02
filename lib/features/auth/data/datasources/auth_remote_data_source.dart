@@ -17,6 +17,11 @@ abstract class AuthRemoteDataSource {
     required String childCode,
   });
 
+  Future<UserModel> loginParent({
+    required String email,
+    required String password,
+  });
+
   Future<UserModel> loginAdmin({
     required String email,
     required String password,
@@ -109,40 +114,83 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String password,
     required String childCode,
   }) async {
+    final response = await supabaseClient.auth.signUp(
+      email: email.trim(),
+      password: password,
+    );
+    final user = response.user;
+    final identities = user?.identities;
+    if (user == null || (identities != null && identities.isEmpty)) {
+      throw Exception('هذا البريد مسجّل من قبل. ادخل من صفحة الدخول.');
+    }
+
+    final code = childCode.trim();
+    if (code.isNotEmpty) {
+      await supabaseClient.rpc('link_parent_to_child', params: {
+        'p_parent_id': user.id,
+        'p_child_code': code,
+      });
+    }
+
+    return UserModel(id: user.id, email: email.trim(), role: 'parent');
+  }
+
+  @override
+  Future<UserModel> loginParent({
+    required String email,
+    required String password,
+  }) async {
+    final response = await supabaseClient.auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
+    );
+    final user = response.user;
+    if (user == null) {
+      throw Exception('البريد أو كلمة المرور غير صحيحة.');
+    }
+    await _rejectIfNotParent(user.id);
+    return UserModel(
+      id: user.id,
+      email: user.email ?? email.trim(),
+      role: 'parent',
+    );
+  }
+
+  Future<void> _rejectIfNotParent(String id) async {
+    final role = await _roleOf(id);
+    if (role == 'admin') {
+      await supabaseClient.auth.signOut();
+      throw Exception('هذا حساب إدارة. ادخل من شاشة الإدارة.');
+    }
+    if (await _rowExists('organizations', id)) {
+      await supabaseClient.auth.signOut();
+      throw Exception('هذا حساب منظمة. ادخل من شاشة المنظمة.');
+    }
+    if (await _rowExists('organization_teachers', id)) {
+      await supabaseClient.auth.signOut();
+      throw Exception('هذا حساب معلم. ادخل من شاشة المنظمة.');
+    }
+  }
+
+  Future<String?> _roleOf(String id) async {
     try {
-      User? user;
-      try {
-        final authResponse = await supabaseClient.auth.signUp(
-          email: email,
-          password: password,
-        );
-        user = authResponse.user;
-      } on AuthException catch (e) {
-        if (e.message.contains('already registered')) {
-          final authResponse = await supabaseClient.auth.signInWithPassword(
-            email: email,
-            password: password,
-          );
-          user = authResponse.user;
-        } else {
-          rethrow;
-        }
-      }
+      final row = await supabaseClient
+          .from('users')
+          .select('role')
+          .eq('id', id)
+          .maybeSingle();
+      return row?['role'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
 
-      if (user == null) throw Exception('Failed to sign up parent');
-
-      final code = childCode.trim();
-      if (code.isNotEmpty) {
-        await supabaseClient.rpc('link_parent_to_child', params: {
-          'p_parent_id': user.id,
-          'p_child_code': code,
-        });
-      }
-
-      // 3. Assuming parents are also in a users table or we just construct the model
-      return UserModel(id: user.id, email: email, role: 'parent');
-    } catch (e) {
-      throw Exception('Failed to register parent: $e');
+  Future<bool> _rowExists(String table, String id) async {
+    try {
+      final row = await supabaseClient.from(table).select('id').eq('id', id).maybeSingle();
+      return row != null;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -151,48 +199,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String email,
     required String password,
   }) async {
-    try {
-      User? user;
-      try {
-        final authResponse = await supabaseClient.auth.signInWithPassword(
-          email: email,
-          password: password,
-        );
-        user = authResponse.user;
-      } on AuthException catch (e) {
-        if (e.message.contains('Invalid login credentials')) {
-          // Auto-create the admin if they don't exist
-          final authResponse = await supabaseClient.auth.signUp(
-            email: email,
-            password: password,
-          );
-          user = authResponse.user;
-          if (user != null) {
-            // Promote to admin immediately via RPC to bypass RLS
-            await supabaseClient.rpc('make_me_admin');
-          }
-        } else {
-          rethrow;
-        }
-      }
-
-      if (user == null) throw Exception('Failed to login admin');
-
-      // Check role
-      final data = await supabaseClient
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-
-      if (data['role'] != 'admin') {
-        await supabaseClient.auth.signOut();
-        throw Exception('Unauthorized access. Admins only.');
-      }
-
-      return UserModel(id: user.id, email: email, role: 'admin');
-    } catch (e) {
-      throw Exception('Failed to login admin: $e');
+    final authResponse = await supabaseClient.auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
+    );
+    final user = authResponse.user;
+    if (user == null) {
+      throw Exception('البريد أو كلمة المرور غير صحيحة.');
     }
+
+    final data = await supabaseClient
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (data == null || data['role'] != 'admin') {
+      await supabaseClient.auth.signOut();
+      throw Exception('هذا الحساب ليس حساب الإدارة.');
+    }
+
+    return UserModel(
+      id: user.id,
+      email: user.email ?? email.trim(),
+      role: 'admin',
+    );
   }
 }

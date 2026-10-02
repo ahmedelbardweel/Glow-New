@@ -168,28 +168,33 @@ def main():
     cols = np.r_[edges[:, 1], edges[:, 0]]
     adjacency = coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(len(base), len(base))).tocsr()
     averaging = diags(1/np.maximum(np.asarray(adjacency.sum(1)).ravel(), 1)) @ adjacency
-    # Fit a continuous oval section to the upper arm. The end of the palm,
-    # inner belly boundary and head are outside this corrective envelope.
+    # Relax the folded transition in all three axes before restoring its
+    # rounded section. Projecting a fold directly leaves overlapping faces.
     y = base[:, 1]
-    side = np.sign(base[:, 0]+.062)
     ax = np.abs(base[:, 0]+.062)
+    mask = smoothstep(.175,.245,y)*(1-smoothstep(.45,.53,y))
+    mask *= smoothstep(.13,.205,ax)
+    mask *= 1-smoothstep(.075,.13,base[:,2])*(1-smoothstep(.20,.235,ax))
+    relaxed = base.copy()
+    for _ in range(850):
+        relaxed += .46*mask[:,None]*(averaging @ relaxed-relaxed)
+    y = relaxed[:,1]
+    side = np.sign(relaxed[:,0]+.062)
+    ax = np.abs(relaxed[:,0]+.062)
     cx = np.interp(y, [.24,.30,.35,.40,.46,.52], [.226,.216,.203,.188,.165,.142])
     cz = np.interp(y, [.24,.30,.40,.50], [-.006,.008,.009,-.020])
     rx = np.interp(y, [.24,.30,.40,.50], [.057,.065,.068,.075])
     rz = np.interp(y, [.24,.30,.40,.50], [.078,.073,.075,.090])
-    u, v = (ax-cx)/rx, (base[:,2]-cz)/rz
-    radial = np.maximum(np.sqrt(u*u+v*v), 1e-5)
-    oval = base.copy()
+    u,v = (ax-cx)/rx, (relaxed[:,2]-cz)/rz
+    radial = np.maximum(np.sqrt(u*u+v*v),1e-5)
+    oval = relaxed.copy()
     oval[:,0] = -.062+side*(cx+rx*u/radial)
     oval[:,2] = cz+rz*v/radial
-    mask = smoothstep(.265,.33,y)*(1-smoothstep(.43,.495,y))
-    mask *= smoothstep(.15,.205,ax)
-    mask *= smoothstep(-.145,-.075,base[:,2])
-    mask *= 1-smoothstep(.075,.12,base[:,2])*(1-smoothstep(.20,.235,ax))
-    delta = (oval-base)*mask[:,None]*args.strength
-    # Fair the displacement itself so the transition has no abrupt slope.
-    for _ in range(35):
-        delta += .42*mask[:,None]*(averaging @ delta-delta)
+    project = mask*smoothstep(-.15,-.07,base[:,2])
+    target = relaxed+(oval-relaxed)*project[:,None]
+    for _ in range(18):
+        target += .25*mask[:,None]*(averaging @ target-target)
+    delta = (target-base)*args.strength
     posed_new = posed + delta[inverse]
     linear = skin[:, :3, :3]
     delta_bind = np.linalg.solve(linear, (posed_new-posed)[..., None])[..., 0]

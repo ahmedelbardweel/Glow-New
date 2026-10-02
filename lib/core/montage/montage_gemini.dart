@@ -38,7 +38,10 @@ class MontageGemini {
       final response = await client.functions
           .invoke(
             'smooth-service',
-            body: {'sentences': sentences},
+            body: {
+              'sentences': sentences,
+              'model': AdminApiKeys.geminiModel,
+            },
           )
           .timeout(const Duration(seconds: 25));
       final data = response.data;
@@ -89,7 +92,7 @@ Future<Map<String, dynamic>> _planWithKey(
   final response = await http
       .post(
         Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+          'https://generativelanguage.googleapis.com/v1beta/models/${AdminApiKeys.geminiModel}:generateContent',
         ),
         headers: {
           'Content-Type': 'application/json',

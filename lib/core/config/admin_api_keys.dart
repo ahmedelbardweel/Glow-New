@@ -8,6 +8,8 @@ class AdminApiKeys {
   static const _gemini = 'ADMIN_GEMINI_API_KEY';
   static const _eleven = 'ADMIN_ELEVEN_API_KEY';
   static const _geminiOut = 'ADMIN_GEMINI_OUT';
+  static const _geminiModel = 'ADMIN_GEMINI_MODEL';
+  static const defaultGeminiModel = 'gemini-3.8-flash';
 
   static String? get gemini => _read(_gemini);
 
@@ -18,6 +20,19 @@ class AdminApiKeys {
   static bool get hasEleven => eleven != null;
 
   static bool get geminiExhausted => Hive.box('auth').get(_geminiOut) == true;
+
+  static String get geminiModel {
+    final saved = _read(_geminiModel);
+    if (saved != null && geminiModelChoices.any((model) => model.id == saved)) {
+      return saved;
+    }
+    return defaultGeminiModel;
+  }
+
+  static Future<void> saveGeminiModel(String value) {
+    final known = geminiModelChoices.any((model) => model.id == value);
+    return _write(_geminiModel, known ? value : defaultGeminiModel);
+  }
 
   static Future<void> markGeminiExhausted() {
     return Hive.box('auth').put(_geminiOut, true);
@@ -47,3 +62,24 @@ class AdminApiKeys {
     await box.put(key, trimmed);
   }
 }
+
+class GeminiModelChoice {
+  const GeminiModelChoice(this.label, this.id);
+
+  final String label;
+  final String id;
+}
+
+const geminiModelChoices = <GeminiModelChoice>[
+  GeminiModelChoice('Gemini 3.8 Flash', 'gemini-3.8-flash'),
+  GeminiModelChoice('Gemini 3.7 Flash', 'gemini-3.7-flash'),
+  GeminiModelChoice('Gemini 3.6 Flash', 'gemini-3.6-flash'),
+  GeminiModelChoice('Gemini 3.5 Flash', 'gemini-3.5-flash'),
+  GeminiModelChoice('Gemini 3.5 Flash-Lite', 'gemini-3.5-flash-lite'),
+  GeminiModelChoice('Gemini 3.1 Flash-Lite', 'gemini-3.1-flash-lite'),
+  GeminiModelChoice('Gemini 3.1 Pro', 'gemini-3.1-pro-preview'),
+  GeminiModelChoice('Gemini 3 Flash', 'gemini-3-flash-preview'),
+  GeminiModelChoice('Gemini 2.5 Pro', 'gemini-2.5-pro'),
+  GeminiModelChoice('Gemini 2.5 Flash', 'gemini-2.5-flash'),
+  GeminiModelChoice('Gemini 2.5 Flash-Lite', 'gemini-2.5-flash-lite'),
+];

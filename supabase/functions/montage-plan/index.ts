@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   const key = (Deno.env.get('GEMINI_API_KEY') || Deno.env.get('Glow') || '').trim()
   if (!key) return json({ error: 'missing_key' }, 500)
 
-  let body: { sentences?: unknown }
+  let body: { sentences?: unknown; model?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -53,7 +53,23 @@ Deno.serve(async (req) => {
   })
   if (script.length === 0) return json({ error: 'empty_script' }, 400)
 
-  const model = Deno.env.get('GEMINI_MODEL') || 'gemini-3.8-flash'
+  const allowedModels = new Set([
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
+    'gemini-3.1-pro-preview',
+    'gemini-3-flash-preview',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+  ])
+  const requested = typeof body.model === 'string' ? body.model.trim() : ''
+  const model = allowedModels.has(requested)
+    ? requested
+    : (Deno.env.get('GEMINI_MODEL') || 'gemini-3.8-flash')
   const prompt = [
     'أنت مخرج مونتاج. مر على كل الجمل بالترتيب، ومن كل جملة على كل كلمة. لا تتوقف بعد أول معنى.',
     'كل كلمة تحمل معنى، أو تشبه كلمة تحمل معنى، تأخذ إشارة على تلك الكلمة فقط.',

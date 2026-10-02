@@ -9,7 +9,7 @@ import '../../../../core/widgets/app_bottom_sheet.dart';
 Future<void> showAdminApiKeysSheet(BuildContext context) {
   return showAppSheet<void>(
     context: context,
-    heightFactor: 0.82,
+    heightFactor: 0.9,
     builder: (sheetContext) => const _AdminApiKeysSheet(),
   );
 }
@@ -25,12 +25,14 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
   final _gemini = TextEditingController();
   final _eleven = TextEditingController();
   ElevenCredit? _credit;
+  var _model = AdminApiKeys.defaultGeminiModel;
   var _saved = false;
   var _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _model = AdminApiKeys.geminiModel;
     _loadCredit();
   }
 
@@ -116,6 +118,26 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
               ),
             ],
             const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _model,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'موديل Gemini',
+              ),
+              items: [
+                for (final model in geminiModelChoices)
+                  DropdownMenuItem(
+                    value: model.id,
+                    child: Text(model.label),
+                  ),
+              ],
+              onChanged: (value) async {
+                if (value == null) return;
+                setState(() => _model = value);
+                await AdminApiKeys.saveGeminiModel(value);
+              },
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _gemini,
               obscureText: true,

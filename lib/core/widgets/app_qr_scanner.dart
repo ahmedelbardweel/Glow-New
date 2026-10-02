@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../theme/app_colors.dart';
+import 'custom_loader.dart';
 
 /// Camera preview for a QR sheet. The camera starts after the sheet is open,
 /// using the selector that works on real Android phones.
@@ -36,13 +37,17 @@ class AppQrScanHandle {
   Future<void> resume() => _state?.resume() ?? Future<void>.value();
 }
 
-class _AppQrScannerState extends State<AppQrScanner> {
+class _AppQrScannerState extends State<AppQrScanner> with WidgetsBindingObserver {
   MobileScannerController? _camera;
   var _handled = false;
+  var _recovering = false;
+  var _recoveries = 0;
+  var _useNewSelector = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.handle?._state = this;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(milliseconds: 450), () {
@@ -94,23 +99,85 @@ class _AppQrScannerState extends State<AppQrScanner> {
     }
   }
 
-  void _openCamera() {
+  void _openCamera({bool reset = true}) {
     final previous = _camera;
-    setState(() {
-      _camera = MobileScannerController(
-        detectionSpeed: DetectionSpeed.normal,
-        detectionTimeoutMs: 400,
-        facing: CameraFacing.back,
-        formats: const [BarcodeFormat.qrCode],
-        returnImage: false,
-        useNewCameraSelector: true,
-      );
-    });
+    previous?.removeListener(_onCamera);
+    final next = MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      detectionTimeoutMs: 400,
+      facing: CameraFacing.back,
+      formats: const [BarcodeFormat.qrCode],
+      returnImage: false,
+      useNewCameraSelector: _useNewSelector,
+    );
+    next.addListener(_onCamera);
+    if (reset) _recoveries = 0;
+    _recovering = false;
+    setState(() => _camera = next);
     if (previous != null) unawaited(previous.dispose());
+  }
+
+  void _onCamera() {
+    final camera = _camera;
+    if (camera == null) return;
+    if (camera.value.isRunning && camera.value.error == null) {
+      _recoveries = 0;
+      return;
+    }
+    final error = camera.value.error;
+    if (error != null && _willRetry(error)) unawaited(_recover());
+  }
+
+  bool _willRetry(MobileScannerException error) {
+    if (_handled || _recoveries >= 3) return false;
+    return error.errorCode != MobileScannerErrorCode.unsupported &&
+        error.errorCode != MobileScannerErrorCode.permissionDenied;
+  }
+
+  /// The permission dialog pauses the screen, so the first open often fails
+  /// even after the user allows the camera. Try again once the app is back.
+  Future<void> _recover() async {
+    if (!mounted || _handled || _recovering) return;
+    if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
+    final camera = _camera;
+    final error = camera?.value.error;
+    if (camera == null || error == null || camera.value.isRunning) return;
+    if (!_willRetry(error)) return;
+    _recovering = true;
+    _recoveries++;
+    setState(() {});
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted || _handled) {
+      _recovering = false;
+      return;
+    }
+    final current = _camera;
+    try {
+      if (current != null && current.value.error != null && !current.value.isRunning) {
+        await current.start().timeout(const Duration(seconds: 4));
+      }
+    } catch (_) {}
+    _recovering = false;
+    if (!mounted || _handled) return;
+    final after = _camera?.value.error;
+    if (after != null && _recoveries == 1) {
+      _useNewSelector = !_useNewSelector;
+      _openCamera(reset: false);
+      return;
+    }
+    setState(() {});
+    if (after != null && _willRetry(after)) unawaited(_recover());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_recover());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _camera?.removeListener(_onCamera);
     if (widget.handle?._state == this) widget.handle?._state = null;
     final camera = _camera;
     if (camera != null) unawaited(camera.dispose());
@@ -149,6 +216,12 @@ class _AppQrScannerState extends State<AppQrScanner> {
                 controller: camera,
                 onDetect: _onDetect,
                 errorBuilder: (context, error, child) {
+                  if (_recovering || _willRetry(error)) {
+                    return const ColoredBox(
+                      color: AppColors.secondary,
+                      child: Center(child: CustomLoader(color: Colors.white)),
+                    );
+                  }
                   return _CameraMessage(
                     message: _cameraMessage(error),
                     onRetry: _handled ? null : _openCamera,

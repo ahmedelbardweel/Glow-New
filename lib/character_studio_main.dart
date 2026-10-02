@@ -15,8 +15,8 @@ void main() {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF277A59)),
-        scaffoldBackgroundColor: const Color(0xFFF3F7F3),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFFFFFF)),
+        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
       ),
       home: const CharacterStudioScreen(),
     ),

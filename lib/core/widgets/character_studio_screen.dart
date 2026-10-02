@@ -203,7 +203,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
-            color: const Color(0xFFE6EEE7),
+            color: Colors.white,
             border: Border.all(color: const Color(0xFFDCE6DC)),
           ),
           child: Stack(

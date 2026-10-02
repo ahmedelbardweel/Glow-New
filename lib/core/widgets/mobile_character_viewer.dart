@@ -148,7 +148,7 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
     final controller = WebViewController();
     _controller = controller;
     await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
-    await controller.setBackgroundColor(const Color(0xFFF4F7F5));
+    await controller.setBackgroundColor(Colors.transparent);
     if (controller.platform is AndroidWebViewController) {
       await (controller.platform as AndroidWebViewController)
           .setAllowFileAccess(true);
@@ -504,14 +504,14 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
           _characterSurface(_controller!),
         if (!_ready && _error == null)
           ColoredBox(
-            color: const Color(0xFFF4F7F5),
+            color: Colors.white,
             child: _GlowingLoader(
               color: CharacterHelper.getColor(widget.characterName),
             ),
           ),
         if (_error != null)
           ColoredBox(
-            color: const Color(0xFFF4F7F5),
+            color: Colors.white,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(20),

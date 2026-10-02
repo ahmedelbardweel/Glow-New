@@ -172,7 +172,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         widget.configuration.onReady?.call();
       },
       settings: three.Settings(
-        clearColor: 0xF4F7F5,
+        clearColor: 0xFFFFFF,
+        clearAlpha: 0,
+        alpha: true,
         antialias: kIsWeb, // MSAA often crashes mobile FBOs
         enableShadowMap: false,
         toneMapping: three.NoToneMapping,
@@ -696,7 +698,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
             ),
           if (!_ready && _error == null)
             ColoredBox(
-              color: const Color(0xFFF4F7F5),
+              color: Colors.white,
               child: _GlowingLoader(
                 color: CharacterHelper.getColor(config.characterName),
               ),

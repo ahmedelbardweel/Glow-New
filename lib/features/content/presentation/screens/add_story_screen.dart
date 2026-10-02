@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection_container.dart';
@@ -17,6 +19,9 @@ import '../../../../core/widgets/story_timeline_editor.dart';
 import '../../../../core/audio/story_sentence_voice.dart';
 import '../../../../core/services/resource_manager.dart';
 import '../../../../core/widgets/admin_voice_field.dart';
+import '../../../../core/montage/montage_gemini.dart';
+import '../../../../core/montage/montage_plan.dart';
+import '../../../../core/widgets/app_bottom_sheet.dart';
 
 class _SentenceLine {
   _SentenceLine() {
@@ -77,6 +82,10 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   bool _scriptBusy = false;
   bool _preparingEdit = false;
   bool _audioRebuilt = false;
+  bool _montageBusy = false;
+  int _appliedMontage = 0;
+  String _montageCacheKey = '';
+  Map<String, dynamic>? _montageCache;
   String? _sceneSignature;
   String _savedSceneKey = '';
   final List<_SentenceLine> _lines = [];
@@ -219,6 +228,18 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
               endTime: fit(block.startTime, block.endTime),
             ),
       ].where((block) => block.endTime > block.startTime).toList(),
+      jumpBlocks: [
+        for (final block in previous?.jumpBlocks ?? const <StoryJumpBlock>[])
+          if (block.startTime < seconds)
+            StoryJumpBlock(
+              startTime: block.startTime,
+              endTime: fit(block.startTime, block.endTime),
+            ),
+      ].where((block) => block.endTime > block.startTime).toList(),
+      transitions: [
+        for (final item in previous?.transitions ?? const <StoryTransition>[])
+          if (item.time < seconds) item,
+      ],
     );
   }
 
@@ -686,12 +707,169 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     }
   }
 
+  bool _retryMontage(String code) {
+    return code == 'gemini_failed' ||
+        code == 'bad_response' ||
+        code == 'timeout' ||
+        code == 'request_failed';
+  }
+
+  Future<Map<String, dynamic>> _loadMontagePlan(List<Map<String, dynamic>> sentences) async {
+    MontageGeminiException? last;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await MontageGemini().plan(sentences);
+      } on MontageGeminiException catch (error) {
+        last = error;
+        if (!_retryMontage(error.code) || attempt == 1) throw error;
+      }
+      await Future.delayed(Duration(milliseconds: 900 * (attempt + 1)));
+    }
+    throw last ?? const MontageGeminiException('request_failed');
+  }
+
+  String _montageMessage(String code) {
+    switch (code) {
+      case 'signed_out':
+        return 'سجّل الدخول حتى يقرأ جيمني السكربت';
+      case 'missing_key':
+        return 'أضف مفتاح جيمني في سوبابيز';
+      case 'empty_script':
+        return 'السكربت فاضي';
+      case 'jwt':
+        return 'في إعدادات الدالة أوقف Verify JWT ثم احفظ';
+      case 'gemini_failed':
+      case 'bad_response':
+      case 'timeout':
+      case 'request_failed':
+      default:
+        return 'المحاولة ما اكتملت. اضغط الأيقونة مرة ثانية';
+    }
+  }
+
+  void _montageSnack(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  bool _montageLanesFilled(StoryTimeline timeline) {
+    return timeline.motionBlocks.isNotEmpty ||
+        timeline.jumpBlocks.isNotEmpty ||
+        timeline.hatBlocks.isNotEmpty ||
+        timeline.glassesBlocks.isNotEmpty ||
+        timeline.musclesBlocks.isNotEmpty ||
+        timeline.transitions.isNotEmpty;
+  }
+
+  Future<void> _analyzeMontage() async {
+    if (_montageBusy) return;
+    final timeline = _timeline;
+    if (timeline == null || timeline.blocks.isEmpty) {
+      _montageSnack('جهّز المونتاج أولاً');
+      return;
+    }
+    final ready = _lines.where((line) => line.controller.text.trim().isNotEmpty).toList();
+    if (ready.isEmpty) {
+      _montageSnack('أضف جملة واحدة على الأقل');
+      return;
+    }
+    if (ready.length != timeline.blocks.length) {
+      _montageSnack('عدد الجمل ما يطابق الشخصيات. ولّد الصوت وافتح المونتاج من جديد.');
+      return;
+    }
+    final count = ready.length;
+    if (_montageLanesFilled(timeline)) {
+      final replace = await showAppSheet<bool>(
+        context: context,
+        heightFactor: 0.34,
+        builder: (sheetContext) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'استبدال المونتاج',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                const Text('جيمني يستبدل الحركة والنطة والقبعة والنظارة والعضلات والتأثير. بلوكات الشخصيات تبقى.'),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(true),
+                  child: const Text('استبدال'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(false),
+                  child: const Text('إلغاء'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      if (replace != true || !mounted) return;
+    }
+
+    final sentences = <MontageSentence>[
+      for (var i = 0; i < count; i++)
+        MontageSentence(
+          text: ready[i].controller.text.trim(),
+          characterName: _characterName(ready[i].characterId),
+          start: timeline.blocks[i].startTime,
+          end: timeline.blocks[i].endTime,
+        ),
+    ];
+    setState(() => _montageBusy = true);
+    try {
+      final key = '2\n${sentences.map((sentence) => '${sentence.characterName}|${sentence.text}').join('\n')}';
+      final Map<String, dynamic> plan;
+      if (_montageCacheKey == key && _montageCache != null) {
+        plan = _montageCache!;
+      } else {
+        plan = await _loadMontagePlan(montageRequestSentences(sentences));
+        _montageCacheKey = key;
+        _montageCache = plan;
+      }
+      if (!mounted) return;
+      final apply = placeMontage(
+        characters: timeline.blocks,
+        sentences: sentences,
+        plan: plan,
+        totalDuration: timeline.totalDuration,
+      );
+      if (apply.placed == 0) {
+        _montageSnack('جيمني ما لقى كلمة تستاهل حركة');
+        return;
+      }
+      setState(() {
+        _timeline = apply.timeline;
+        _appliedMontage++;
+      });
+      _montageSnack(
+        apply.missed == 0
+            ? 'جيمني حط الحركة على الكلمات'
+            : 'جيمني حط الحركة، وترك ${apply.missed} كلمة ما لقاها في النص',
+      );
+    } on MontageGeminiException catch (error) {
+      if (!mounted) return;
+      _montageSnack(_montageMessage(error.code));
+    } catch (_) {
+      if (!mounted) return;
+      _montageSnack(_montageMessage('request_failed'));
+    } finally {
+      if (mounted) setState(() => _montageBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final editing = widget.storyToEdit != null;
     return BlocProvider.value(
       value: _contentBloc,
-      child: Scaffold(
+      child: Stack(
+        children: [
+      Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
           leading: _step == 1
@@ -706,6 +884,14 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
           ),
           elevation: 0,
           surfaceTintColor: Colors.white,
+          actions: [
+            if (_step == 1)
+              IconButton(
+                tooltip: 'تحليل جيمني',
+                onPressed: _montageBusy ? null : _analyzeMontage,
+                icon: const Icon(Icons.auto_awesome),
+              ),
+          ],
         ),
         body: BlocConsumer<ContentBloc, ContentState>(
           listener: (context, state) {
@@ -809,13 +995,12 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                       key: ValueKey(_audioFile!.path),
                                       audioFile: _audioFile!,
                                       initialTimeline: _timeline,
+                                      appliedMontage: _appliedMontage,
                                       positionNotifier: _positionNotifier,
                                       audioPlayer: _audioPlayer,
                                       isPlaying: _isPlaying,
                                       onTogglePlay: _togglePlayPause,
-                                      onTimelineChanged: (val) {
-                                        setState(() => _timeline = val);
-                                      },
+                                      onTimelineChanged: (val) => _timeline = val,
                                     ),
                                   ],
                                 ],
@@ -862,6 +1047,56 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
             );
           },
         ),
+      ),
+          if (_step == 1 && _montageBusy) const Positioned.fill(child: _MontageAiVeil()),
+        ],
+      ),
+    );
+  }
+}
+
+class _MontageAiVeil extends StatefulWidget {
+  const _MontageAiVeil();
+
+  @override
+  State<_MontageAiVeil> createState() => _MontageAiVeilState();
+}
+
+class _MontageAiVeilState extends State<_MontageAiVeil> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AbsorbPointer(
+      child: SizedBox.expand(
+        child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: ColoredBox(
+          color: const Color(0x47FFFFFF),
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _pulse,
+              builder: (context, child) {
+                final t = Curves.easeInOut.transform(_pulse.value);
+                return Opacity(
+                  opacity: 0.45 + (0.55 * t),
+                  child: Transform.scale(scale: 0.92 + (0.16 * t), child: child),
+                );
+              },
+              child: const Icon(Icons.auto_awesome, size: 64, color: AppColors.secondary),
+            ),
+          ),
+        ),
+      ),
       ),
     );
   }

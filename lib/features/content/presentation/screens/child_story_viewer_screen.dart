@@ -19,6 +19,7 @@ import '../../../../core/utils/character_helper.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import 'dart:convert';
 import '../../../../core/models/story_timeline.dart';
+import '../../../../core/widgets/story_transition_frame.dart';
 import '../../../../core/animation/story_motion.dart';
 
 class ChildStoryViewerScreen extends StatefulWidget {
@@ -867,7 +868,14 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                             // 3D Character Viewer (Full area)
                                             Positioned.fill(
                                               child: RepaintBoundary(
-                                                child: SmartCharacterViewer(
+                                                child: ValueListenableBuilder<Duration>(
+                                                  valueListenable: _positionNotifier,
+                                                  builder: (context, pos, child) {
+                                                    final seconds = pos.inMilliseconds / 1000.0;
+                                                    final pose = _currentTimeline?.poseAt(seconds) ?? StoryTransitionPose.rest;
+                                                    return StoryTransitionFrame(pose: pose, child: child!);
+                                                  },
+                                                  child: SmartCharacterViewer(
                                                   characterName: activeChar,
                                                   storyText:
                                                       '${story.title}\n${story.content}',
@@ -883,6 +891,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                                   showMuscles: showMuscles,
                                                   cameraFit: 1.45,
                                                   onReady: () => _onCharacterReady(_sceneGeneration),
+                                                  ),
                                                 ),
                                               ),
                                             ),

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 class StoryBlock {
@@ -168,12 +170,140 @@ class StoryMusclesBlock {
   }
 }
 
+/// A jump the character performs on its own lane, under the character track.
+class StoryJumpBlock {
+  final double startTime;
+  final double endTime;
+
+  StoryJumpBlock({required this.startTime, required this.endTime});
+
+  static const dragData = 'jump';
+
+  static bool isDrag(String data) => data == dragData;
+
+  bool isPlaying(double currentTime) {
+    return currentTime >= startTime && currentTime <= endTime;
+  }
+
+  StoryTransitionPose poseAt(double time) {
+    if (!isPlaying(time)) return StoryTransitionPose.rest;
+    final phase = ((time - startTime) % 0.7) / 0.7;
+    final hop = math.sin(phase * math.pi);
+    return StoryTransitionPose(jump: -hop * 0.2);
+  }
+
+  factory StoryJumpBlock.fromJson(Map<String, dynamic> json) {
+    return StoryJumpBlock(
+      startTime: (json['startTime'] as num).toDouble(),
+      endTime: (json['endTime'] as num).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'startTime': startTime, 'endTime': endTime};
+  }
+}
+
+/// How the character looks while a timeline transition is playing.
+class StoryTransitionPose {
+  final double opacity;
+  final double slide;
+  final double jump;
+  final double scale;
+
+  const StoryTransitionPose({
+    this.opacity = 1,
+    this.slide = 0,
+    this.jump = 0,
+    this.scale = 1,
+  });
+
+  static const rest = StoryTransitionPose();
+}
+
+/// An effect placed on the seam between two character blocks.
+class StoryTransition {
+  static const fade = 'fade';
+  static const slide = 'slide';
+  static const pop = 'pop';
+  static const types = [fade, slide, pop];
+
+  final double time;
+  final double duration;
+  final String type;
+
+  StoryTransition({
+    required this.time,
+    this.duration = 0.5,
+    this.type = fade,
+  });
+
+  static String dragDataFor(String type) => 'transition:$type';
+
+  static bool isDrag(String data) => data.startsWith('transition:');
+
+  static String? typeOf(String data) {
+    if (!isDrag(data)) return null;
+    final type = data.substring('transition:'.length);
+    return types.contains(type) ? type : null;
+  }
+
+  static String label(String type) {
+    switch (type) {
+      case slide:
+        return 'انزلاق';
+      case pop:
+        return 'تكبير';
+      default:
+        return 'تلاشي';
+    }
+  }
+
+  double get start => time - duration / 2;
+  double get end => time + duration / 2;
+
+  bool covers(double t) => t >= start && t <= end;
+
+  StoryTransitionPose poseAt(double t) {
+    if (!covers(t) || duration <= 0) return StoryTransitionPose.rest;
+    final span = ((t - start) / duration).clamp(0.0, 1.0);
+    final fromCenter = ((t - time) / (duration / 2)).clamp(-1.0, 1.0);
+    switch (type) {
+      case slide:
+        final travel = fromCenter <= 0 ? -(fromCenter + 1) : (1 - fromCenter);
+        return StoryTransitionPose(slide: travel);
+      case pop:
+        final pop = math.sin(span * math.pi);
+        return StoryTransitionPose(scale: 1 + pop * 0.42);
+      default:
+        return StoryTransitionPose(opacity: fromCenter.abs().clamp(0.0, 1.0));
+    }
+  }
+
+  factory StoryTransition.fromJson(Map<String, dynamic> json) {
+    final raw = json['type'] as String?;
+    return StoryTransition(
+      time: (json['time'] as num).toDouble(),
+      duration: (json['duration'] as num?)?.toDouble() ?? 0.5,
+      type: raw != null && types.contains(raw) ? raw : fade,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'time': time,
+        'duration': duration,
+        'type': type,
+      };
+}
+
 class StoryTimeline {
   final List<StoryBlock> blocks;
   final List<StoryMotionBlock> motionBlocks;
   final List<StoryHatBlock> hatBlocks;
   final List<StoryGlassesBlock> glassesBlocks;
   final List<StoryMusclesBlock> musclesBlocks;
+  final List<StoryJumpBlock> jumpBlocks;
+  final List<StoryTransition> transitions;
   final double totalDuration; // In seconds
 
   StoryTimeline({
@@ -182,6 +312,8 @@ class StoryTimeline {
     this.hatBlocks = const [],
     this.glassesBlocks = const [],
     this.musclesBlocks = const [],
+    this.jumpBlocks = const [],
+    this.transitions = const [],
     required this.totalDuration,
   });
 
@@ -231,6 +363,29 @@ class StoryTimeline {
     return false;
   }
 
+  StoryTransitionPose poseAt(double time) {
+    var pose = StoryTransitionPose.rest;
+    for (final transition in transitions) {
+      if (transition.covers(time)) {
+        pose = transition.poseAt(time);
+        break;
+      }
+    }
+    for (final jump in jumpBlocks) {
+      if (!jump.isPlaying(time)) continue;
+      final hop = jump.poseAt(time);
+      return StoryTransitionPose(
+        opacity: pose.opacity,
+        slide: pose.slide,
+        jump: pose.jump + hop.jump,
+        scale: pose.scale * hop.scale,
+      );
+    }
+    return pose;
+  }
+
+  double characterOpacityAt(double time) => poseAt(time).opacity;
+
   /// Returns a unique list of all characters used in this timeline
   /// This is useful for preloading models.
   List<String> get allCharacterIds {
@@ -243,6 +398,8 @@ class StoryTimeline {
     final hatBlocksList = json['hatBlocks'] as List<dynamic>? ?? [];
     final glassesBlocksList = json['glassesBlocks'] as List<dynamic>? ?? [];
     final musclesBlocksList = json['musclesBlocks'] as List<dynamic>? ?? [];
+    final jumpBlocksList = json['jumpBlocks'] as List<dynamic>? ?? [];
+    final transitionsList = json['transitions'] as List<dynamic>? ?? [];
     return StoryTimeline(
       blocks: blocksList
           .map((b) => StoryBlock.fromJson(b as Map<String, dynamic>))
@@ -259,6 +416,12 @@ class StoryTimeline {
       musclesBlocks: musclesBlocksList
           .map((b) => StoryMusclesBlock.fromJson(b as Map<String, dynamic>))
           .toList(),
+      jumpBlocks: jumpBlocksList
+          .map((b) => StoryJumpBlock.fromJson(b as Map<String, dynamic>))
+          .toList(),
+      transitions: transitionsList
+          .map((b) => StoryTransition.fromJson(b as Map<String, dynamic>))
+          .toList(),
       totalDuration: (json['totalDuration'] as num?)?.toDouble() ?? 0.0,
     );
   }
@@ -270,6 +433,8 @@ class StoryTimeline {
       'hatBlocks': hatBlocks.map((b) => b.toJson()).toList(),
       'glassesBlocks': glassesBlocks.map((b) => b.toJson()).toList(),
       'musclesBlocks': musclesBlocks.map((b) => b.toJson()).toList(),
+      'jumpBlocks': jumpBlocks.map((b) => b.toJson()).toList(),
+      'transitions': transitions.map((b) => b.toJson()).toList(),
       'totalDuration': totalDuration,
     };
   }

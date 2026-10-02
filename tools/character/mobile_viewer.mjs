@@ -402,11 +402,11 @@ try {
   // MSAA on: WebView GL is stable (unlike native flutter_angle FBOs).
   renderer = new THREE.WebGLRenderer({
     antialias: true,
-    alpha: false,
+    alpha: true,
     powerPreference: 'high-performance',
     preserveDrawingBuffer: false,
   });
-  renderer.setClearColor(0xf4f7f5);
+  renderer.setClearColor(0xffffff, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   // Keep lighting response close to the web three_js viewer.

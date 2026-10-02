@@ -6,7 +6,9 @@ import '../animation/story_motion.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../models/story_timeline.dart';
 import '../utils/character_helper.dart';
+import 'app_bottom_sheet.dart';
 import 'smart_character_viewer.dart';
+import 'story_transition_frame.dart';
 
 class StoryTimelineEditor extends StatefulWidget {
   final File audioFile;
@@ -16,6 +18,7 @@ class StoryTimelineEditor extends StatefulWidget {
   final AudioPlayer? audioPlayer;
   final bool isPlaying;
   final VoidCallback? onTogglePlay;
+  final int appliedMontage;
 
   const StoryTimelineEditor({
     super.key,
@@ -26,6 +29,7 @@ class StoryTimelineEditor extends StatefulWidget {
     this.audioPlayer,
     this.isPlaying = false,
     this.onTogglePlay,
+    this.appliedMontage = 0,
   });
 
   @override
@@ -40,13 +44,18 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   List<StoryHatBlock> _hatBlocks = [];
   List<StoryGlassesBlock> _glassesBlocks = [];
   List<StoryMusclesBlock> _musclesBlocks = [];
+  List<StoryJumpBlock> _jumpBlocks = [];
+  List<StoryTransition> _transitions = [];
+  final List<_TimelineHistory> _history = [];
+  bool _editing = false;
   bool _isLoading = true;
   
   double _pixelsPerSecond = 80.0;
-  final double _paletteChipHeight = 32.0;
-  final double _trackHeight = 28.0;
+  final double _paletteChipHeight = 40.0;
+  final double _trackHeight = 40.0;
   final double _waveformHeight = 26.0;
   final double _laneGap = 2.0;
+  final double _characterGap = 48;
   final double _rulerSpace = 4.0;
 
   static const _hatPaletteColors = <Color>[
@@ -65,6 +74,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   final GlobalKey _hatTrackKey = GlobalKey();
   final GlobalKey _glassesTrackKey = GlobalKey();
   final GlobalKey _musclesTrackKey = GlobalKey();
+  final GlobalKey _jumpTrackKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
   
   int? _selectedBlockIndex;
@@ -72,8 +82,10 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   int? _selectedHatBlockIndex;
   int? _selectedGlassesBlockIndex;
   int? _selectedMusclesBlockIndex;
+  int? _selectedJumpBlockIndex;
+  int? _selectedTransitionIndex;
   int _paletteCategory = 0;
-  static const _paletteCategoryNames = ['الشخصية', 'الحركة', 'القبعة', 'النظارة', 'العضلات'];
+  static const _paletteCategoryNames = ['الشخصية', 'الحركة', 'القبعة', 'النظارة', 'العضلات', 'التأثير'];
   String? _lastPreviewCharacter;
   String? _lastPreviewMotion;
 
@@ -97,6 +109,13 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       if (widget.initialTimeline!.musclesBlocks.isNotEmpty) {
         _musclesBlocks = List.from(widget.initialTimeline!.musclesBlocks);
       }
+      if (widget.initialTimeline!.jumpBlocks.isNotEmpty) {
+        _jumpBlocks = List.from(widget.initialTimeline!.jumpBlocks);
+      }
+      if (widget.initialTimeline!.transitions.isNotEmpty) {
+        _transitions = List.from(widget.initialTimeline!.transitions);
+        _collapseTransitionSeams();
+      }
     }
     _loadAudioDuration();
     
@@ -113,12 +132,32 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       oldWidget.positionNotifier?.removeListener(_onPositionChanged);
       widget.positionNotifier?.addListener(_onPositionChanged);
     }
+    final next = widget.initialTimeline;
+    if (oldWidget.appliedMontage != widget.appliedMontage && next != null) {
+      _editing = false;
+      _armEdit();
+      _motionBlocks = List.of(next.motionBlocks);
+      _hatBlocks = List.of(next.hatBlocks);
+      _glassesBlocks = List.of(next.glassesBlocks);
+      _musclesBlocks = List.of(next.musclesBlocks);
+      _jumpBlocks = List.of(next.jumpBlocks);
+      _transitions = List.of(next.transitions);
+      _selectedBlockIndex = null;
+      _selectedMotionBlockIndex = null;
+      _selectedHatBlockIndex = null;
+      _selectedGlassesBlockIndex = null;
+      _selectedMusclesBlockIndex = null;
+      _selectedJumpBlockIndex = null;
+      _selectedTransitionIndex = null;
+      _editing = false;
+      _previewLook = '';
+    }
   }
+
+  String _previewLook = '';
 
   void _onPositionChanged() {
     if (!mounted) return;
-    setState(() {}); // Re-render playhead
-    
     if (_scrollController.hasClients && widget.positionNotifier != null) {
       final currentTime = widget.positionNotifier!.value.inMilliseconds / 1000.0;
       final playheadPos = currentTime * _pixelsPerSecond;
@@ -132,6 +171,12 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
         _scrollController.jumpTo(playheadPos);
       }
     }
+    final time = (widget.positionNotifier?.value.inMilliseconds ?? 0) / 1000.0;
+    final hat = _getActiveHatAt(time);
+    final look = '${_getActiveCharacterAt(time)}|${_getActiveMotionAt(time)}|${hat?.colorHex ?? ''}|${_glassesOnAt(time)}|${_musclesOnAt(time)}';
+    if (look == _previewLook) return;
+    _previewLook = look;
+    setState(() {});
   }
 
   Future<void> _loadAudioDuration() async {
@@ -166,25 +211,136 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     super.dispose();
   }
 
+  void _armEdit() {
+    if (_editing) return;
+    _editing = true;
+    _history.add(_TimelineHistory.capture(this));
+    if (_history.length > 30) _history.removeAt(0);
+  }
+
+  void _finishEdit() {
+    if (!_editing) return;
+    _editing = false;
+    setState(() {});
+  }
+
+  void _undo() {
+    if (_history.isEmpty) return;
+    final snap = _history.removeLast();
+    _editing = false;
+    setState(() {
+      _blocks = List.of(snap.blocks);
+      _motionBlocks = List.of(snap.motionBlocks);
+      _hatBlocks = List.of(snap.hatBlocks);
+      _glassesBlocks = List.of(snap.glassesBlocks);
+      _musclesBlocks = List.of(snap.musclesBlocks);
+      _jumpBlocks = List.of(snap.jumpBlocks);
+      _transitions = List.of(snap.transitions);
+      _selectedBlockIndex = null;
+      _selectedMotionBlockIndex = null;
+      _selectedHatBlockIndex = null;
+      _selectedGlassesBlockIndex = null;
+      _selectedMusclesBlockIndex = null;
+      _selectedJumpBlockIndex = null;
+      _selectedTransitionIndex = null;
+    });
+    _notifyChanged();
+  }
+
+  bool _picked(int? index, int length) => index != null && index >= 0 && index < length;
+
+  (double, double)? _selectedSpan() {
+    if (_picked(_selectedBlockIndex, _blocks.length)) {
+      final block = _blocks[_selectedBlockIndex!];
+      return (block.startTime, block.endTime);
+    }
+    if (_picked(_selectedMotionBlockIndex, _motionBlocks.length)) {
+      final block = _motionBlocks[_selectedMotionBlockIndex!];
+      return (block.startTime, block.endTime);
+    }
+    if (_picked(_selectedHatBlockIndex, _hatBlocks.length)) {
+      final block = _hatBlocks[_selectedHatBlockIndex!];
+      return (block.startTime, block.endTime);
+    }
+    if (_picked(_selectedGlassesBlockIndex, _glassesBlocks.length)) {
+      final block = _glassesBlocks[_selectedGlassesBlockIndex!];
+      return (block.startTime, block.endTime);
+    }
+    if (_picked(_selectedMusclesBlockIndex, _musclesBlocks.length)) {
+      final block = _musclesBlocks[_selectedMusclesBlockIndex!];
+      return (block.startTime, block.endTime);
+    }
+    if (_picked(_selectedJumpBlockIndex, _jumpBlocks.length)) {
+      final block = _jumpBlocks[_selectedJumpBlockIndex!];
+      return (block.startTime, block.endTime);
+    }
+    if (_picked(_selectedTransitionIndex, _transitions.length)) {
+      final time = _transitions[_selectedTransitionIndex!].time;
+      return (time, time);
+    }
+    return null;
+  }
+
+  double? _guideTime() {
+    if (!_editing) return null;
+    final span = _selectedSpan();
+    if (span == null || _pixelsPerSecond <= 0) return null;
+    final slack = 6 / _pixelsPerSecond;
+    double? best;
+    var bestDist = slack;
+    for (var i = 0; i < _blocks.length; i++) {
+      if (_selectedBlockIndex == i) continue;
+      final block = _blocks[i];
+      for (final edge in [block.startTime, block.endTime]) {
+        for (final mine in [span.$1, span.$2]) {
+          final dist = (mine - edge).abs();
+          if (dist > bestDist) continue;
+          bestDist = dist;
+          best = edge;
+        }
+      }
+    }
+    return best;
+  }
+
+  bool get _canDuplicate =>
+      _picked(_selectedBlockIndex, _blocks.length) ||
+      _picked(_selectedMotionBlockIndex, _motionBlocks.length) ||
+      _picked(_selectedHatBlockIndex, _hatBlocks.length) ||
+      _picked(_selectedGlassesBlockIndex, _glassesBlocks.length) ||
+      _picked(_selectedMusclesBlockIndex, _musclesBlocks.length) ||
+      _picked(_selectedJumpBlockIndex, _jumpBlocks.length);
+
+  bool get _canCopyLook {
+    if (!_picked(_selectedBlockIndex, _blocks.length)) return false;
+    final start = _blocks[_selectedBlockIndex!].startTime;
+    return _blocks.any((block) => block.startTime > start + 0.01);
+  }
+
   void _notifyChanged() {
+    _collapseTransitionSeams();
     _blocks.sort((a, b) => a.startTime.compareTo(b.startTime));
     _motionBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
     _hatBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
     _glassesBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
     _musclesBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
+    _jumpBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
+    _transitions.sort((a, b) => a.time.compareTo(b.time));
     widget.onTimelineChanged(StoryTimeline(
       blocks: _blocks,
       motionBlocks: _motionBlocks,
       hatBlocks: _hatBlocks,
       glassesBlocks: _glassesBlocks,
       musclesBlocks: _musclesBlocks,
+      jumpBlocks: _jumpBlocks,
+      transitions: _transitions,
       totalDuration: _totalDuration.inMilliseconds / 1000.0,
     ));
   }
 
-  double _laneBlockHeight(bool selected) => selected ? 32 : _trackHeight;
+  double _laneBlockHeight(bool selected) => selected ? _trackHeight + 8 : _trackHeight;
 
-  double _laneBlockTop(bool selected) => selected ? (_trackHeight - 32) / 2 : 0;
+  double _laneBlockTop(bool selected) => selected ? -4 : 0;
 
   Widget _trackHint(String text) {
     return IgnorePointer(
@@ -240,7 +396,8 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       }
     }
     updatedBlocks.add(StoryBlock(characterId: characterId, startTime: timeInSeconds, endTime: end));
-    
+
+    _armEdit();
     setState(() {
       _blocks = updatedBlocks;
       _selectedBlockIndex = _blocks.indexWhere((b) => b.startTime == timeInSeconds);
@@ -250,9 +407,11 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       _selectedMusclesBlockIndex = null;
     });
     _notifyChanged();
+    _finishEdit();
   }
 
   void _updateBlockStart(int index, double deltaSeconds) {
+    if (!_picked(index, _blocks.length)) return;
     final block = _blocks[index];
     double newStart = block.startTime + deltaSeconds;
     
@@ -275,6 +434,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _updateBlockEnd(int index, double deltaSeconds) {
+    if (!_picked(index, _blocks.length)) return;
     final block = _blocks[index];
     double newEnd = block.endTime + deltaSeconds;
     
@@ -298,6 +458,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _moveBlock(int index, double deltaSeconds) {
+    if (!_picked(index, _blocks.length)) return;
     final block = _blocks[index];
     double newStart = block.startTime + deltaSeconds;
     double duration = block.endTime - block.startTime;
@@ -325,53 +486,204 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _splitBlock() {
-    if (_selectedBlockIndex == null) return;
+    if (!_picked(_selectedBlockIndex, _blocks.length)) return;
     final time = (widget.positionNotifier?.value.inMilliseconds ?? 0) / 1000.0;
     final index = _selectedBlockIndex!;
     final block = _blocks[index];
 
     if (time > block.startTime + 0.1 && time < block.endTime - 0.1) {
+      _armEdit();
       setState(() {
         _blocks[index] = StoryBlock(characterId: block.characterId, startTime: block.startTime, endTime: time);
         _blocks.insert(index + 1, StoryBlock(characterId: block.characterId, startTime: time, endTime: block.endTime));
         _selectedBlockIndex = index + 1;
       });
       _notifyChanged();
+      _finishEdit();
     }
   }
 
   void _deleteBlock() {
-    if (_selectedBlockIndex != null) {
+    if (_picked(_selectedBlockIndex, _blocks.length)) {
+      _armEdit();
       setState(() {
         _blocks.removeAt(_selectedBlockIndex!);
         _selectedBlockIndex = null;
       });
-      _notifyChanged();
-    } else if (_selectedMotionBlockIndex != null) {
+    } else if (_picked(_selectedMotionBlockIndex, _motionBlocks.length)) {
+      _armEdit();
       setState(() {
         _motionBlocks.removeAt(_selectedMotionBlockIndex!);
         _selectedMotionBlockIndex = null;
       });
-      _notifyChanged();
-    } else if (_selectedHatBlockIndex != null) {
+    } else if (_picked(_selectedHatBlockIndex, _hatBlocks.length)) {
+      _armEdit();
       setState(() {
         _hatBlocks.removeAt(_selectedHatBlockIndex!);
         _selectedHatBlockIndex = null;
       });
-      _notifyChanged();
-    } else if (_selectedGlassesBlockIndex != null) {
+    } else if (_picked(_selectedGlassesBlockIndex, _glassesBlocks.length)) {
+      _armEdit();
       setState(() {
         _glassesBlocks.removeAt(_selectedGlassesBlockIndex!);
         _selectedGlassesBlockIndex = null;
       });
-      _notifyChanged();
-    } else if (_selectedMusclesBlockIndex != null) {
+    } else if (_picked(_selectedMusclesBlockIndex, _musclesBlocks.length)) {
+      _armEdit();
       setState(() {
         _musclesBlocks.removeAt(_selectedMusclesBlockIndex!);
         _selectedMusclesBlockIndex = null;
       });
-      _notifyChanged();
+    } else if (_picked(_selectedJumpBlockIndex, _jumpBlocks.length)) {
+      _armEdit();
+      setState(() {
+        _jumpBlocks.removeAt(_selectedJumpBlockIndex!);
+        _selectedJumpBlockIndex = null;
+      });
+    } else if (_picked(_selectedTransitionIndex, _transitions.length)) {
+      _armEdit();
+      setState(() {
+        _transitions.removeAt(_selectedTransitionIndex!);
+        _selectedTransitionIndex = null;
+      });
+    } else {
+      return;
     }
+    _notifyChanged();
+    _finishEdit();
+  }
+
+  void _addTransitionAt(double seam, String type) {
+    if (_transitions.any((item) => (item.time - seam).abs() < 0.2)) return;
+    _transitions.add(StoryTransition(time: seam, type: type));
+    _notifyChanged();
+    setState(() {
+      _selectedTransitionIndex = _transitions.indexWhere((item) => (item.time - seam).abs() < 0.05);
+      _selectedBlockIndex = null;
+      _selectedMotionBlockIndex = null;
+      _selectedHatBlockIndex = null;
+      _selectedGlassesBlockIndex = null;
+      _selectedMusclesBlockIndex = null;
+      _selectedJumpBlockIndex = null;
+    });
+  }
+
+  int _seamIndexForTime(double time, List<double> seams) {
+    if (seams.isEmpty) return -1;
+    var best = 0;
+    var bestDist = (time - seams[0]).abs();
+    for (var i = 1; i < seams.length; i++) {
+      final dist = (time - seams[i]).abs();
+      if (dist < bestDist) {
+        best = i;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  void _collapseTransitionSeams() {
+    final seams = _characterSeams();
+    if (seams.isEmpty) {
+      _transitions = [];
+      return;
+    }
+    final kept = <StoryTransition>[];
+    for (var i = 0; i < seams.length; i++) {
+      StoryTransition? chosen;
+      var chosenDist = double.infinity;
+      for (final item in _transitions) {
+        if (_seamIndexForTime(item.time, seams) != i) continue;
+        final dist = (item.time - seams[i]).abs();
+        if (dist > chosenDist) continue;
+        chosenDist = dist;
+        chosen = StoryTransition(time: seams[i], duration: item.duration, type: item.type);
+      }
+      if (chosen != null) kept.add(chosen);
+    }
+    _transitions = kept;
+  }
+
+  void _placeTransition(double seam, String type) {
+    _armEdit();
+    _transitions.add(StoryTransition(time: seam, type: type));
+    _collapseTransitionSeams();
+    _notifyChanged();
+    setState(() {
+      _selectedTransitionIndex = _transitions.indexWhere((item) => (item.time - seam).abs() < 0.25);
+      _selectedBlockIndex = null;
+      _selectedMotionBlockIndex = null;
+      _selectedHatBlockIndex = null;
+      _selectedGlassesBlockIndex = null;
+      _selectedMusclesBlockIndex = null;
+      _selectedJumpBlockIndex = null;
+    });
+    _finishEdit();
+  }
+
+  Future<void> _openEffectSheet(double seam) async {
+    final existing = _transitions.where((item) => (item.time - seam).abs() < 0.25);
+    final picked = await showAppSheet<String>(
+      context: context,
+      heightFactor: 0.46,
+      builder: (sheetContext) {
+        return _EffectSheet(
+          initial: existing.isEmpty ? StoryTransition.fade : existing.first.type,
+          onAdd: (type) => Navigator.of(sheetContext).pop(type),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    _placeTransition(seam, picked);
+  }
+
+  StoryTransitionPose _poseAt(double time) {
+    return StoryTimeline(
+      blocks: const [],
+      transitions: _transitions,
+      jumpBlocks: _jumpBlocks,
+      totalDuration: 1,
+    ).poseAt(time);
+  }
+
+  (double, double) _characterFrame(int index, StoryBlock block) {
+    final rawLeft = block.startTime * _pixelsPerSecond;
+    final rawRight = block.endTime * _pixelsPerSecond;
+    var left = rawLeft;
+    var right = rawRight;
+    StoryBlock? previous;
+    StoryBlock? following;
+    for (var i = 0; i < _blocks.length; i++) {
+      if (i == index) continue;
+      final other = _blocks[i];
+      if (other.endTime <= block.startTime + 0.05) {
+        if (previous == null || other.endTime > previous.endTime) previous = other;
+      }
+      if (other.startTime >= block.endTime - 0.05) {
+        if (following == null || other.startTime < following.startTime) following = other;
+      }
+    }
+    if (previous != null) left += _characterGap / 2;
+    if (following != null) right -= _characterGap / 2;
+    if (right - left < 20) {
+      final middle = (rawLeft + rawRight) / 2;
+      left = middle - 10;
+      right = middle + 10;
+    }
+    return (left, right - left);
+  }
+
+  List<double> _characterSeams() {
+    final ordered = [..._blocks]..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final seams = <double>[];
+    for (var i = 0; i < ordered.length - 1; i++) {
+      final current = ordered[i];
+      final next = ordered[i + 1];
+      seams.add(current.endTime <= next.startTime
+          ? (current.endTime + next.startTime) / 2
+          : current.endTime);
+    }
+    return seams;
   }
 
   String? _getActiveCharacterAt(double time) {
@@ -442,6 +754,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       StoryMotionBlock(motionId: motionId, startTime: timeInSeconds, endTime: end),
     );
 
+    _armEdit();
     setState(() {
       _motionBlocks = updatedBlocks;
       _selectedMotionBlockIndex = _motionBlocks.indexWhere((b) => b.startTime == timeInSeconds);
@@ -451,9 +764,11 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       _selectedMusclesBlockIndex = null;
     });
     _notifyChanged();
+    _finishEdit();
   }
 
   void _updateMotionBlockStart(int index, double deltaSeconds) {
+    if (!_picked(index, _motionBlocks.length)) return;
     final block = _motionBlocks[index];
     double newStart = block.startTime + deltaSeconds;
     if (newStart < 0) newStart = 0;
@@ -473,6 +788,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _updateMotionBlockEnd(int index, double deltaSeconds) {
+    if (!_picked(index, _motionBlocks.length)) return;
     final block = _motionBlocks[index];
     double newEnd = block.endTime + deltaSeconds;
     final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
@@ -493,6 +809,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _moveMotionBlock(int index, double deltaSeconds) {
+    if (!_picked(index, _motionBlocks.length)) return;
     final block = _motionBlocks[index];
     double newStart = block.startTime + deltaSeconds;
     double duration = block.endTime - block.startTime;
@@ -548,6 +865,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       StoryHatBlock(colorHex: colorHex, startTime: timeInSeconds, endTime: end),
     );
 
+    _armEdit();
     setState(() {
       _hatBlocks = updatedBlocks;
       _selectedHatBlockIndex = _hatBlocks.indexWhere((b) => b.startTime == timeInSeconds);
@@ -557,9 +875,11 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       _selectedMusclesBlockIndex = null;
     });
     _notifyChanged();
+    _finishEdit();
   }
 
   void _updateHatBlockStart(int index, double deltaSeconds) {
+    if (!_picked(index, _hatBlocks.length)) return;
     final block = _hatBlocks[index];
     double newStart = block.startTime + deltaSeconds;
     if (newStart < 0) newStart = 0;
@@ -579,6 +899,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _updateHatBlockEnd(int index, double deltaSeconds) {
+    if (!_picked(index, _hatBlocks.length)) return;
     final block = _hatBlocks[index];
     double newEnd = block.endTime + deltaSeconds;
     final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
@@ -599,6 +920,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _moveHatBlock(int index, double deltaSeconds) {
+    if (!_picked(index, _hatBlocks.length)) return;
     final block = _hatBlocks[index];
     double newStart = block.startTime + deltaSeconds;
     double duration = block.endTime - block.startTime;
@@ -642,6 +964,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       }
     }
     updated.add(StoryGlassesBlock(startTime: timeInSeconds, endTime: end));
+    _armEdit();
     setState(() {
       _glassesBlocks = updated;
       _selectedGlassesBlockIndex = _glassesBlocks.indexWhere((b) => b.startTime == timeInSeconds);
@@ -651,9 +974,11 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       _selectedMusclesBlockIndex = null;
     });
     _notifyChanged();
+    _finishEdit();
   }
 
   void _updateGlassesBlockStart(int index, double deltaSeconds) {
+    if (!_picked(index, _glassesBlocks.length)) return;
     final block = _glassesBlocks[index];
     double newStart = block.startTime + deltaSeconds;
     if (newStart < 0) newStart = 0;
@@ -668,6 +993,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _updateGlassesBlockEnd(int index, double deltaSeconds) {
+    if (!_picked(index, _glassesBlocks.length)) return;
     final block = _glassesBlocks[index];
     double newEnd = block.endTime + deltaSeconds;
     final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
@@ -683,6 +1009,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _moveGlassesBlock(int index, double deltaSeconds) {
+    if (!_picked(index, _glassesBlocks.length)) return;
     final block = _glassesBlocks[index];
     final duration = block.endTime - block.startTime;
     double newStart = block.startTime + deltaSeconds;
@@ -726,6 +1053,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       }
     }
     updated.add(StoryMusclesBlock(startTime: timeInSeconds, endTime: end));
+    _armEdit();
     setState(() {
       _musclesBlocks = updated;
       _selectedMusclesBlockIndex = _musclesBlocks.indexWhere((b) => b.startTime == timeInSeconds);
@@ -735,9 +1063,11 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       _selectedGlassesBlockIndex = null;
     });
     _notifyChanged();
+    _finishEdit();
   }
 
   void _updateMusclesBlockStart(int index, double deltaSeconds) {
+    if (!_picked(index, _musclesBlocks.length)) return;
     final block = _musclesBlocks[index];
     double newStart = block.startTime + deltaSeconds;
     if (newStart < 0) newStart = 0;
@@ -752,6 +1082,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _updateMusclesBlockEnd(int index, double deltaSeconds) {
+    if (!_picked(index, _musclesBlocks.length)) return;
     final block = _musclesBlocks[index];
     double newEnd = block.endTime + deltaSeconds;
     final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
@@ -767,6 +1098,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   void _moveMusclesBlock(int index, double deltaSeconds) {
+    if (!_picked(index, _musclesBlocks.length)) return;
     final block = _musclesBlocks[index];
     final duration = block.endTime - block.startTime;
     double newStart = block.startTime + deltaSeconds;
@@ -789,19 +1121,162 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     _notifyChanged();
   }
   
-  void _duplicateBlock() {
-    if (_selectedBlockIndex != null) {
-      final block = _blocks[_selectedBlockIndex!];
-      final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
-      final duration = block.endTime - block.startTime;
-      double newStart = block.endTime;
-      double newEnd = newStart + duration;
-      
-      if (newStart >= totalSeconds) return; 
-      if (newEnd > totalSeconds) newEnd = totalSeconds;
-      
-      _addBlockAtTime(block.characterId, newStart);
+  (double, double)? _fitCopy(double start, double end, double? nextStart) {
+    final total = _totalDuration.inMilliseconds / 1000.0;
+    if (total <= 0 || start >= total - 0.05) return null;
+    var finish = end > total ? total : end;
+    if (nextStart != null && finish > nextStart) finish = nextStart;
+    if (finish - start < 0.2) return null;
+    return (start, finish);
+  }
+
+  double? _followingStart(Iterable<double> starts, double after) {
+    double? next;
+    for (final start in starts) {
+      if (start + 0.001 < after) continue;
+      if (next == null || start < next) next = start;
     }
+    return next;
+  }
+
+  int? _keep(int? index) => index != null && index >= 0 ? index : null;
+
+  void _selectOnly({int? block, int? motion, int? hat, int? glasses, int? muscles, int? jump}) {
+    _selectedBlockIndex = _keep(block);
+    _selectedMotionBlockIndex = _keep(motion);
+    _selectedHatBlockIndex = _keep(hat);
+    _selectedGlassesBlockIndex = _keep(glasses);
+    _selectedMusclesBlockIndex = _keep(muscles);
+    _selectedJumpBlockIndex = _keep(jump);
+    _selectedTransitionIndex = null;
+  }
+
+  void _duplicateBlock() {
+    if (!_canDuplicate) return;
+    final total = _totalDuration.inMilliseconds / 1000.0;
+    if (_picked(_selectedBlockIndex, _blocks.length)) {
+      final block = _blocks[_selectedBlockIndex!];
+      if (block.endTime >= total) return;
+      _addBlockAtTime(block.characterId, block.endTime);
+      return;
+    }
+
+    late final void Function() add;
+    if (_picked(_selectedMotionBlockIndex, _motionBlocks.length)) {
+      final block = _motionBlocks[_selectedMotionBlockIndex!];
+      final fit = _fitCopy(block.endTime, block.endTime + (block.endTime - block.startTime), _followingStart(_motionBlocks.map((item) => item.startTime), block.endTime));
+      if (fit == null) return;
+      add = () {
+        _motionBlocks.add(StoryMotionBlock(motionId: block.motionId, startTime: fit.$1, endTime: fit.$2));
+        _notifyChanged();
+        _selectOnly(motion: _motionBlocks.lastIndexWhere((item) => (item.startTime - fit.$1).abs() < 0.001));
+      };
+    } else if (_picked(_selectedHatBlockIndex, _hatBlocks.length)) {
+      final block = _hatBlocks[_selectedHatBlockIndex!];
+      final fit = _fitCopy(block.endTime, block.endTime + (block.endTime - block.startTime), _followingStart(_hatBlocks.map((item) => item.startTime), block.endTime));
+      if (fit == null) return;
+      add = () {
+        _hatBlocks.add(StoryHatBlock(colorHex: block.colorHex, startTime: fit.$1, endTime: fit.$2));
+        _notifyChanged();
+        _selectOnly(hat: _hatBlocks.lastIndexWhere((item) => (item.startTime - fit.$1).abs() < 0.001));
+      };
+    } else if (_picked(_selectedGlassesBlockIndex, _glassesBlocks.length)) {
+      final block = _glassesBlocks[_selectedGlassesBlockIndex!];
+      final fit = _fitCopy(block.endTime, block.endTime + (block.endTime - block.startTime), _followingStart(_glassesBlocks.map((item) => item.startTime), block.endTime));
+      if (fit == null) return;
+      add = () {
+        _glassesBlocks.add(StoryGlassesBlock(startTime: fit.$1, endTime: fit.$2));
+        _notifyChanged();
+        _selectOnly(glasses: _glassesBlocks.lastIndexWhere((item) => (item.startTime - fit.$1).abs() < 0.001));
+      };
+    } else if (_picked(_selectedMusclesBlockIndex, _musclesBlocks.length)) {
+      final block = _musclesBlocks[_selectedMusclesBlockIndex!];
+      final fit = _fitCopy(block.endTime, block.endTime + (block.endTime - block.startTime), _followingStart(_musclesBlocks.map((item) => item.startTime), block.endTime));
+      if (fit == null) return;
+      add = () {
+        _musclesBlocks.add(StoryMusclesBlock(startTime: fit.$1, endTime: fit.$2));
+        _notifyChanged();
+        _selectOnly(muscles: _musclesBlocks.lastIndexWhere((item) => (item.startTime - fit.$1).abs() < 0.001));
+      };
+    } else if (_picked(_selectedJumpBlockIndex, _jumpBlocks.length)) {
+      final block = _jumpBlocks[_selectedJumpBlockIndex!];
+      final fit = _fitCopy(block.endTime, block.endTime + (block.endTime - block.startTime), _followingStart(_jumpBlocks.map((item) => item.startTime), block.endTime));
+      if (fit == null) return;
+      add = () {
+        _jumpBlocks.add(StoryJumpBlock(startTime: fit.$1, endTime: fit.$2));
+        _notifyChanged();
+        _selectOnly(jump: _jumpBlocks.lastIndexWhere((item) => (item.startTime - fit.$1).abs() < 0.001));
+      };
+    } else {
+      return;
+    }
+    _armEdit();
+    setState(add);
+    _finishEdit();
+  }
+
+  (double, double)? _clipTo(double start, double end, double hostStart, double hostEnd) {
+    final from = start < hostStart ? hostStart : start;
+    final to = end > hostEnd ? hostEnd : end;
+    if (to - from < 0.15) return null;
+    return (from, to);
+  }
+
+  void _copyLook() {
+    if (!_picked(_selectedBlockIndex, _blocks.length)) return;
+    final source = _blocks[_selectedBlockIndex!];
+    StoryBlock? next;
+    for (final block in _blocks) {
+      if (block.startTime <= source.startTime + 0.01) continue;
+      if (next == null || block.startTime < next.startTime) next = block;
+    }
+    if (next == null) return;
+    final target = next;
+    final shift = target.startTime - source.startTime;
+    bool onSource(double start, double end) => start < source.endTime && end > source.startTime;
+    final motions = [for (final block in _motionBlocks) if (onSource(block.startTime, block.endTime)) block];
+    final hats = [for (final block in _hatBlocks) if (onSource(block.startTime, block.endTime)) block];
+    final glasses = [for (final block in _glassesBlocks) if (onSource(block.startTime, block.endTime)) block];
+    final muscles = [for (final block in _musclesBlocks) if (onSource(block.startTime, block.endTime)) block];
+    final jumps = [for (final block in _jumpBlocks) if (onSource(block.startTime, block.endTime)) block];
+    if (motions.isEmpty && hats.isEmpty && glasses.isEmpty && muscles.isEmpty && jumps.isEmpty) return;
+
+    bool onTarget(double start, double end) => start < target.endTime && end > target.startTime;
+    _armEdit();
+    setState(() {
+      _motionBlocks.removeWhere((block) => onTarget(block.startTime, block.endTime));
+      _hatBlocks.removeWhere((block) => onTarget(block.startTime, block.endTime));
+      _glassesBlocks.removeWhere((block) => onTarget(block.startTime, block.endTime));
+      _musclesBlocks.removeWhere((block) => onTarget(block.startTime, block.endTime));
+      _jumpBlocks.removeWhere((block) => onTarget(block.startTime, block.endTime));
+      for (final block in motions) {
+        final clip = _clipTo(block.startTime + shift, block.endTime + shift, target.startTime, target.endTime);
+        if (clip == null) continue;
+        _motionBlocks.add(StoryMotionBlock(motionId: block.motionId, startTime: clip.$1, endTime: clip.$2));
+      }
+      for (final block in hats) {
+        final clip = _clipTo(block.startTime + shift, block.endTime + shift, target.startTime, target.endTime);
+        if (clip == null) continue;
+        _hatBlocks.add(StoryHatBlock(colorHex: block.colorHex, startTime: clip.$1, endTime: clip.$2));
+      }
+      for (final block in glasses) {
+        final clip = _clipTo(block.startTime + shift, block.endTime + shift, target.startTime, target.endTime);
+        if (clip == null) continue;
+        _glassesBlocks.add(StoryGlassesBlock(startTime: clip.$1, endTime: clip.$2));
+      }
+      for (final block in muscles) {
+        final clip = _clipTo(block.startTime + shift, block.endTime + shift, target.startTime, target.endTime);
+        if (clip == null) continue;
+        _musclesBlocks.add(StoryMusclesBlock(startTime: clip.$1, endTime: clip.$2));
+      }
+      for (final block in jumps) {
+        final clip = _clipTo(block.startTime + shift, block.endTime + shift, target.startTime, target.endTime);
+        if (clip == null) continue;
+        _jumpBlocks.add(StoryJumpBlock(startTime: clip.$1, endTime: clip.$2));
+      }
+    });
+    _notifyChanged();
+    _finishEdit();
   }
 
   void _zoom(double factor) {
@@ -819,7 +1294,8 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
     final trackWidth = totalSeconds * _pixelsPerSecond;
     final characterTop = _rulerSpace + _waveformHeight + _laneGap;
-    final motionTop = characterTop + _trackHeight + _laneGap;
+    final jumpTop = characterTop + _trackHeight + _laneGap;
+    final motionTop = jumpTop + _trackHeight + _laneGap;
     final hatTop = motionTop + _trackHeight + _laneGap;
     final glassesTop = hatTop + _trackHeight + _laneGap;
     final musclesTop = glassesTop + _trackHeight + _laneGap;
@@ -839,7 +1315,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(AppColors.border_radius),
+            borderRadius: BorderRadius.circular(AppColors.timeline_radius),
             border: Border.all(color: AppColors.inputBorder),
           ),
           child: Column(
@@ -854,49 +1330,44 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                       height: 260,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                         border: BoxBorder.all(color: AppColors.inputBorder)
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: _getActiveCharacterAt(currentTime) != null
-                                ? SmartCharacterViewer(
-                                    characterName: _getActiveCharacterAt(currentTime)!,
-                                    isPlaying: widget.isPlaying,
-                                    isSpeaking: widget.isPlaying && widget.audioFile.existsSync(),
-                                    playbackPosition: widget.positionNotifier,
-                                    motion: _getActiveMotionAt(currentTime) != null
-                                        ? CharacterMotion.values.firstWhere((m) => m.name == _getActiveMotionAt(currentTime)!, orElse: () => CharacterMotion.idle)
-                                        : null,
-                                    showHat: _getActiveHatAt(currentTime) != null,
-                                    hatColor: _getActiveHatAt(currentTime)?.color ?? const Color(0xFF2C2C2E),
-                                    showGlasses: _glassesOnAt(currentTime),
-                                    showMuscles: _musclesOnAt(currentTime),
-                                  )
-                                : const Center(
-                                    child: Text(
-                                      'لا توجد شخصية في هذا الوقت',
-                                      style: TextStyle(color: Colors.black, fontSize: 14),
-                                    ),
+                            child: widget.positionNotifier == null
+                                ? _previewScene(currentTime)
+                                : ValueListenableBuilder<Duration>(
+                                    valueListenable: widget.positionNotifier!,
+                                    builder: (context, position, child) {
+                                      final time = position.inMilliseconds / 1000.0;
+                                      if (_getActiveCharacterAt(time) == null) {
+                                        return const Center(
+                                          child: Text(
+                                            'لا توجد شخصية في هذا الوقت',
+                                            style: TextStyle(color: Colors.black, fontSize: 14),
+                                          ),
+                                        );
+                                      }
+                                      return StoryTransitionFrame(pose: _poseAt(time), child: child!);
+                                    },
+                                    child: _previewCharacter(currentTime),
                                   ),
                           ),
                           Positioned(
                             bottom: 8,
                             left: 8,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                border: Border.all(color: AppColors.inputBorder),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
-                              child: Text(
-                                '${_formatTime(currentTime)} / ${_formatTime(totalSeconds)}',
-                                style: const TextStyle(color: Colors.black, fontSize: 12),
-                              ),
-                            ),
+                            child: widget.positionNotifier == null
+                                ? _timeChip(currentTime, totalSeconds)
+                                : ValueListenableBuilder<Duration>(
+                                    valueListenable: widget.positionNotifier!,
+                                    builder: (context, position, _) => _timeChip(
+                                      position.inMilliseconds / 1000.0,
+                                      totalSeconds,
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -906,7 +1377,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                       margin: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                         border: Border.all(color: AppColors.inputBorder),
                       ),
                       child: Directionality(
@@ -931,7 +1402,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                             color: _paletteCategory == i
                                                 ? AppColors.secondary
                                                 : AppColors.background,
-                                            borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                            borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                             border: Border.all(
                                               color: _paletteCategory == i
                                                   ? AppColors.secondary
@@ -974,7 +1445,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                       height: _paletteChipHeight,
                                       decoration: BoxDecoration(
                                         color: CharacterHelper.getColor(key).withOpacity(0.8),
-                                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                       ),
                                       child: Center(
                                         child: Text(
@@ -1011,7 +1482,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                       height: _paletteChipHeight,
                                       decoration: BoxDecoration(
                                         color: Colors.white,
-                                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                         border: Border.all(color: AppColors.inputBorder),
                                       ),
                                       child: Center(child: Text(motion.arabicLabel, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))),
@@ -1022,7 +1493,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                     child: Container(
                                       width: 72,
                                       height: _paletteChipHeight,
-                                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppColors.border_radius), border: Border.all(color: AppColors.inputBorder)),
+                                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppColors.timeline_radius), border: Border.all(color: AppColors.inputBorder)),
                                       child: Center(child: Text(motion.arabicLabel, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))),
                                     ),
                                   ),
@@ -1031,7 +1502,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                     height: _paletteChipHeight,
                                     decoration: BoxDecoration(
                                       color: isSelected ? Colors.teal.shade300 : Colors.white,
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                       border: Border.all(color: isSelected ? Colors.teal.shade300 : AppColors.inputBorder),
                                     ),
                                     child: Center(child: Text(motion.arabicLabel, style: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold))),
@@ -1066,7 +1537,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                       height: _paletteChipHeight,
                                       decoration: BoxDecoration(
                                         color: color,
-                                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                         border: Border.all(color: Colors.black26),
                                       ),
                                       child: const Icon(Icons.face_retouching_natural, color: Colors.white70, size: 22),
@@ -1127,6 +1598,42 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               ),
                             ],
                           ),
+                          if (_paletteCategory == 5)
+                          _PaletteLane(
+                            key: const ValueKey('transition'),
+                            labeled: false,
+                            title: 'التأثير',
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: Draggable<String>(
+                                  data: StoryJumpBlock.dragData,
+                                  feedback: Material(
+                                    color: Colors.transparent,
+                                    child: _jumpChip(dragging: true),
+                                  ),
+                                  childWhenDragging: Opacity(opacity: 0.35, child: _jumpChip()),
+                                  child: _jumpChip(),
+                                ),
+                              ),
+                              for (final type in StoryTransition.types)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Draggable<String>(
+                                    data: StoryTransition.dragDataFor(type),
+                                    feedback: Material(
+                                      color: Colors.transparent,
+                                      child: _transitionChip(type, dragging: true),
+                                    ),
+                                    childWhenDragging: Opacity(
+                                      opacity: 0.35,
+                                      child: _transitionChip(type),
+                                    ),
+                                    child: _transitionChip(type),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                         ),
                       ),
@@ -1139,7 +1646,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                 margin: const EdgeInsets.fromLTRB(5, 0, 5, 4),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                   border: Border.all(color: AppColors.inputBorder),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1164,9 +1671,13 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                         ),
                         const SizedBox(width: 5),
                       ],
-                      _buildToolButton(Icons.call_split, 'تقسيم', _selectedBlockIndex != null ? _splitBlock : null),
+                      _buildToolButton(Icons.call_split, 'تقسيم', _picked(_selectedBlockIndex, _blocks.length) ? _splitBlock : null),
                       const SizedBox(width: 5),
-                      _buildToolButton(Icons.copy, 'تكرار', _selectedBlockIndex != null ? _duplicateBlock : null),
+                      _buildToolButton(Icons.copy, 'تكرار', _canDuplicate ? _duplicateBlock : null),
+                      const SizedBox(width: 5),
+                      _buildToolButton(Icons.auto_awesome, 'نسخ الشكل', _canCopyLook ? _copyLook : null),
+                      const SizedBox(width: 5),
+                      _buildToolButton(Icons.undo, 'تراجع', _history.isNotEmpty ? _undo : null),
                       const SizedBox(width: 5),
                       _buildToolButton(
                         Icons.delete_outline,
@@ -1175,7 +1686,9 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                 _selectedMotionBlockIndex != null ||
                                 _selectedHatBlockIndex != null ||
                                 _selectedGlassesBlockIndex != null ||
-                                _selectedMusclesBlockIndex != null)
+                                _selectedMusclesBlockIndex != null ||
+                                _selectedJumpBlockIndex != null ||
+                                _selectedTransitionIndex != null)
                             ? _deleteBlock
                             : null,
                         isDestructive: true,
@@ -1198,7 +1711,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                    borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                     border: Border.all(color: AppColors.inputBorder),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1237,7 +1750,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                   border: BoxBorder.all(
                                     color: AppColors.inputBorder
                                   )
@@ -1279,7 +1792,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                     key: _trackKey,
                                     decoration: BoxDecoration(
                                       color: candidateData.isNotEmpty ? AppColors.secondaryContainer : AppColors.background,
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                       border: Border.all(
                                         color: candidateData.isNotEmpty ? AppColors.secondary : AppColors.inputBorder,
                                         width: candidateData.isNotEmpty ? 2 : 1,
@@ -1291,6 +1804,48 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                         if (_blocks.isEmpty) _trackHint('اسحب الشخصية إلى هنا'),
                                         ..._blocks.asMap().entries.map((entry) {
                                           return _buildTimelineBlock(entry.key, entry.value);
+                                        }),
+                                        ..._seamSlots(),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            Positioned(
+                              left: 0,
+                              top: jumpTop,
+                              width: trackWidth,
+                              height: _trackHeight,
+                              child: DragTarget<String>(
+                                onAcceptWithDetails: (details) {
+                                  if (!StoryJumpBlock.isDrag(details.data)) return;
+                                  if (_jumpTrackKey.currentContext != null) {
+                                    final RenderBox box = _jumpTrackKey.currentContext!.findRenderObject() as RenderBox;
+                                    final Offset localOffset = box.globalToLocal(details.offset);
+                                    final double time = localOffset.dx / _pixelsPerSecond;
+                                    _addJumpBlockAtTime(time);
+                                  }
+                                },
+                                builder: (context, candidateData, rejectedData) {
+                                  final canAccept = candidateData.whereType<String>().any(StoryJumpBlock.isDrag);
+                                  return Container(
+                                    key: _jumpTrackKey,
+                                    decoration: BoxDecoration(
+                                      color: canAccept ? AppColors.primaryContainer : AppColors.background,
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                                      border: Border.all(
+                                        color: canAccept ? AppColors.primary : AppColors.inputBorder,
+                                        width: canAccept ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        if (_jumpBlocks.isEmpty) _trackHint('اسحب النطة إلى هنا'),
+                                        ..._jumpBlocks.asMap().entries.map((entry) {
+                                          return _buildJumpBlockWidget(entry.key, entry.value);
                                         }),
                                       ],
                                     ),
@@ -1321,7 +1876,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                     key: _motionTrackKey,
                                     decoration: BoxDecoration(
                                       color: candidateData.isNotEmpty ? AppColors.tertiaryContainer : AppColors.background,
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                       border: Border.all(
                                         color: candidateData.isNotEmpty ? AppColors.tertiary : AppColors.inputBorder,
                                         width: candidateData.isNotEmpty ? 2 : 1,
@@ -1366,7 +1921,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                     key: _hatTrackKey,
                                     decoration: BoxDecoration(
                                       color: canAccept ? AppColors.primaryContainer : AppColors.background,
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                       border: Border.all(
                                         color: canAccept ? AppColors.primary : AppColors.inputBorder,
                                         width: canAccept ? 2 : 1,
@@ -1410,7 +1965,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                     key: _glassesTrackKey,
                                     decoration: BoxDecoration(
                                       color: canAccept ? AppColors.secondaryContainer : AppColors.background,
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                       border: Border.all(
                                         color: canAccept ? AppColors.secondary : AppColors.inputBorder,
                                         width: canAccept ? 2 : 1,
@@ -1454,7 +2009,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                     key: _musclesTrackKey,
                                     decoration: BoxDecoration(
                                       color: canAccept ? AppColors.secondaryContainer : AppColors.background,
-                                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                       border: Border.all(
                                         color: canAccept ? AppColors.secondary : AppColors.inputBorder,
                                         width: canAccept ? 2 : 1,
@@ -1474,10 +2029,22 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               ),
                             ),
 
+                            if (_guideTime() != null)
+                              Positioned(
+                                left: _guideTime()! * _pixelsPerSecond - 1,
+                                top: 0,
+                                bottom: 0,
+                                child: IgnorePointer(
+                                  child: Container(width: 2, color: AppColors.primary),
+                                ),
+                              ),
+
                             // Playhead
                             if (widget.positionNotifier != null)
-                              Positioned(
-                                left: currentTime * _pixelsPerSecond,
+                              ValueListenableBuilder<Duration>(
+                                valueListenable: widget.positionNotifier!,
+                                builder: (context, position, child) => Positioned(
+                                left: position.inMilliseconds / 1000.0 * _pixelsPerSecond,
                                 top: 0,
                                 bottom: 0,
                                 child: GestureDetector(
@@ -1494,39 +2061,41 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                       }
                                     }
                                   },
-                                  child: Container(
-                                    width: 60,
-                                    transform: Matrix4.translationValues(-30, 0, 0), // center the 60px container
-                                    child: Column(
-                                      children: [
-                                        Container(
-                                          width: 22,
-                                          height: 22,
-                                          decoration: const BoxDecoration(
-                                            color: Colors.black,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black26, 
-                                                blurRadius: 4, 
-                                                offset: Offset(0, 2)
-                                              )
-                                            ],
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Container(
-                                            width: 2.5,
-                                            decoration: const BoxDecoration(
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  child: child,
                                 ),
                               ),
+                              child: Container(
+                                width: 60,
+                                transform: Matrix4.translationValues(-30, 0, 0),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black26,
+                                            blurRadius: 4,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Container(
+                                        width: 2.5,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1540,12 +2109,192 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     );
   }
 
+  Widget _timeChip(double time, double totalSeconds) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+      child: Text(
+        '${_formatTime(time)} / ${_formatTime(totalSeconds)}',
+        style: const TextStyle(color: Colors.black, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _previewScene(double time) {
+    if (_getActiveCharacterAt(time) == null) {
+      return const Center(
+        child: Text(
+          'لا توجد شخصية في هذا الوقت',
+          style: TextStyle(color: Colors.black, fontSize: 14),
+        ),
+      );
+    }
+    return StoryTransitionFrame(
+      pose: _poseAt(time),
+      child: _previewCharacter(time),
+    );
+  }
+
+  Widget _previewCharacter(double time) {
+    final character = _getActiveCharacterAt(time);
+    if (character == null) return const SizedBox.shrink();
+    final motionName = _getActiveMotionAt(time);
+    final hat = _getActiveHatAt(time);
+    return SmartCharacterViewer(
+      characterName: character,
+      isPlaying: widget.isPlaying,
+      isSpeaking: widget.isPlaying && widget.audioFile.existsSync(),
+      playbackPosition: widget.positionNotifier,
+      motion: motionName != null
+          ? CharacterMotion.values.firstWhere((m) => m.name == motionName, orElse: () => CharacterMotion.idle)
+          : null,
+      showHat: hat != null,
+      hatColor: hat?.color ?? const Color(0xFF2C2C2E),
+      showGlasses: _glassesOnAt(time),
+      showMuscles: _musclesOnAt(time),
+    );
+  }
+
+  Widget _jumpChip({bool dragging = false}) {
+    return Container(
+      width: 64,
+      height: _paletteChipHeight,
+      decoration: BoxDecoration(
+        color: dragging ? AppColors.secondary : AppColors.primary,
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+      ),
+      child: const Center(
+        child: Text(
+          'نطة',
+          style: TextStyle(color: AppColors.onPrimary, fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Widget _transitionChip(String type, {bool dragging = false}) {
+    return Container(
+      width: 64,
+      height: _paletteChipHeight,
+      decoration: BoxDecoration(
+        color: dragging ? AppColors.primary : AppColors.secondary,
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+      ),
+      child: Center(
+        child: Text(
+          StoryTransition.label(type),
+          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  IconData _transitionIcon(String type) {
+    switch (type) {
+      case StoryTransition.slide:
+        return Icons.swap_horiz;
+      case StoryTransition.pop:
+        return Icons.open_in_full;
+      default:
+        return Icons.blur_on;
+    }
+  }
+
+  List<Widget> _seamSlots() {
+    final seams = _characterSeams();
+    return [
+      for (var i = 0; i < seams.length; i++)
+        _buildSeamSlot(seams[i], _transitionIndexForSeam(i, seams)),
+    ];
+  }
+
+  int _transitionIndexForSeam(int seamIndex, List<double> seams) {
+    var best = -1;
+    var bestDist = double.infinity;
+    for (var i = 0; i < _transitions.length; i++) {
+      if (_seamIndexForTime(_transitions[i].time, seams) != seamIndex) continue;
+      final dist = (_transitions[i].time - seams[seamIndex]).abs();
+      if (dist >= bestDist) continue;
+      bestDist = dist;
+      best = i;
+    }
+    return best;
+  }
+
+  Widget _buildSeamSlot(double seam, int transitionIndex) {
+    final filled = transitionIndex >= 0;
+    final selected = filled && _selectedTransitionIndex == transitionIndex;
+    return Positioned(
+      left: seam * _pixelsPerSecond - 14,
+      top: 4,
+      width: 28,
+      height: _trackHeight - 8,
+      child: DragTarget<String>(
+        onWillAcceptWithDetails: (details) =>
+            StoryTransition.isDrag(details.data) && !filled,
+        onAcceptWithDetails: (details) {
+          final type = StoryTransition.typeOf(details.data);
+          if (type != null && !filled) _addTransitionAt(seam, type);
+        },
+        builder: (context, candidateData, rejectedData) {
+          final hot = candidateData.any((data) => data != null && StoryTransition.isDrag(data));
+          if (filled) {
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedTransitionIndex = transitionIndex;
+                  _selectedBlockIndex = null;
+                  _selectedMotionBlockIndex = null;
+                  _selectedHatBlockIndex = null;
+                  _selectedGlassesBlockIndex = null;
+                  _selectedMusclesBlockIndex = null;
+                  _selectedJumpBlockIndex = null;
+                });
+                _openEffectSheet(seam);
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : AppColors.secondary,
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                  border: Border.all(color: Colors.white, width: selected ? 2 : 1),
+                ),
+                child: Icon(
+                  _transitionIcon(_transitions[transitionIndex].type),
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+            );
+          }
+          return GestureDetector(
+            onTap: () => _openEffectSheet(seam),
+            child: Container(
+              decoration: BoxDecoration(
+                color: hot ? AppColors.primary.withValues(alpha: 0.35) : Colors.white,
+                borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                border: Border.all(
+                  color: hot ? AppColors.primary : AppColors.inputBorder,
+                  width: hot ? 2 : 1,
+                ),
+              ),
+              child: const Icon(Icons.add, size: 14, color: AppColors.secondary),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildPaletteItem(String key) {
     return Container(
       width: 60,
       decoration: BoxDecoration(
         color: CharacterHelper.getColor(key),
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
         border: Border.all(color: AppColors.inputBorder),
       ),
       child: Center(
@@ -1563,7 +2312,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       height: _paletteChipHeight,
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
         border: Border.all(
           color: isSelected ? Colors.deepOrange : AppColors.inputBorder,
           width: isSelected ? 2.5 : 1,
@@ -1584,11 +2333,11 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     
     return InkWell(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(AppColors.border_radius),
+      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
       child: Container(
        decoration: BoxDecoration(
          color: Colors.white,
-         borderRadius: BorderRadius.circular(AppColors.border_radius),
+         borderRadius: BorderRadius.circular(AppColors.timeline_radius),
          border: Border.all(color: AppColors.inputBorder),
        ),
         child: Padding(
@@ -1610,17 +2359,20 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     required GestureDragUpdateCallback onDrag,
   }) {
     return Positioned(
-      left: start ? -10 : null,
-      right: start ? null : -10,
+      left: start ? -14 : null,
+      right: start ? null : -14,
       top: 0,
       bottom: 0,
-      width: 20,
+      width: 28,
       child: GestureDetector(
+        onHorizontalDragStart: (_) => _armEdit(),
         onHorizontalDragUpdate: onDrag,
+        onHorizontalDragEnd: (_) => _finishEdit(),
+        onHorizontalDragCancel: _finishEdit,
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(AppColors.timeline_radius),
             border: Border.all(color: AppColors.inputBorder),
           ),
           child: const Icon(Icons.drag_indicator, size: 12, color: Colors.black),
@@ -1630,8 +2382,9 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   Widget _buildTimelineBlock(int index, StoryBlock block) {
-    final left = block.startTime * _pixelsPerSecond;
-    final width = (block.endTime - block.startTime) * _pixelsPerSecond;
+    final frame = _characterFrame(index, block);
+    final left = frame.$1;
+    final width = frame.$2;
     final isSelected = _selectedBlockIndex == index;
 
     return Positioned(
@@ -1647,6 +2400,8 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             _selectedHatBlockIndex = null;
             _selectedGlassesBlockIndex = null;
             _selectedMusclesBlockIndex = null;
+            _selectedJumpBlockIndex = null;
+            _selectedTransitionIndex = null;
           });
         },
         child: Stack(
@@ -1654,13 +2409,16 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
           children: [
             // Main Body
             GestureDetector(
+              onHorizontalDragStart: (_) => _armEdit(),
               onHorizontalDragUpdate: (details) {
                 _moveBlock(index, details.delta.dx / _pixelsPerSecond);
               },
+              onHorizontalDragEnd: (_) => _finishEdit(),
+              onHorizontalDragCancel: _finishEdit,
               child: Container(
                 decoration: BoxDecoration(
                   color: CharacterHelper.getColor(block.characterId).withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                   border: Border.all(
                     color: AppColors.inputBorder,
                     width: isSelected ? 2 : 1,
@@ -1712,6 +2470,8 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             _selectedHatBlockIndex = null;
             _selectedGlassesBlockIndex = null;
             _selectedMusclesBlockIndex = null;
+            _selectedJumpBlockIndex = null;
+            _selectedTransitionIndex = null;
           });
         },
         child: Stack(
@@ -1719,13 +2479,16 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
           children: [
             // Main Body
             GestureDetector(
+              onHorizontalDragStart: (_) => _armEdit(),
               onHorizontalDragUpdate: (details) {
                 _moveMotionBlock(index, details.delta.dx / _pixelsPerSecond);
               },
+              onHorizontalDragEnd: (_) => _finishEdit(),
+              onHorizontalDragCancel: _finishEdit,
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.teal.shade300,
-                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                   border: Border.all(
                     color: AppColors.inputBorder,
                     width: isSelected ? 2 : 1,
@@ -1778,19 +2541,24 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             _selectedMotionBlockIndex = null;
             _selectedGlassesBlockIndex = null;
             _selectedMusclesBlockIndex = null;
+            _selectedJumpBlockIndex = null;
+            _selectedTransitionIndex = null;
           });
         },
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             GestureDetector(
+              onHorizontalDragStart: (_) => _armEdit(),
               onHorizontalDragUpdate: (details) {
                 _moveHatBlock(index, details.delta.dx / _pixelsPerSecond);
               },
+              onHorizontalDragEnd: (_) => _finishEdit(),
+              onHorizontalDragCancel: _finishEdit,
               child: Container(
                 decoration: BoxDecoration(
                   color: block.color,
-                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                   border: Border.all(
                     color: AppColors.inputBorder,
                     width: isSelected ? 2 : 1,
@@ -1841,7 +2609,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       height: _paletteChipHeight,
       decoration: BoxDecoration(
         color: selected ? Colors.black87 : const Color(0xFF2C2C2E),
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
         border: Border.all(color: selected ? Colors.black : Colors.black26, width: selected ? 2 : 1),
       ),
       child: const Center(
@@ -1870,19 +2638,24 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             _selectedMotionBlockIndex = null;
             _selectedHatBlockIndex = null;
             _selectedMusclesBlockIndex = null;
+            _selectedJumpBlockIndex = null;
+            _selectedTransitionIndex = null;
           });
         },
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             GestureDetector(
+              onHorizontalDragStart: (_) => _armEdit(),
               onHorizontalDragUpdate: (details) {
                 _moveGlassesBlock(index, details.delta.dx / _pixelsPerSecond);
               },
+              onHorizontalDragEnd: (_) => _finishEdit(),
+              onHorizontalDragCancel: _finishEdit,
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFF2C2C2E),
-                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                   border: Border.all(
                     color: AppColors.inputBorder,
                     width: isSelected ? 2 : 1,
@@ -1919,7 +2692,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       height: _paletteChipHeight,
       decoration: BoxDecoration(
         color: selected ? const Color(0xFF145C38) : const Color(0xFF1B7A4E),
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
         border: Border.all(color: selected ? Colors.black : Colors.black26, width: selected ? 2 : 1),
       ),
       child: const Center(
@@ -1948,19 +2721,24 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             _selectedMotionBlockIndex = null;
             _selectedHatBlockIndex = null;
             _selectedGlassesBlockIndex = null;
+            _selectedJumpBlockIndex = null;
+            _selectedTransitionIndex = null;
           });
         },
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             GestureDetector(
+              onHorizontalDragStart: (_) => _armEdit(),
               onHorizontalDragUpdate: (details) {
                 _moveMusclesBlock(index, details.delta.dx / _pixelsPerSecond);
               },
+              onHorizontalDragEnd: (_) => _finishEdit(),
+              onHorizontalDragCancel: _finishEdit,
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFF1B7A4E),
-                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                   border: Border.all(
                     color: AppColors.inputBorder,
                     width: isSelected ? 2 : 1,
@@ -1987,6 +2765,272 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  void _addJumpBlockAtTime(double timeInSeconds) {
+    final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
+    if (totalSeconds == 0) return;
+    if (timeInSeconds < 0) timeInSeconds = 0;
+    double end = timeInSeconds + 1.2;
+    if (end > totalSeconds) end = totalSeconds;
+    final updated = <StoryJumpBlock>[];
+    for (final block in _jumpBlocks) {
+      if (block.endTime <= timeInSeconds || block.startTime >= end) {
+        updated.add(block);
+      } else if (block.startTime < timeInSeconds && block.endTime > end) {
+        updated.add(StoryJumpBlock(startTime: block.startTime, endTime: timeInSeconds));
+        updated.add(StoryJumpBlock(startTime: end, endTime: block.endTime));
+      } else if (block.startTime < timeInSeconds && block.endTime <= end) {
+        updated.add(StoryJumpBlock(startTime: block.startTime, endTime: timeInSeconds));
+      } else if (block.startTime >= timeInSeconds && block.endTime > end) {
+        updated.add(StoryJumpBlock(startTime: end, endTime: block.endTime));
+      }
+    }
+    updated.add(StoryJumpBlock(startTime: timeInSeconds, endTime: end));
+    _armEdit();
+    setState(() {
+      _jumpBlocks = updated;
+      _selectedJumpBlockIndex = _jumpBlocks.indexWhere((block) => block.startTime == timeInSeconds);
+      _selectedBlockIndex = null;
+      _selectedMotionBlockIndex = null;
+      _selectedHatBlockIndex = null;
+      _selectedGlassesBlockIndex = null;
+      _selectedMusclesBlockIndex = null;
+      _selectedTransitionIndex = null;
+    });
+    _notifyChanged();
+    _finishEdit();
+  }
+
+  void _moveJumpBlock(int index, double deltaSeconds) {
+    if (!_picked(index, _jumpBlocks.length)) return;
+    final block = _jumpBlocks[index];
+    final duration = block.endTime - block.startTime;
+    var newStart = block.startTime + deltaSeconds;
+    if (newStart < 0) newStart = 0;
+    final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
+    if (newStart + duration > totalSeconds) newStart = totalSeconds - duration;
+    if (index > 0 && newStart < _jumpBlocks[index - 1].endTime) {
+      newStart = _jumpBlocks[index - 1].endTime;
+    }
+    if (index < _jumpBlocks.length - 1 && (newStart + duration) > _jumpBlocks[index + 1].startTime) {
+      newStart = _jumpBlocks[index + 1].startTime - duration;
+    }
+    setState(() {
+      _jumpBlocks[index] = StoryJumpBlock(startTime: newStart, endTime: newStart + duration);
+    });
+    _notifyChanged();
+  }
+
+  void _updateJumpBlockStart(int index, double deltaSeconds) {
+    if (!_picked(index, _jumpBlocks.length)) return;
+    final block = _jumpBlocks[index];
+    var newStart = block.startTime + deltaSeconds;
+    if (newStart < 0) newStart = 0;
+    if (newStart > block.endTime - 0.4) newStart = block.endTime - 0.4;
+    if (index > 0 && newStart < _jumpBlocks[index - 1].endTime) {
+      newStart = _jumpBlocks[index - 1].endTime;
+    }
+    setState(() {
+      _jumpBlocks[index] = StoryJumpBlock(startTime: newStart, endTime: block.endTime);
+    });
+    _notifyChanged();
+  }
+
+  void _updateJumpBlockEnd(int index, double deltaSeconds) {
+    if (!_picked(index, _jumpBlocks.length)) return;
+    final block = _jumpBlocks[index];
+    var newEnd = block.endTime + deltaSeconds;
+    final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
+    if (newEnd > totalSeconds) newEnd = totalSeconds;
+    if (newEnd < block.startTime + 0.4) newEnd = block.startTime + 0.4;
+    if (index < _jumpBlocks.length - 1 && newEnd > _jumpBlocks[index + 1].startTime) {
+      newEnd = _jumpBlocks[index + 1].startTime;
+    }
+    setState(() {
+      _jumpBlocks[index] = StoryJumpBlock(startTime: block.startTime, endTime: newEnd);
+    });
+    _notifyChanged();
+  }
+
+  Widget _buildJumpBlockWidget(int index, StoryJumpBlock block) {
+    final left = block.startTime * _pixelsPerSecond;
+    final width = (block.endTime - block.startTime) * _pixelsPerSecond;
+    final isSelected = _selectedJumpBlockIndex == index;
+    return Positioned(
+      left: left,
+      top: _laneBlockTop(isSelected),
+      width: width,
+      height: _laneBlockHeight(isSelected),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedJumpBlockIndex = index;
+            _selectedBlockIndex = null;
+            _selectedMotionBlockIndex = null;
+            _selectedHatBlockIndex = null;
+            _selectedGlassesBlockIndex = null;
+            _selectedMusclesBlockIndex = null;
+            _selectedTransitionIndex = null;
+          });
+        },
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            GestureDetector(
+              onHorizontalDragStart: (_) => _armEdit(),
+              onHorizontalDragUpdate: (details) {
+                _moveJumpBlock(index, details.delta.dx / _pixelsPerSecond);
+              },
+              onHorizontalDragEnd: (_) => _finishEdit(),
+              onHorizontalDragCancel: _finishEdit,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                  border: Border.all(
+                    color: AppColors.inputBorder,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: const Center(
+                  child: Text(
+                    'نطة',
+                    style: TextStyle(color: AppColors.onPrimary, fontSize: 12, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+            if (isSelected) ...[
+              _edgeHandle(
+                start: true,
+                onDrag: (details) => _updateJumpBlockStart(index, details.delta.dx / _pixelsPerSecond),
+              ),
+              _edgeHandle(
+                start: false,
+                onDrag: (details) => _updateJumpBlockEnd(index, details.delta.dx / _pixelsPerSecond),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineHistory {
+  final List<StoryBlock> blocks;
+  final List<StoryMotionBlock> motionBlocks;
+  final List<StoryHatBlock> hatBlocks;
+  final List<StoryGlassesBlock> glassesBlocks;
+  final List<StoryMusclesBlock> musclesBlocks;
+  final List<StoryJumpBlock> jumpBlocks;
+  final List<StoryTransition> transitions;
+
+  const _TimelineHistory({
+    required this.blocks,
+    required this.motionBlocks,
+    required this.hatBlocks,
+    required this.glassesBlocks,
+    required this.musclesBlocks,
+    required this.jumpBlocks,
+    required this.transitions,
+  });
+
+  factory _TimelineHistory.capture(_StoryTimelineEditorState state) {
+    return _TimelineHistory(
+      blocks: List<StoryBlock>.of(state._blocks),
+      motionBlocks: List<StoryMotionBlock>.of(state._motionBlocks),
+      hatBlocks: List<StoryHatBlock>.of(state._hatBlocks),
+      glassesBlocks: List<StoryGlassesBlock>.of(state._glassesBlocks),
+      musclesBlocks: List<StoryMusclesBlock>.of(state._musclesBlocks),
+      jumpBlocks: List<StoryJumpBlock>.of(state._jumpBlocks),
+      transitions: List<StoryTransition>.of(state._transitions),
+    );
+  }
+}
+
+class _EffectSheet extends StatefulWidget {
+  final String initial;
+  final ValueChanged<String> onAdd;
+
+  const _EffectSheet({required this.initial, required this.onAdd});
+
+  @override
+  State<_EffectSheet> createState() => _EffectSheetState();
+}
+
+class _EffectSheetState extends State<_EffectSheet> {
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initial;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'التأثيرات',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.secondary, fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          for (final type in StoryTransition.types)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: _selected == type ? AppColors.secondary : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                  side: const BorderSide(color: AppColors.inputBorder),
+                ),
+                child: InkWell(
+                  onTap: () => setState(() => _selected = type),
+                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                  child: SizedBox(
+                    height: 44,
+                    child: Center(
+                      child: Text(
+                        StoryTransition.label(type),
+                        style: TextStyle(
+                          color: _selected == type ? Colors.white : AppColors.secondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          const Spacer(),
+          Material(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+            child: InkWell(
+              onTap: () => widget.onAdd(_selected),
+              borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+              child: const SizedBox(
+                height: 46,
+                child: Center(
+                  child: Text(
+                    'إضافة',
+                    style: TextStyle(color: AppColors.onPrimary, fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2098,7 +3142,7 @@ class _PaletteLaneState extends State<_PaletteLane> {
                           height: 12,
                           decoration: BoxDecoration(
                             color: AppColors.background,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                             border: Border.all(color: AppColors.inputBorder),
                           ),
                           child: Align(
@@ -2108,7 +3152,7 @@ class _PaletteLaneState extends State<_PaletteLane> {
                               height: 8,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                 border: Border.all(color: const Color(0xFF94A3B8)),
                               ),
                               child: const Icon(Icons.drag_handle, size: 12, color: Color(0xFF94A3B8)),

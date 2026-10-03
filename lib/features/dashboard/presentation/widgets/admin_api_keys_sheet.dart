@@ -27,13 +27,14 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
   ElevenCredit? _credit;
   var _model = AdminApiKeys.defaultGeminiModel;
   var _saved = false;
+  var _cloudFailed = false;
   var _loading = true;
 
   @override
   void initState() {
     super.initState();
     _model = AdminApiKeys.geminiModel;
-    _loadCredit();
+    _load();
   }
 
   @override
@@ -41,6 +42,13 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
     _gemini.dispose();
     _eleven.dispose();
     super.dispose();
+  }
+
+  Future<void> _load() async {
+    await AdminApiKeys.sync();
+    if (!mounted) return;
+    setState(() => _model = AdminApiKeys.geminiModel);
+    await _loadCredit();
   }
 
   Future<void> _loadCredit() async {
@@ -57,9 +65,11 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
     final eleven = _eleven.text.trim();
     if (gemini.isNotEmpty) await AdminApiKeys.saveGemini(gemini);
     if (eleven.isNotEmpty) await AdminApiKeys.saveEleven(eleven);
+    final savedOnAccount = await AdminApiKeys.push();
     if (!mounted) return;
     setState(() {
-      _saved = true;
+      _saved = savedOnAccount;
+      _cloudFailed = !savedOnAccount;
       _loading = true;
     });
     _gemini.clear();
@@ -135,6 +145,9 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
                 if (value == null) return;
                 setState(() => _model = value);
                 await AdminApiKeys.saveGeminiModel(value);
+                final savedOnAccount = await AdminApiKeys.push();
+                if (!mounted) return;
+                setState(() => _cloudFailed = !savedOnAccount);
               },
             ),
             const SizedBox(height: 12),
@@ -146,7 +159,7 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
                 helperText: geminiOut
                     ? 'خلص رصيد Gemini'
                     : AdminApiKeys.hasGemini
-                        ? 'في مفتاح محفوظ'
+                        ? 'محفوظ على الحساب'
                         : 'يستخدم المفتاح الأصلي',
                 helperStyle: geminiOut ? const TextStyle(color: AppColors.error) : null,
               ),
@@ -169,10 +182,21 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
             if (_saved) ...[
               const SizedBox(height: 12),
               Text(
-                'تم الحفظ',
+                'تم الحفظ على الحساب',
                 textAlign: TextAlign.center,
                 style: textTheme.bodyMedium?.copyWith(
                   color: AppColors.tertiary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+            if (_cloudFailed) ...[
+              const SizedBox(height: 12),
+              Text(
+                'ما انحفظ على الحساب. شغّل ملف admin_settings من Supabase مرة واحدة.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.error,
                   fontWeight: FontWeight.bold,
                 ),
               ),

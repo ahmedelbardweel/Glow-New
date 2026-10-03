@@ -1,4 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../di/injection_container.dart';
 
 /// Keys the admin can replace from settings when a quota runs out.
 /// An empty value keeps the original key.
@@ -44,6 +47,47 @@ class AdminApiKeys {
   }
 
   static Future<void> saveEleven(String value) => _write(_eleven, value);
+
+  /// Pulls the shared admin keys. If the account has none yet, the keys on
+  /// this phone are uploaded so the next device can read them.
+  static Future<void> sync() async {
+    try {
+      final client = sl<SupabaseClient>();
+      if (client.auth.currentSession == null) return;
+      final row = await client
+          .from('admin_settings')
+          .select('gemini_key, eleven_key, gemini_model')
+          .eq('id', 'keys')
+          .maybeSingle();
+      final remoteGemini = '${row?['gemini_key'] ?? ''}'.trim();
+      final remoteEleven = '${row?['eleven_key'] ?? ''}'.trim();
+      if (row == null || (remoteGemini.isEmpty && remoteEleven.isEmpty)) {
+        if (gemini != null || eleven != null) await push();
+        return;
+      }
+      await saveGemini(remoteGemini);
+      await saveEleven(remoteEleven);
+      final remoteModel = '${row['gemini_model'] ?? ''}'.trim();
+      if (remoteModel.isNotEmpty) await saveGeminiModel(remoteModel);
+    } catch (_) {}
+  }
+
+  static Future<bool> push() async {
+    try {
+      final client = sl<SupabaseClient>();
+      if (client.auth.currentSession == null) return false;
+      await client.from('admin_settings').upsert({
+        'id': 'keys',
+        'gemini_key': gemini ?? '',
+        'eleven_key': eleven ?? '',
+        'gemini_model': geminiModel,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   static String? _read(String key) {
     final value = Hive.box('auth').get(key);

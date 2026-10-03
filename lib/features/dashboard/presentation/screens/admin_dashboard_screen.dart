@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -33,6 +35,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     super.initState();
     _contentBloc = sl<ContentBloc>();
     _contentBloc.add(const ContentEvent.getWorlds());
+    unawaited(AdminApiKeys.sync());
   }
 
   String _apiKeysSubtitle(ElevenCredit credit) {
@@ -66,6 +69,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               tooltip: 'الإعدادات',
               icon: const Icon(Icons.more_vert),
               onPressed: () async {
+                await AdminApiKeys.sync();
+                if (!context.mounted) return;
                 final credit = await ElevenCredit.load();
                 if (!context.mounted) return;
                 showStaffSettingsSheet(

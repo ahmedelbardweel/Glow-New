@@ -4,6 +4,16 @@ import 'package:three_js/three_js.dart' as three;
 /// Recolors only green skin in the supplied atlas. Geometry, source textures,
 /// normal/roughness maps and the animation mixer stay shared across identities.
 class CharacterSkinPalette {
+  CharacterSkinPalette({
+    this.referenceLuminance = 0.07652005545,
+    this.shadeContrast = 1,
+  });
+
+  /// Linear luminance of the atlas's original green, so recolors keep shading.
+  final double referenceLuminance;
+
+  /// Exponent on the baked texture shading; below 1 flattens baked lighting.
+  final double shadeContrast;
   final _target = three.Color(0xffffff);
   late final Map<String, dynamic> _colorUniform = {'value': _target};
   final Map<String, dynamic> _strengthUniform = {'value': 0.0};
@@ -102,7 +112,8 @@ float glowMuscleHeight(vec3 p, vec3 n) {
         return;
       }
       _materials.add(material);
-      material.customProgramCacheKey = () => 'glow-skin-palette-v8';
+      material.customProgramCacheKey = () =>
+          'glow-skin-palette-v8-$referenceLuminance-$shadeContrast';
       material.onBeforeCompile = (dynamic shader, dynamic renderer) {
         shader.uniforms ??= <String, dynamic>{};
         shader.uniforms['glowSkinTarget'] = _colorUniform;
@@ -117,24 +128,18 @@ uniform float glowMuscles;
 $_muscleGlsl
 ${shader.vertexShader}
 '''
-                .replaceFirst(
-                  '#include <beginnormal_vertex>',
-                  '''
+                .replaceFirst('#include <beginnormal_vertex>', '''
 #include <beginnormal_vertex>
 float glowHdx = glowMuscleHeight(position + vec3(0.004, 0.0, 0.0), normal) - glowMuscleHeight(position - vec3(0.004, 0.0, 0.0), normal);
 float glowHdy = glowMuscleHeight(position + vec3(0.0, 0.004, 0.0), normal) - glowMuscleHeight(position - vec3(0.0, 0.004, 0.0), normal);
 objectNormal = normalize(objectNormal - vec3(glowHdx, glowHdy, 0.0) * (36.0 * glowMuscles));
-''',
-                )
-                .replaceFirst(
-                  '#include <begin_vertex>',
-                  '''
+''')
+                .replaceFirst('#include <begin_vertex>', '''
 #include <begin_vertex>
 vGlowSkinRegion = _glow_skin_region;
 vGlowMuscle = glowMuscleDraw(position, normal);
 transformed += normal * glowMuscleHeight(position, normal) * glowMuscles;
-''',
-                );
+''');
         shader.fragmentShader =
             '''
 uniform vec3 glowSkinTarget;
@@ -151,9 +156,10 @@ ${shader.fragmentShader}
     / max(diffuseColor.g, 0.0001);
   float skinMask = smoothstep(0.20, 0.45, greenDominance)
     * clamp(vGlowSkinRegion, 0.0, 1.0) * glowSkinStrength;
-  // Preserve texture luminance and all subsequent PBR lighting. The reference
-  // is the linear luminance of the saved green identity (#22592A).
-  float textureShade = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / 0.07652005545;
+  // Preserve texture luminance and all subsequent PBR lighting.
+  float textureShade = pow(
+    max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / $referenceLuminance, 0.0),
+    ${shadeContrast.toStringAsFixed(3)});
   diffuseColor.rgb = mix(diffuseColor.rgb, glowSkinTarget * textureShade, skinMask);
   float muscleOn = glowMuscles;
   diffuseColor.rgb *= mix(1.0, 0.62, clamp(vGlowMuscle.x, 0.0, 1.0) * muscleOn);

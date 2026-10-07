@@ -24,8 +24,9 @@ class _AdminApiKeysSheet extends StatefulWidget {
 class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
   final _gemini = TextEditingController();
   final _eleven = TextEditingController();
+  final _groq = TextEditingController();
   ElevenCredit? _credit;
-  var _model = AdminApiKeys.defaultGeminiModel;
+  var _model = AdminApiKeys.defaultMontageModel;
   var _saved = false;
   var _cloudFailed = false;
   var _loading = true;
@@ -33,7 +34,7 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
   @override
   void initState() {
     super.initState();
-    _model = AdminApiKeys.geminiModel;
+    _model = AdminApiKeys.montageChoice.id;
     _load();
   }
 
@@ -41,13 +42,14 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
   void dispose() {
     _gemini.dispose();
     _eleven.dispose();
+    _groq.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     await AdminApiKeys.sync();
     if (!mounted) return;
-    setState(() => _model = AdminApiKeys.geminiModel);
+    setState(() => _model = AdminApiKeys.montageChoice.id);
     await _loadCredit();
   }
 
@@ -63,8 +65,10 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
   Future<void> _save() async {
     final gemini = _gemini.text.trim();
     final eleven = _eleven.text.trim();
+    final groq = _groq.text.trim();
     if (gemini.isNotEmpty) await AdminApiKeys.saveGemini(gemini);
     if (eleven.isNotEmpty) await AdminApiKeys.saveEleven(eleven);
+    if (groq.isNotEmpty) await AdminApiKeys.saveGroq(groq);
     final savedOnAccount = await AdminApiKeys.push();
     if (!mounted) return;
     setState(() {
@@ -74,6 +78,7 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
     });
     _gemini.clear();
     _eleven.clear();
+    _groq.clear();
     await _loadCredit();
   }
 
@@ -83,7 +88,7 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
     final credit = _credit;
     final geminiOut = AdminApiKeys.geminiExhausted;
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -109,7 +114,7 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
             ),
             const SizedBox(height: 8),
             Text(
-              'لما يخلص رصيد Gemini أو Eleven، الصق المفتاح الجديد هنا. اترك الخانة فارغة إذا ما بدك تغيّرها.',
+              'اختَر موديل المونتاج والصق المفتاح. الحفظ ينزل على حساب الأدمن، فيشوفه كل الأدمن.',
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(color: AppColors.secondary),
             ),
@@ -132,10 +137,10 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
               value: _model,
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'موديل Gemini',
+                labelText: 'موديل المونتاج',
               ),
               items: [
-                for (final model in geminiModelChoices)
+                for (final model in montageModelChoices)
                   DropdownMenuItem(
                     value: model.id,
                     child: Text(model.label),
@@ -144,7 +149,7 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
               onChanged: (value) async {
                 if (value == null) return;
                 setState(() => _model = value);
-                await AdminApiKeys.saveGeminiModel(value);
+                await AdminApiKeys.saveMontageModel(value);
                 final savedOnAccount = await AdminApiKeys.push();
                 if (!mounted) return;
                 setState(() => _cloudFailed = !savedOnAccount);
@@ -162,6 +167,15 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
                         ? 'محفوظ على الحساب'
                         : 'يستخدم المفتاح الأصلي',
                 helperStyle: geminiOut ? const TextStyle(color: AppColors.error) : null,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _groq,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'مفتاح Groq',
+                helperText: AdminApiKeys.hasGroq ? 'محفوظ على الحساب' : 'لازم لموديلات Groq',
               ),
             ),
             const SizedBox(height: 12),
@@ -201,7 +215,7 @@ class _AdminApiKeysSheetState extends State<_AdminApiKeysSheet> {
                 ),
               ),
             ],
-            const Spacer(),
+            const SizedBox(height: 20),
             FilledButton(
               onPressed: _loading
                   ? null

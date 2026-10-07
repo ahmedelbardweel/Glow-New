@@ -12,13 +12,30 @@ class AdminPhraseVoice {
 
   static const _bucket = 'story_audio';
 
+  /// 64-bit FNV-1a in two 32-bit halves so web (JS numbers) and native agree.
+  /// The output keeps the native signed-int hex format of stored file names.
   static String fileId(String text) {
-    var hash = 0xcbf29ce484222325;
+    const word = 0x100000000;
+    var hi = 0xcbf29ce4;
+    var lo = 0x84222325;
     for (final unit in text.trim().codeUnits) {
-      hash ^= unit;
-      hash = (hash * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
+      lo ^= unit;
+      final low = lo * 0x1b3;
+      final carry = low ~/ word;
+      hi = (hi * 0x1b3 + carry + lo * 0x100) % word;
+      lo = low % word;
     }
-    return hash.toRadixString(16).padLeft(16, '0');
+    var sign = '';
+    if (hi >= 0x80000000) {
+      sign = '-';
+      final borrow = lo == 0 ? 1 : 0;
+      lo = (word - lo) % word;
+      hi = (word - 1 - hi + borrow) % word;
+    }
+    final digits = hi == 0
+        ? lo.toRadixString(16)
+        : hi.toRadixString(16) + lo.toRadixString(16).padLeft(8, '0');
+    return '$sign$digits'.padLeft(16, '0');
   }
 
   static String urlFor(String text) {

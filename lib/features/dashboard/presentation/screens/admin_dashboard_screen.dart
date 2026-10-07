@@ -46,7 +46,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       parts.add('Eleven ${credit.label}');
     }
     if (AdminApiKeys.geminiExhausted) parts.add('Gemini خلص الرصيد');
-    if (parts.isEmpty) return 'غيّر مفتاح Gemini أو Eleven لما يخلص الرصيد';
+    parts.insert(0, AdminApiKeys.montageChoice.label);
+    if (parts.length == 1) return 'المونتاج: ${AdminApiKeys.montageChoice.label}';
     return parts.join(' · ');
   }
 

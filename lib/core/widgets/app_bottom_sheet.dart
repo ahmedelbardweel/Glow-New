@@ -54,17 +54,30 @@ Future<T?> showAppSheet<T>({
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
-      final inset = avoidKeyboard ? media.viewInsets.bottom : 0.0;
-      final height = math.max(160.0, media.size.height * heightFactor - inset);
+      final keyboard = avoidKeyboard ? media.viewInsets.bottom : 0.0;
+      final available = math.max(
+        220.0,
+        media.size.height - keyboard - media.padding.top - 12,
+      );
+      final height = math.min(media.size.height * heightFactor, available);
+      // The sheet itself sits on the keyboard. Children must not see the
+      // inset again, or a focused field scrolls a second time inside the sheet.
+      final frame = _SheetFrame(
+        height: height,
+        keyboardOpen: keyboard > 0,
+        onPop: () {
+          if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+        },
+        child: builder(sheetContext),
+      );
       return Padding(
-        padding: EdgeInsets.only(bottom: inset),
-        child: _SheetFrame(
-          height: height,
-          onPop: () {
-            if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-          },
-          child: builder(sheetContext),
-        ),
+        padding: EdgeInsets.only(bottom: keyboard),
+        child: avoidKeyboard
+            ? MediaQuery(
+                data: media.copyWith(viewInsets: EdgeInsets.zero),
+                child: frame,
+              )
+            : frame,
       );
     },
   );
@@ -103,11 +116,13 @@ class SheetCloseButton extends StatelessWidget {
 class _SheetFrame extends StatefulWidget {
   const _SheetFrame({
     required this.height,
+    required this.keyboardOpen,
     required this.onPop,
     required this.child,
   });
 
   final double height;
+  final bool keyboardOpen;
   final VoidCallback onPop;
   final Widget child;
 
@@ -145,13 +160,17 @@ class _SheetFrameState extends State<_SheetFrame> {
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onVerticalDragUpdate: (details) {
-              if (_popped) return;
+              if (_popped || widget.keyboardOpen) return;
               final next = _drag + details.delta.dy;
               if (next < 0) return;
               setState(() => _drag = next);
             },
             onVerticalDragEnd: (details) {
               if (_popped) return;
+              if (widget.keyboardOpen) {
+                setState(() => _drag = 0);
+                return;
+              }
               final velocity = details.primaryVelocity ?? 0;
               if (_drag > 72 || velocity > 700) {
                 _pop();
@@ -167,9 +186,9 @@ class _SheetFrameState extends State<_SheetFrame> {
               offset: Offset(0, _drag),
               child: Material(
                 color: AppColors.background,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(AppColors.border_radius),
-                ),
+                elevation: 8,
+                shadowColor: const Color(0x33001946),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
                   children: [

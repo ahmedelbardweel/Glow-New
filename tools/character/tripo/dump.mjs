@@ -1,0 +1,20 @@
+import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { dequantize } from '@gltf-transform/functions';
+import { MeshoptDecoder } from 'meshoptimizer';
+import fs from 'node:fs';
+
+await MeshoptDecoder.ready;
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
+const doc = await io.read(process.argv[2]);
+await doc.transform(dequantize());
+const prim = doc.getRoot().listMeshes()[0].listPrimitives()[0];
+fs.writeFileSync('uv.bin', Buffer.from(new Float32Array(prim.getAttribute('TEXCOORD_0').getArray()).buffer));
+fs.writeFileSync('nrm.bin', Buffer.from(new Float32Array(prim.getAttribute('NORMAL').getArray()).buffer));
+const mat = prim.getMaterial();
+const save = (tex, name) => tex && fs.writeFileSync(name, tex.getImage());
+save(mat.getBaseColorTexture(), 'color.jpg');
+save(mat.getMetallicRoughnessTexture(), 'orm.jpg');
+save(mat.getNormalTexture(), 'normal.png');
+console.log('material', mat.getName(), mat.getBaseColorFactor(), mat.getMetallicFactor(), mat.getRoughnessFactor(), 'occlusion', !!mat.getOcclusionTexture());
+console.log('DUMP_DONE');

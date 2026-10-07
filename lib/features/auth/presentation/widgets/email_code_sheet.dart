@@ -32,9 +32,10 @@ Future<void> confirmCreatedEmail(BuildContext context, String email) async {
 }
 
 Future<bool> showEmailCodeSheet(BuildContext context, {required String email}) {
+  FocusManager.instance.primaryFocus?.unfocus();
   return showAppSheet<bool>(
     context: context,
-    heightFactor: 0.46,
+    heightFactor: 0.52,
     avoidKeyboard: true,
     builder: (sheetContext) => _EmailCodeForm(
       email: email,
@@ -120,53 +121,62 @@ class _EmailCodeFormState extends State<_EmailCodeForm> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 48, 10, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'رمز التحقق',
-              textAlign: TextAlign.center,
-              style: textTheme.titleLarge?.copyWith(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w900,
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 44, 16, bottom > 0 ? bottom : 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'رمز التحقق',
+                    textAlign: TextAlign.center,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'أرسلنا رمزاً من 8 أرقام إلى\n${widget.email}',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodyMedium?.copyWith(color: AppColors.secondary),
+                  ),
+                  const SizedBox(height: 20),
+                  _CodeBoxes(
+                    controller: _code,
+                    length: _length,
+                    enabled: !_busy && !_sending,
+                    hasError: _error != null,
+                    onCompleted: _verify,
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(color: AppColors.burgundy),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'أرسلنا رمزاً من 8 أرقام إلى\n${widget.email}',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyMedium?.copyWith(color: AppColors.secondary),
-            ),
-            const SizedBox(height: 16),
-            _CodeBoxes(
-              controller: _code,
-              length: _length,
-              enabled: !_busy && !_sending,
-              hasError: _error != null,
-              onCompleted: _verify,
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium?.copyWith(color: AppColors.burgundy),
-              ),
-            ],
-            const Spacer(),
-            FilledButton(
-              onPressed: _busy || _sending ? null : _verify,
-              child: Text(_busy ? 'جارٍ التحقق' : 'تأكيد'),
-            ),
-            TextButton(
-              onPressed: _busy || _sending ? null : _send,
-              child: Text(_sending ? 'جارٍ الإرسال' : 'إعادة إرسال الرمز'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _busy || _sending ? null : _verify,
+            child: Text(_busy ? 'جارٍ التحقق' : 'تأكيد'),
+          ),
+          TextButton(
+            onPressed: _busy || _sending ? null : _send,
+            child: Text(_sending ? 'جارٍ الإرسال' : 'إعادة إرسال الرمز'),
+          ),
+        ],
       ),
     );
   }
@@ -193,11 +203,38 @@ class _CodeBoxes extends StatefulWidget {
 
 class _CodeBoxesState extends State<_CodeBoxes> {
   final _focus = FocusNode();
+  var _sheetSettled = false;
+  Animation<double>? _sheetAnimation;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onCode);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _waitForSheet());
+  }
+
+  void _waitForSheet() {
+    if (!mounted) return;
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.status == AnimationStatus.completed) {
+      _sheetSettled = true;
+      _tryFocus();
+      return;
+    }
+    _sheetAnimation = animation;
+    animation.addStatusListener(_onSheetStatus);
+  }
+
+  void _onSheetStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _sheetAnimation?.removeStatusListener(_onSheetStatus);
+    _sheetSettled = true;
+    _tryFocus();
+  }
+
+  void _tryFocus() {
+    if (!_sheetSettled || !mounted || !widget.enabled || _focus.hasFocus) return;
+    _focus.requestFocus();
   }
 
   @override
@@ -207,13 +244,12 @@ class _CodeBoxesState extends State<_CodeBoxes> {
       oldWidget.controller.removeListener(_onCode);
       widget.controller.addListener(_onCode);
     }
-    if (!oldWidget.enabled && widget.enabled) {
-      _focus.requestFocus();
-    }
+    if (!oldWidget.enabled && widget.enabled) _tryFocus();
   }
 
   @override
   void dispose() {
+    _sheetAnimation?.removeStatusListener(_onSheetStatus);
     widget.controller.removeListener(_onCode);
     _focus.dispose();
     super.dispose();
@@ -255,11 +291,14 @@ class _CodeBoxesState extends State<_CodeBoxes> {
                 controller: widget.controller,
                 focusNode: _focus,
                 enabled: widget.enabled,
-                autofocus: widget.enabled,
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
                 maxLength: widget.length,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                enableSuggestions: false,
+                autocorrect: false,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                scrollPadding: EdgeInsets.zero,
                 style: const TextStyle(color: Colors.transparent, fontSize: 1),
                 cursorColor: Colors.transparent,
                 showCursor: false,

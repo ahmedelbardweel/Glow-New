@@ -734,13 +734,13 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       case 'signed_out':
         return 'سجّل الدخول أولاً ثم أعد المحاولة';
       case 'missing_key':
-        return 'تعذر تجهيز المشهد الآن. حاول لاحقاً';
+        return 'حط مفتاح الموديل من إعدادات الأدمن';
       case 'empty_script':
         return 'اكتب نص المشهد أولاً';
       case 'jwt':
         return 'تعذر تجهيز المشهد. سجّل الدخول من جديد ثم أعد المحاولة';
       case 'quota':
-        return 'خلص رصيد Gemini. جدّد المفتاح من الإعدادات';
+        return 'خلص رصيد هذا الموديل. بدّله من إعدادات الأدمن';
       case 'gemini_failed':
       case 'bad_response':
       case 'timeout':
@@ -795,7 +795,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                const Text('جيمني يستبدل الحركة والنطة والقبعة والنظارة والعضلات والتأثير. بلوكات الشخصيات تبقى.'),
+                const Text('الذكاء يقرأ معنى الكلمات ويستبدل الحركة والنطة والقبعة والنظارة والعضلات والتأثير. بلوكات الشخصيات تبقى.'),
                 const Spacer(),
                 FilledButton(
                   onPressed: () => Navigator.of(sheetContext).pop(true),
@@ -842,7 +842,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         totalDuration: timeline.totalDuration,
       );
       if (apply.placed == 0) {
-        _montageSnack('جيمني ما لقى كلمة تستاهل حركة');
+        _montageSnack('ما لقى كلمة معناها يستاهل حركة');
         return;
       }
       setState(() {
@@ -851,8 +851,8 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       });
       _montageSnack(
         apply.missed == 0
-            ? 'جيمني حط الحركة على الكلمات'
-            : 'جيمني حط الحركة، وترك ${apply.missed} كلمة ما لقاها في النص',
+            ? 'حط الحركة على معنى الكلمات'
+            : 'حط الحركة، وترك ${apply.missed} كلمة ما لقاها في النص',
       );
     } on MontageGeminiException catch (error) {
       if (!mounted) return;
@@ -890,7 +890,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
           actions: [
             if (_step == 1)
               IconButton(
-                tooltip: 'تحليل جيمني',
+                tooltip: 'تحليل المعنى',
                 onPressed: _montageBusy ? null : _analyzeMontage,
                 icon: const Icon(Icons.auto_awesome),
               ),

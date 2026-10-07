@@ -23,8 +23,13 @@ create table if not exists public.admin_settings (
   gemini_key text not null default '',
   eleven_key text not null default '',
   gemini_model text not null default 'gemini-3.8-flash',
+  groq_key text not null default '',
+  montage_model text not null default 'groq:qwen/qwen3.8-27b',
   updated_at timestamptz not null default now()
 );
+
+alter table public.admin_settings add column if not exists groq_key text not null default '';
+alter table public.admin_settings add column if not exists montage_model text not null default 'groq:qwen/qwen3.8-27b';
 
 alter table public.admin_settings enable row level security;
 

@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../animation/story_motion.dart';
 import '../utils/character_helper.dart';
+import '../utils/character_poses.dart';
 import 'smart_character_viewer.dart';
+
+enum _StudioMode { rigged, poses, legacy }
 
 /// A backend-independent workbench for the same character used by stories.
 class CharacterStudioScreen extends StatefulWidget {
@@ -39,6 +42,11 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   var _showGlasses = true;
   var _showMuscles = true;
   var _hatColor = const Color(0xFF2C2C2E);
+  var _mode = _StudioMode.rigged;
+  var _pose = CharacterPoses.all.first;
+
+  bool get _posesMode => _mode == _StudioMode.poses;
+  bool get _rigged => _mode == _StudioMode.rigged;
 
   static const _hatColors = <Color>[
     Color(0xFF2C2C2E),
@@ -222,29 +230,44 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 hatColor: _hatColor,
                 showMuscles: _showMuscles,
                 showGlasses: _showGlasses,
+                pose: _posesMode ? _pose.id : null,
+                rigged: _rigged,
               ),
               PositionedDirectional(
                 top: 18,
                 start: 18,
                 child: _badge(
                   icon: Icons.view_in_ar_outlined,
-                  label:
+                  label: switch (_mode) {
+                    _StudioMode.poses =>
+                      'الوضعيات · ${CharacterPoses.all.length} وضعية',
+                    _StudioMode.rigged =>
+                      'الشخصية الجديدة · ${CharacterMotion.values.length} حركات',
+                    _StudioMode.legacy =>
                       'مجسم واحد · ${CharacterMotion.values.length} حركات وتعبيرات',
+                  },
                 ),
               ),
               PositionedDirectional(
                 top: 18,
                 end: 18,
-                child: ValueListenableBuilder<Duration>(
-                  valueListenable: _position,
-                  builder: (context, position, child) => _badge(
-                    icon: _playing ? Icons.play_arrow_rounded : Icons.pause,
-                    label: _playing
-                        ? (_selectedMotion ?? _plan.motionAt(position))
-                              .arabicLabel
-                        : 'متوقف',
-                  ),
-                ),
+                child: _posesMode
+                    ? _badge(
+                        icon: Icons.accessibility_new_rounded,
+                        label: _pose.label,
+                      )
+                    : ValueListenableBuilder<Duration>(
+                        valueListenable: _position,
+                        builder: (context, position, child) => _badge(
+                          icon: _playing
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause,
+                          label: _playing
+                              ? (_selectedMotion ?? _plan.motionAt(position))
+                                    .arabicLabel
+                              : 'متوقف',
+                        ),
+                      ),
               ),
               const PositionedDirectional(
                 bottom: 18,
@@ -266,9 +289,81 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        _playbackPanel(),
+        if (!_posesMode) ...[const SizedBox(height: 14), _playbackPanel()],
       ],
+    );
+  }
+
+  Widget _modeSwitch() {
+    return SegmentedButton<_StudioMode>(
+      segments: const [
+        ButtonSegment(
+          value: _StudioMode.rigged,
+          icon: Icon(Icons.auto_awesome_rounded, size: 18),
+          label: Text('الجديدة'),
+        ),
+        ButtonSegment(
+          value: _StudioMode.poses,
+          icon: Icon(Icons.accessibility_new_rounded, size: 18),
+          label: Text('الوضعيات'),
+        ),
+        ButtonSegment(
+          value: _StudioMode.legacy,
+          icon: Icon(Icons.animation_rounded, size: 18),
+          label: Text('القديمة'),
+        ),
+      ],
+      selected: {_mode},
+      showSelectedIcon: false,
+      onSelectionChanged: (value) => setState(() => _mode = value.first),
+      style: SegmentedButton.styleFrom(
+        selectedBackgroundColor: _ink,
+        selectedForegroundColor: Colors.white,
+        foregroundColor: _ink,
+        side: const BorderSide(color: Color(0xFFDBE5DD)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+      ),
+    );
+  }
+
+  Widget _poseGrid() {
+    return LayoutBuilder(
+      builder: (context, constraints) => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: CharacterPoses.all.map((pose) {
+          final selected = _pose.id == pose.id;
+          return SizedBox(
+            width: (constraints.maxWidth - 16) / 3,
+            child: Material(
+              color: selected ? _ink : const Color(0xFFF3F6F3),
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setState(() => _pose = pose),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 13,
+                    horizontal: 6,
+                  ),
+                  child: Text(
+                    pose.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: selected ? Colors.white : _ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -385,6 +480,8 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _modeSwitch(),
+              const SizedBox(height: 22),
               _sectionTitle('لون الشخصية', Icons.palette_outlined),
               const SizedBox(height: 16),
               Row(
@@ -433,227 +530,249 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 22),
-              _sectionTitle('الحركة والتعبير', Icons.accessibility_new_rounded),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => setState(() => _selectedMotion = null),
-                  icon: Icon(
-                    _selectedMotion == null
-                        ? Icons.check_circle_rounded
-                        : Icons.auto_stories_outlined,
-                    size: 18,
-                  ),
-                  label: const Text('تلقائي حسب القصة'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _accent,
-                    backgroundColor: _selectedMotion == null
-                        ? const Color(0xFFEAF3EC)
-                        : Colors.white,
-                    side: BorderSide(
-                      color: _selectedMotion == null
-                          ? _accent
-                          : const Color(0xFFDBE5DD),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(13),
-                  ),
+              if (_posesMode) ...[
+                const SizedBox(height: 22),
+                _sectionTitle('الوضعيات', Icons.accessibility_new_rounded),
+                const SizedBox(height: 12),
+                _poseGrid(),
+              ] else ...[
+                const SizedBox(height: 22),
+                _sectionTitle(
+                  'الحركة والتعبير',
+                  Icons.accessibility_new_rounded,
                 ),
-              ),
-              const SizedBox(height: 10),
-              LayoutBuilder(
-                builder: (context, constraints) => Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: CharacterMotion.values.map((motion) {
-                    final selected = _selectedMotion == motion;
-                    return SizedBox(
-                      width: (constraints.maxWidth - 24) / 4,
-                      child: Material(
-                        color: selected ? _ink : const Color(0xFFF3F6F3),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => setState(() => _selectedMotion = null),
+                    icon: Icon(
+                      _selectedMotion == null
+                          ? Icons.check_circle_rounded
+                          : Icons.auto_stories_outlined,
+                      size: 18,
+                    ),
+                    label: const Text('تلقائي حسب القصة'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _accent,
+                      backgroundColor: _selectedMotion == null
+                          ? const Color(0xFFEAF3EC)
+                          : Colors.white,
+                      side: BorderSide(
+                        color: _selectedMotion == null
+                            ? _accent
+                            : const Color(0xFFDBE5DD),
+                      ),
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
+                      ),
+                      padding: const EdgeInsets.all(13),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                LayoutBuilder(
+                  builder: (context, constraints) => Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: CharacterMotion.values.map((motion) {
+                      final selected = _selectedMotion == motion;
+                      return SizedBox(
+                        width: (constraints.maxWidth - 24) / 4,
+                        child: Material(
+                          color: selected ? _ink : const Color(0xFFF3F6F3),
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => setState(() => _selectedMotion = motion),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  _motionIcon(motion),
-                                  size: 21,
-                                  color: selected ? Colors.white : _muted,
-                                ),
-                                const SizedBox(height: 7),
-                                Text(
-                                  motion.arabicLabel,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: selected ? Colors.white : _ink,
-                                    fontWeight: FontWeight.w600,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () =>
+                                setState(() => _selectedMotion = motion),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    _motionIcon(motion),
+                                    size: 21,
+                                    color: selected ? Colors.white : _muted,
                                   ),
+                                  const SizedBox(height: 7),
+                                  Text(
+                                    motion.arabicLabel,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: selected ? Colors.white : _ink,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile.adaptive(
+                  value: _skeleton,
+                  onChanged: (value) => setState(() => _skeleton = value),
+                  contentPadding: EdgeInsets.zero,
+                  activeTrackColor: _accent,
+                  title: const Text(
+                    'إظهار العظام',
+                    style: TextStyle(color: _ink, fontSize: 13),
+                  ),
+                ),
+                if (!_rigged) ...[
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: _showMuscles,
+                    onChanged: (value) => setState(() => _showMuscles = value),
+                    contentPadding: EdgeInsets.zero,
+                    activeTrackColor: _accent,
+                    title: const Text(
+                      'عضلات البطن',
+                      style: TextStyle(color: _ink, fontSize: 13),
+                    ),
+                    subtitle: const Text(
+                      'صدر وبطن على الجسم، وتقدر تشيلها',
+                      style: TextStyle(color: _muted, fontSize: 11),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: _showGlasses,
+                    onChanged: (value) => setState(() => _showGlasses = value),
+                    contentPadding: EdgeInsets.zero,
+                    activeTrackColor: _accent,
+                    title: const Text(
+                      'النظارة',
+                      style: TextStyle(color: _ink, fontSize: 13),
+                    ),
+                    subtitle: const Text(
+                      'فوق العينين، وتقدر تشيلها',
+                      style: TextStyle(color: _muted, fontSize: 11),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: _showHat,
+                    onChanged: (value) => setState(() => _showHat = value),
+                    contentPadding: EdgeInsets.zero,
+                    activeTrackColor: _accent,
+                    title: const Text(
+                      'إظهار الطاقية',
+                      style: TextStyle(color: _ink, fontSize: 13),
+                    ),
+                    subtitle: const Text(
+                      'قبعة فيدورا مع أذنين',
+                      style: TextStyle(color: _muted, fontSize: 11),
+                    ),
+                  ),
+                  if (_showHat) ...[
+                    const SizedBox(height: 10),
+                    const Text(
+                      'لون الطاقية',
+                      style: TextStyle(color: _ink, fontSize: 13),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: _hatColors.map((color) {
+                        final selected =
+                            _hatColor.toARGB32() == color.toARGB32();
+                        return Semantics(
+                          button: true,
+                          selected: selected,
+                          label: 'لون الطاقية',
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(22),
+                            onTap: () => setState(() => _hatColor = color),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: selected
+                                      ? _ink
+                                      : const Color(0xFFD0D8D0),
+                                  width: selected ? 2.2 : 1,
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                value: _skeleton,
-                onChanged: (value) => setState(() => _skeleton = value),
-                contentPadding: EdgeInsets.zero,
-                activeTrackColor: _accent,
-                title: const Text(
-                  'إظهار العظام',
-                  style: TextStyle(color: _ink, fontSize: 13),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile.adaptive(
-                value: _showMuscles,
-                onChanged: (value) => setState(() => _showMuscles = value),
-                contentPadding: EdgeInsets.zero,
-                activeTrackColor: _accent,
-                title: const Text(
-                  'عضلات البطن',
-                  style: TextStyle(color: _ink, fontSize: 13),
-                ),
-                subtitle: const Text(
-                  'صدر وبطن على الجسم، وتقدر تشيلها',
-                  style: TextStyle(color: _muted, fontSize: 11),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile.adaptive(
-                value: _showGlasses,
-                onChanged: (value) => setState(() => _showGlasses = value),
-                contentPadding: EdgeInsets.zero,
-                activeTrackColor: _accent,
-                title: const Text(
-                  'النظارة',
-                  style: TextStyle(color: _ink, fontSize: 13),
-                ),
-                subtitle: const Text(
-                  'فوق العينين، وتقدر تشيلها',
-                  style: TextStyle(color: _muted, fontSize: 11),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile.adaptive(
-                value: _showHat,
-                onChanged: (value) => setState(() => _showHat = value),
-                contentPadding: EdgeInsets.zero,
-                activeTrackColor: _accent,
-                title: const Text(
-                  'إظهار الطاقية',
-                  style: TextStyle(color: _ink, fontSize: 13),
-                ),
-                subtitle: const Text(
-                  'قبعة فيدورا مع أذنين',
-                  style: TextStyle(color: _muted, fontSize: 11),
-                ),
-              ),
-              if (_showHat) ...[
-                const SizedBox(height: 10),
-                const Text(
-                  'لون الطاقية',
-                  style: TextStyle(color: _ink, fontSize: 13),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: _hatColors.map((color) {
-                    final selected = _hatColor.toARGB32() == color.toARGB32();
-                    return Semantics(
-                      button: true,
-                      selected: selected,
-                      label: 'لون الطاقية',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: () => setState(() => _hatColor = color),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          height: 36,
-                          width: 36,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: selected ? _ink : const Color(0xFFD0D8D0),
-                              width: selected ? 2.2 : 1,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
               ],
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        _panel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _sectionTitle('جرّب حكايتك', Icons.edit_note_rounded),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _storyController,
-                minLines: 4,
-                maxLines: 7,
-                maxLength: 2000,
-                textDirection: TextDirection.rtl,
-                style: const TextStyle(color: _ink, fontSize: 13, height: 1.8),
-                decoration: InputDecoration(
-                  hintText: 'مرحبا! مشى صديقنا إلى الحديقة…',
-                  filled: true,
-                  fillColor: const Color(0xFFF5F7F3),
-                  contentPadding: const EdgeInsets.all(14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+        if (!_posesMode) ...[
+          const SizedBox(height: 16),
+          _panel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _sectionTitle('جرّب حكايتك', Icons.edit_note_rounded),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _storyController,
+                  minLines: 4,
+                  maxLines: 7,
+                  maxLength: 2000,
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 13,
+                    height: 1.8,
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _accent),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              FilledButton.icon(
-                onPressed: _applyStory,
-                icon: const Icon(Icons.auto_stories_outlined, size: 18),
-                label: const Text('تطبيق القصة'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _accent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  decoration: InputDecoration(
+                    hintText: 'مرحبا! مشى صديقنا إلى الحديقة…',
+                    filled: true,
+                    fillColor: const Color(0xFFF5F7F3),
+                    contentPadding: const EdgeInsets.all(14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: _accent),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'الحركات تتبع كلمات القصة بتوقيت تقريبي. '
-                'يمكنك اختيار الحركة يدويًا. حركة الفم للمعاينة '
-                'ولا تتزامن مع تسجيل صوتي.',
-                style: TextStyle(color: _muted, fontSize: 11, height: 1.7),
-              ),
-            ],
+                const SizedBox(height: 4),
+                FilledButton.icon(
+                  onPressed: _applyStory,
+                  icon: const Icon(Icons.auto_stories_outlined, size: 18),
+                  label: const Text('تطبيق القصة'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _accent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'الحركات تتبع كلمات القصة بتوقيت تقريبي. '
+                  'يمكنك اختيار الحركة يدويًا. حركة الفم للمعاينة '
+                  'ولا تتزامن مع تسجيل صوتي.',
+                  style: TextStyle(color: _muted, fontSize: 11, height: 1.7),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

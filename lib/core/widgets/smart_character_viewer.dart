@@ -9,6 +9,7 @@ import '../animation/character_eye_animation.dart';
 import '../animation/character_sleeve_morph.dart';
 import '../services/character_asset_cache.dart';
 import '../utils/character_helper.dart';
+import '../utils/character_poses.dart';
 import 'mobile_character_viewer.dart';
 
 /// One skinned GLB with reusable animations and five material colors.
@@ -29,9 +30,18 @@ class SmartCharacterViewer extends StatelessWidget {
     this.showMuscles = false,
     this.showGlasses = false,
     this.cameraFit = 1.10,
+    this.pose,
+    this.rigged = false,
     this.onReady,
   });
   final String characterName;
+
+  /// Shows one static pose of [CharacterPoses] instead of the animated mascot.
+  /// Web only: the pose model is served beside the web build.
+  final String? pose;
+
+  /// Shows the new rigged Glow ([CharacterRig]). Web only, like [pose].
+  final bool rigged;
   final String storyText;
   final bool isPlaying;
   final bool isSpeaking;
@@ -48,8 +58,14 @@ class SmartCharacterViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final source = CharacterHelper.getModelPath(characterName);
-    if (!kIsWeb &&
+    final source = pose != null
+        ? Uri.base.resolve(CharacterPoses.modelPath).toString()
+        : rigged
+        ? Uri.base.resolve(CharacterRig.modelPath).toString()
+        : CharacterHelper.getModelPath(characterName);
+    if (pose == null &&
+        !rigged &&
+        !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.android)) {
       return MobileCharacterViewer(
@@ -109,7 +125,19 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   late StoryMotionPlan _plan;
   final _actions = <String, three.AnimationAction>{};
   final _bones = <three.Object3D>[];
-  final _skinPalette = CharacterSkinPalette();
+  final _poseNodes = <String, three.Object3D>{};
+  late final _skinPalette = config.pose != null
+      ? CharacterSkinPalette(
+          referenceLuminance: CharacterPoses.skinLuminance,
+          shadeContrast: 0.55,
+        )
+      : config.rigged
+      ? CharacterSkinPalette(
+          referenceLuminance: CharacterRig.skinLuminance,
+          shadeContrast: 0.75,
+        )
+      : CharacterSkinPalette();
+  bool _paletteAttached = false;
   final _eyeAnimation = CharacterEyeAnimation();
   final _sleeveMorph = CharacterSleeveMorph();
   three.Object3D? _model;
@@ -156,7 +184,14 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     // the GLB and recreating the EGL context whenever the layout changes.
     final pixels =
         (widget.size.longestSide * MediaQuery.devicePixelRatioOf(context))
-            .clamp(512.0, _compatibilityMode ? 640.0 : 1280.0);
+            .clamp(
+              512.0,
+              _compatibilityMode
+                  ? 640.0
+                  : kIsWeb
+                  ? 3072.0
+                  : 1280.0,
+            );
     final view = _GuardedThreeJS(
       size: _canvasSize,
       canRender: _canRender,
@@ -250,11 +285,36 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       if (object is three.Bone) _bones.add(object);
       if (object is three.SkinnedMesh) object.frustumCulled = false;
     });
+    for (final pose in CharacterPoses.all) {
+      final node = _model!.getObjectByName(pose.nodeName);
+      if (node != null) _poseNodes[pose.id] = node;
+    }
     if (widget.source == CharacterHelper.sharedModelPath) {
       _skinPalette.attach(_model!);
       _eyeAnimation.attach(_model!);
       _sleeveMorph.attach(_model!);
+      _paletteAttached = true;
+    } else if (config.rigged) {
+      _skinPalette.attach(_model!);
+      _paletteAttached = true;
+    } else if (_poseNodes.isNotEmpty) {
+      _skinPalette.attach(_model!);
+      _paletteAttached = true;
+      _model!.traverse((object) {
+        final material = object is three.Mesh ? object.material : null;
+        if (material is! three.Material) return;
+        for (final texture in [
+          material.map,
+          material.normalMap,
+          material.roughnessMap,
+        ]) {
+          texture
+            ?..anisotropy = 8
+            ..needsUpdate = true;
+        }
+      });
     }
+    _applyPose();
     _recolor();
     _jaw = _model!.getObjectByName('Jaw');
     _mouth = _model!.getObjectByName('Mouth');
@@ -294,7 +354,34 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     // Keep the viewer free of app DI so the studio entrypoint stays light on
     // web. Remote story models go through CharacterAssetCache when bundled, or
     // the network loader when the URI is already absolute.
-    return loader.fromNetwork(uri).timeout(const Duration(seconds: 6));
+    return loader
+        .fromNetwork(uri)
+        .timeout(
+          Duration(seconds: config.pose != null || config.rigged ? 40 : 6),
+        );
+  }
+
+  void _applyPose() {
+    if (_poseNodes.isEmpty) return;
+    final selected = _poseNodes.containsKey(config.pose)
+        ? config.pose
+        : CharacterPoses.all.first.id;
+    _poseNodes.forEach((id, node) {
+      node.visible = id == selected;
+      node.scale.setValues(1, 1, 1);
+    });
+  }
+
+  /// Static poses get a slow, subtle breath so the stage never looks frozen.
+  void _breathe() {
+    final node = _poseNodes[config.pose] ?? _poseNodes.values.firstOrNull;
+    if (node == null) return;
+    final breath = math.sin(_elapsed * 2 * math.pi / 3.6);
+    node.scale.setValues(
+      1 - 0.004 * breath,
+      1 + 0.010 * breath,
+      1 - 0.004 * breath,
+    );
   }
 
   void _frameModel() {
@@ -358,13 +445,15 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 
   void _recolor() {
-    if (widget.source == CharacterHelper.sharedModelPath) {
-      final color = CharacterHelper.getColor(config.characterName);
+    final color = CharacterHelper.getColor(config.characterName);
+    if (_paletteAttached) {
       _skinPalette.setColor(
         color,
         originalGreen:
             CharacterHelper.getColorKey(config.characterName) == 'port',
       );
+    }
+    if (widget.source == CharacterHelper.sharedModelPath) {
       _model?.traverse((object) {
         final material = object.material;
         if (material?.name == 'BodyColor' || material?.name == 'BodyDetail') {
@@ -389,7 +478,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 
   void _applyMuscles() {
-    _skinPalette.setMuscles(config.showMuscles);
+    _skinPalette.setMuscles(
+      config.showMuscles && _poseNodes.isEmpty && !config.rigged,
+    );
     _model?.traverse((object) {
       if (object.material?.name != 'Muscles') return;
       object.visible = false;
@@ -515,6 +606,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       final motion = config.motion ?? _plan.motionAt(_position);
       _eyeAnimation.update(dt, motion);
       _applyTalkingMouth(motion);
+      _breathe();
     }
     _updateSkeleton();
   }
@@ -551,8 +643,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   void didUpdateWidget(covariant _CharacterSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     final old = oldWidget.configuration;
-    if (oldWidget.size != widget.size ||
-        old.cameraFit != config.cameraFit) {
+    if (oldWidget.size != widget.size || old.cameraFit != config.cameraFit) {
       _fitCamera();
     }
     if (old.characterName != config.characterName) {
@@ -571,6 +662,12 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     }
     if (old.showGlasses != config.showGlasses) {
       _applyGlasses();
+    }
+    if (old.pose != config.pose) {
+      _applyPose();
+      _fitCamera();
+      _orbit?.target.setValues(0, 1.78, 0);
+      _orbit?.update();
     }
     if (old.storyText != config.storyText) {
       _plan = StoryMotionPlan.fromText(config.storyText);
@@ -638,6 +735,8 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _view = null;
     _actions.clear();
     _bones.clear();
+    _poseNodes.clear();
+    _paletteAttached = false;
     _activeAction = null;
     _mixer = null;
     _model = null;
@@ -818,7 +917,8 @@ class _GlowingLoader extends StatefulWidget {
   State<_GlowingLoader> createState() => _GlowingLoaderState();
 }
 
-class _GlowingLoaderState extends State<_GlowingLoader> with SingleTickerProviderStateMixin {
+class _GlowingLoaderState extends State<_GlowingLoader>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override

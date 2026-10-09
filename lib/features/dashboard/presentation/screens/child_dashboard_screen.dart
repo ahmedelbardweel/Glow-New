@@ -45,6 +45,7 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
       ));
   String? _childId;
   late final SyncService _syncService;
+  var _spokeWorlds = false;
 
   @override
   void initState() {
@@ -359,6 +360,25 @@ class _ChildDashboardScreenState extends State<ChildDashboardScreen> {
                           await Future.delayed(
                             const Duration(milliseconds: 800),
                           );
+                        }
+
+                        if (!_spokeWorlds) {
+                          _spokeWorlds = true;
+                          final lines = <String>[
+                            'عوالم المغامرات',
+                            if (worlds.isEmpty)
+                              'لا توجد عوالم بعد'
+                            else
+                              for (final world in worlds) ...[
+                                world.title,
+                                if (world.description.trim().isNotEmpty)
+                                  world.description.trim(),
+                              ],
+                          ];
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            unawaited(ChildButtonVoice.speakLines(lines));
+                          });
                         }
 
                         if (worlds.isEmpty) {

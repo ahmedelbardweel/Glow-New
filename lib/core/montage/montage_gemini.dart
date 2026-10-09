@@ -32,6 +32,10 @@ class MontageGemini {
         await AdminApiKeys.markGeminiExhausted();
       }
       rethrow;
+    } on TimeoutException {
+      throw const MontageGeminiException('timeout');
+    } on http.ClientException {
+      throw const MontageGeminiException('request_failed', 'الاتصال انقطع قبل ما يوصل الرد.');
     }
   }
 
@@ -109,15 +113,15 @@ Future<Map<String, dynamic>> _planWithKey(
       throw const MontageGeminiException('quota');
     }
     if (response.statusCode == 404 || body.contains('not found') || body.contains('not_found')) {
-      throw const MontageGeminiException('unavailable');
+      throw MontageGeminiException('unavailable', 'رقم الرد ${response.statusCode}.');
     }
-    throw const MontageGeminiException('gemini_failed');
+    throw MontageGeminiException('gemini_failed', 'رقم الرد ${response.statusCode}.');
   }
   final payload = jsonDecode(response.body);
-  if (payload is! Map) throw const MontageGeminiException('bad_response');
+  if (payload is! Map) throw const MontageGeminiException('bad_response', 'الرد مش بالشكل المتوقع.');
   final candidates = payload['candidates'];
   if (candidates is! List || candidates.isEmpty) {
-    throw const MontageGeminiException('bad_response');
+    throw const MontageGeminiException('bad_response', 'الموديل ما رجّع نص.');
   }
   final content = candidates.first;
   final parts = content is Map ? content['content'] : null;
@@ -160,7 +164,7 @@ Future<Map<String, dynamic>> _planWithGroq(
     if (response.statusCode == 401 || body.contains('invalid_api_key')) {
       throw const MontageGeminiException('missing_key');
     }
-    throw const MontageGeminiException('gemini_failed');
+    throw MontageGeminiException('gemini_failed', 'رقم الرد ${response.statusCode}.');
   }
   final payload = jsonDecode(response.body);
   final choices = payload is Map ? payload['choices'] : null;
@@ -213,10 +217,12 @@ String _montagePrompt(List<Map<String, dynamic>> script) {
 Map<String, dynamic> _cuesFromText(String text) {
   final start = text.indexOf('{');
   final end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) throw const MontageGeminiException('bad_response');
+  if (start < 0 || end <= start) {
+    throw const MontageGeminiException('bad_response', 'الرد ما فيه بيانات حركات.');
+  }
   final parsed = jsonDecode(text.substring(start, end + 1));
   if (parsed is! Map || parsed['cues'] is! List) {
-    throw const MontageGeminiException('bad_response');
+    throw const MontageGeminiException('bad_response', 'الرد وصل بدون قائمة حركات.');
   }
   return {
     'cues': parsed['cues'],

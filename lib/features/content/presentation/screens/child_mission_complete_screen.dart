@@ -31,8 +31,9 @@ class _ChildMissionCompleteScreenState extends State<ChildMissionCompleteScreen>
 
   void _tap(String phrase, void Function(GoRouter router) navigate) {
     final router = GoRouter.of(context);
-    navigate(router);
-    unawaited(ChildButtonVoice.press(phrase, () async {}));
+    unawaited(ChildButtonVoice.press(phrase, () async {
+      navigate(router);
+    }));
   }
 
   @override

@@ -24,6 +24,10 @@ class CharacterHelper {
       'color': Color(0xFFAAD7E9), // Blue
       'model': 'glow_mascot.glb',
     },
+    'sort': {
+      'color': Color(0xFFE2B15A),
+      'model': 'glow_mascot.glb',
+    },
   };
 
   static String getCleanName(String rawName) {

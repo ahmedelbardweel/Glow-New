@@ -9,6 +9,8 @@ import '../../../../core/audio/child_button_clips.dart';
 import '../../../../core/audio/child_button_voice.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../content/data/datasources/content_local_data_source.dart';
+import '../../../content/data/models/story_model.dart';
 import '../../data/child_account_service.dart';
 import '../../data/datasources/auth_local_data_source.dart';
 import '../../data/parent_google_auth.dart';
@@ -24,6 +26,23 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   bool _showButton = false;
   final Completer<void> _logoDone = Completer<void>();
+  late final Future<void> _staticVoices;
+
+  static const _extraPhrases = <String>[
+    'عوالم المغامرات',
+    'لا توجد عوالم بعد',
+    'لا توجد مهام في هذا العالم بعد',
+    'أوسمتي المكتسبة',
+    'لم تحصل على أية أوسمة بعد. أكمل المهام لتبدأ بجمع الأوسمة',
+    'الإعدادات',
+    'تبديل الحساب',
+    'إنشاء حساب جديد',
+    'نقل الحساب بمساعدة ولي الأمر',
+    'ربط ولي الأمر',
+    'إضافة حساب من ولي الأمر',
+    'حساب جديد',
+    'لا توجد تحديات حالياً',
+  ];
 
   Future<void> _holdForLogo() async {
     await _logoDone.future;
@@ -34,6 +53,10 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     unawaited(ChildButtonVoice.warm());
+    _staticVoices = ChildButtonVoice.prepare([
+      ...childButtonClips.keys,
+      ..._extraPhrases,
+    ]);
     _checkAuthStatus();
   }
 
@@ -89,9 +112,9 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     if (cachedChild != null) {
-      unawaited(_syncChildIfNeeded(cachedChild.id));
+      await _syncChildIfNeeded(cachedChild.id);
       sl<SyncService>().prefetchCachedStoryAudio();
-      if (mounted) await _go('/child-dashboard');
+      if (mounted) await _enterChild('/child-dashboard');
       return;
     }
 
@@ -102,7 +125,7 @@ class _SplashScreenState extends State<SplashScreen> {
         await _syncChildIfNeeded(child.id);
         sl<SyncService>().prefetchCachedStoryAudio();
         if (mounted) {
-          _go('/child-dashboard');
+          await _enterChild('/child-dashboard');
           return;
         }
       }
@@ -121,9 +144,76 @@ class _SplashScreenState extends State<SplashScreen> {
     context.go(route);
   }
 
+  /// Child entry stays on the logo until Julia has saved every line.
+  Future<void> _enterChild(String route) async {
+    await Future.wait([
+      _holdForLogo(),
+      _prepareChildVoices(),
+    ]);
+    if (!mounted) return;
+    await _sayAppName();
+    if (!mounted) return;
+    context.go(route);
+  }
+
+  Future<void> _prepareChildVoices() async {
+    try {
+      await _staticVoices;
+      await ChildButtonVoice.prepare(await _contentPhrases());
+    } catch (_) {}
+  }
+
+  Future<List<String>> _contentPhrases() async {
+    final phrases = <String>[];
+    try {
+      final local = sl<ContentLocalDataSource>();
+      final worlds = await local.getCachedWorlds();
+      for (final world in worlds) {
+        phrases.add(world.title);
+        phrases.add(world.description);
+      }
+      final missions = await local.getAllCachedMissions();
+      for (final mission in missions) {
+        phrases.add(mission.title);
+        phrases.add(mission.badgeName);
+      }
+      final stories = await local.getAllCachedStories();
+      final byMission = <String, List<StoryModel>>{};
+      for (final story in stories) {
+        phrases.add(story.title);
+        byMission.putIfAbsent(story.missionId, () => []).add(story);
+      }
+      for (final group in byMission.values) {
+        group.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+        for (var i = 0; i < group.length; i++) {
+          phrases.add('مشهد ${i + 1} من ${group.length}');
+        }
+      }
+      for (final mission in missions) {
+        final questions = await local.getCachedQuestions(mission.id);
+        for (var i = 0; i < questions.length; i++) {
+          phrases.add('السؤال ${i + 1} من ${questions.length}');
+          phrases.add(questions[i].questionText);
+          phrases.addAll(questions[i].options);
+        }
+      }
+      final child = await sl<AuthLocalDataSource>().getLastChild();
+      if (child != null) {
+        final progress = await local.getCachedChildProgress(child.id);
+        for (final item in progress) {
+          phrases.add(item.badgeName ?? 'وسام الإنجاز');
+        }
+      }
+    } catch (_) {}
+    return phrases;
+  }
+
   void _revealStartButton() {
     unawaited(() async {
-      await _holdForLogo();
+      await Future.wait([
+        _holdForLogo(),
+        _staticVoices.then((_) {}, onError: (_, _) {}),
+      ]);
       if (!mounted) return;
       setState(() => _showButton = true);
       unawaited(_welcomeFirstVisit());
@@ -132,7 +222,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   /// Every splash says the app name from a bundled clip.
   Future<void> _sayAppName() async {
-    if (!childButtonClips.containsKey('Glow')) return;
     await ChildButtonVoice.warm();
     await ChildButtonVoice.playSequence(const ['Glow']);
   }
@@ -144,7 +233,6 @@ class _SplashScreenState extends State<SplashScreen> {
     final box = Hive.box('auth');
     final heard = box.get('SPLASH_WELCOME_HEARD') == true;
     final phrases = heard ? const ['Glow'] : first;
-    if (phrases.any((phrase) => !childButtonClips.containsKey(phrase))) return;
     if (!heard) await box.put('SPLASH_WELCOME_HEARD', true);
     await ChildButtonVoice.warm();
     await ChildButtonVoice.playSequence(phrases);

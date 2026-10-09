@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../audio/admin_phrase_voice.dart';
+import '../audio/story_sentence_voice.dart';
 
 /// A normal admin input with a voice button that speaks its text.
 class AdminVoiceField extends StatefulWidget {
@@ -47,11 +48,11 @@ class _AdminVoiceFieldState extends State<AdminVoiceField> {
       if (!mounted) return;
       setState(() => _busy = false);
       await AdminPhraseVoice.play(file);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر توليد صوت هذا الحقل. حاول مرة أخرى.')),
+        SnackBar(content: Text(StorySentenceVoice.explain(error))),
       );
     }
   }

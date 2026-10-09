@@ -30,6 +30,7 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
   late ContentBloc _contentBloc;
   int _currentQuestionIndex = 0;
   int? _selectedIndex;
+  var _voicedQuestion = -1;
 
   @override
   void initState() {
@@ -180,6 +181,17 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
 
                 final currentQ = questions[_currentQuestionIndex];
                 final options = currentQ.options;
+                if (_voicedQuestion != _currentQuestionIndex) {
+                  _voicedQuestion = _currentQuestionIndex;
+                  final lines = <String>[
+                    'السؤال ${_currentQuestionIndex + 1} من ${questions.length}',
+                    currentQ.questionText,
+                  ];
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    unawaited(ChildButtonVoice.speakLines(lines));
+                  });
+                }
                 final letters = ['A', 'B', 'C', 'D'];
                 
                 return Padding(

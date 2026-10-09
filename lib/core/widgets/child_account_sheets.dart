@@ -459,7 +459,9 @@ class _MenuTile extends StatelessWidget {
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
-          onTap();
+          ChildButtonVoice.press(title, () async {
+            onTap();
+          });
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -524,7 +526,9 @@ class _AccountTile extends StatelessWidget {
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
-          onTap();
+          ChildButtonVoice.press(account.name, () async {
+            onTap();
+          });
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -575,7 +579,11 @@ class _BurgundyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FilledButton(
-      onPressed: onPressed,
+      onPressed: () {
+        ChildButtonVoice.press(label, () async {
+          onPressed();
+        });
+      },
       style: FilledButton.styleFrom(
         backgroundColor: AppColors.burgundy,
         foregroundColor: AppColors.onError,

@@ -544,6 +544,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     setState(() {
       _currentIndex = 0;
     });
+    _speakScene();
     _startStory();
   }
 
@@ -556,6 +557,18 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     );
   }
 
+  void _speakScene() {
+    if (_stories.isEmpty) return;
+    final story = _stories[_currentIndex];
+    unawaited(
+      ChildButtonVoice.speakLines([
+        widget.mission.title,
+        'مشهد ${_currentIndex + 1} من ${_stories.length}',
+        if (story.title.trim().isNotEmpty) story.title.trim(),
+      ]),
+    );
+  }
+
   void _nextStory() {
     if (!mounted || _leaving) return;
     if (_currentIndex < _stories.length - 1) {
@@ -563,6 +576,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
         _currentIndex++;
       });
       _logStory(_stories[_currentIndex]);
+      _speakScene();
       _startStory();
     } else {
       // Finished all stories
@@ -577,6 +591,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       setState(() {
         _currentIndex--;
       });
+      _speakScene();
       _startStory();
     }
   }
@@ -643,6 +658,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                         _currentIndex = 0;
                       });
                       _logStory(stories.first);
+                      _speakScene();
                       _startStory();
                     }
                   },
@@ -974,7 +990,11 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                             color: AppColors.secondary,
                                             size: 28,
                                           ),
-                                          onPressed: _restartMission,
+                                          onPressed: () {
+                                            ChildButtonVoice.press('إعادة', () async {
+                                              _restartMission();
+                                            });
+                                          },
                                         ),
                                         const SizedBox(width: 24),
                                         // Play/Pause Button
@@ -990,7 +1010,17 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                             color: AppColors.secondary,
                                             size: 32,
                                           ),
-                                          onPressed: _togglePlayPause,
+                                          onPressed: () {
+                                            final playing = _audioPlayer != null && !_hasAudio
+                                                ? _playRequested
+                                                : _isPlaying;
+                                            ChildButtonVoice.press(
+                                              playing ? 'إيقاف' : 'تشغيل',
+                                              () async {
+                                                _togglePlayPause();
+                                              },
+                                            );
+                                          },
                                         ),
                                         const SizedBox(width: 24),
                                         // Mute Button
@@ -1004,7 +1034,14 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                               color: AppColors.secondary,
                                               size: 28,
                                             ),
-                                            onPressed: _toggleMute,
+                                            onPressed: () {
+                                              ChildButtonVoice.press(
+                                                _isMuted ? 'تشغيل الصوت' : 'كتم الصوت',
+                                                () async {
+                                                  _toggleMute();
+                                                },
+                                              );
+                                            },
                                           )
                                         else
                                           const SizedBox(width: 44),
@@ -1022,7 +1059,15 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                       width: double.infinity,
                                       height: 56,
                                       child: FilledButton(
-                                        onPressed: _nextStory,
+                                        onPressed: () {
+                                          final last = _currentIndex >= _stories.length - 1;
+                                          ChildButtonVoice.press(
+                                            last ? 'إنهاء القصة والتحدي' : 'متابعة المشهد',
+                                            () async {
+                                              _nextStory();
+                                            },
+                                          );
+                                        },
                                         style: FilledButton.styleFrom(
                                           backgroundColor:
                                               CharacterHelper.getColor(

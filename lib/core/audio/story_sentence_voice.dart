@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -19,33 +20,12 @@ class StorySentenceVoice {
   static String get activeApiKey => _apiKey;
 
   static const _voices = <String, _Voice>{
-    'fort': _Voice('IKne3meq5aSn9XLyUdCD', pitch: 1.24),
-    'lort': _Voice('pFZP5JQG7iQjIQuC4Bku', pitch: 1.16),
-    'mort': _Voice('FGY2WhTYpPnrIDTdsKH5', pitch: 1.21),
-    'port': _Voice(
-      'Xb7hH8MSUJpSbSDYk0k2',
-      speed: 1.14,
-      stability: 0.50,
-      similarity: 0.84,
-      style: 0.73,
-      speakerBoost: true,
-    ),
-    'qort': _Voice(
-      'cgSgspJ2msm6clMCkdW9',
-      speed: 1.04,
-      stability: 0.60,
-      similarity: 0.96,
-      style: 0.63,
-      speakerBoost: true,
-    ),
-    'sort': _Voice(
-      'CBDgRB8OyxYGowoi5iXR',
-      speed: 0.87,
-      stability: 0.63,
-      similarity: 1.0,
-      style: 0.94,
-      speakerBoost: true,
-    ),
+    'fort': _Voice('ihKwLOjVUMG4lgUI6meZ'),
+    'mort': _Voice('Vnqlgu3fdiFwisAye1qH'),
+    'port': _Voice('4RloeZf2FRvGiu4uoKOf'),
+    'qort': _Voice('1kvnzrSTos1KbmLKMLCC'),
+    'sort': _Voice('hO2yZ8lxM3axUxL8OeKX'),
+    'lort': _Voice('hO2yZ8lxM3axUxL8OeKX'),
   };
 
   static const _sampleRate = 22050;
@@ -54,44 +34,64 @@ class StorySentenceVoice {
     required String characterId,
     required String text,
   }) {
-    return _render(_voices[characterId] ?? _voices['qort']!, text);
+    final voice = _voices[characterId];
+    if (voice == null) {
+      throw const StoryVoiceException('هالشخصية ما إلها نبرة محفوظة.');
+    }
+    return _render(voice, text);
   }
 
-  /// One soft child narrator for buttons and field speech.
+  /// Julia, the narrator for buttons and field speech. Pitch stays 1 so the
+  /// ElevenLabs voice is unchanged.
   static Future<({File file, double seconds})> speakNarrator(String text) {
-    return _render(const _Voice('pFZP5JQG7iQjIQuC4Bku', pitch: 1.24), text);
+    return _render(const _Voice('Bsa1HP3wF8JGRzGouFEa'), text);
+  }
+
+  static String explain(Object error) {
+    if (error is StoryVoiceException) return error.message;
+    if (error is TimeoutException) return 'Eleven تأخر بالرد أكثر من اللازم. حاول مرة ثانية.';
+    if (error is SocketException) return 'ما في نت، فما وصل الطلب لـ Eleven.';
+    if (error is HttpException) return 'الاتصال بـ Eleven انقطع قبل ما يوصل الصوت.';
+    return 'صار خطأ أثناء تجهيز الصوت. حاول مرة ثانية.';
   }
 
   static Future<({File file, double seconds})> _render(_Voice voice, String text) async {
-    final response = await http
-        .post(
-          Uri.parse(
-            'https://api.elevenlabs.io/v1/text-to-speech/${voice.id}?output_format=pcm_22050',
-          ),
-          headers: {
-            'xi-api-key': _apiKey,
-            'Content-Type': 'application/json',
-            'Accept': 'application/octet-stream',
-          },
-          body: jsonEncode({
-            'text': text,
-            'model_id': 'eleven_multilingual_v2',
-            'voice_settings': {
-              'stability': voice.stability,
-              'similarity_boost': voice.similarity,
-              'style': voice.style,
-              'use_speaker_boost': voice.speakerBoost,
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse(
+              'https://api.elevenlabs.io/v1/text-to-speech/${voice.id}?output_format=pcm_22050',
+            ),
+            headers: {
+              'xi-api-key': _apiKey,
+              'Content-Type': 'application/json',
+              'Accept': 'application/octet-stream',
             },
-            'speed': voice.speed,
-          }),
-        )
-        .timeout(const Duration(seconds: 30));
-
-    if (response.statusCode != 200 || response.bodyBytes.length < 256) {
-      throw Exception('تعذر توليد الصوت');
+            body: jsonEncode({
+              'text': text,
+              'model_id': 'eleven_multilingual_v2',
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      throw const StoryVoiceException('Eleven تأخر بالرد أكثر من اللازم. حاول مرة ثانية.');
+    } on SocketException {
+      throw const StoryVoiceException('ما في نت، فما وصل الطلب لـ Eleven.');
+    } on http.ClientException {
+      throw const StoryVoiceException('الاتصال بـ Eleven انقطع قبل ما يوصل الصوت.');
     }
 
-    final pcm = _childTone(response.bodyBytes, voice.pitch);
+    if (response.statusCode == 200 && response.bodyBytes.length < 256) {
+      throw const StoryVoiceException('Eleven رجّع صوت فاضي، فما في شي نسمعه.');
+    }
+    if (response.statusCode != 200) {
+      throw StoryVoiceException(await _failureMessage(response.statusCode, response.body));
+    }
+
+    final pcm = voice.pitch == 1
+        ? Uint8List.fromList(response.bodyBytes)
+        : _childTone(response.bodyBytes, voice.pitch);
     final dir = await getTemporaryDirectory();
     final file = File(
       '${dir.path}/glow_line_${DateTime.now().microsecondsSinceEpoch}.wav',
@@ -199,22 +199,163 @@ class StorySentenceVoice {
       ];
 }
 
+class StoryVoiceException implements Exception {
+  const StoryVoiceException(this.message);
+
+  final String message;
+}
+
+Future<String> _failureMessage(int httpStatus, String body) async {
+  final error = _elevenError(body);
+  final code = error.status.toLowerCase();
+  final message = error.message;
+  final lower = message.toLowerCase();
+
+  if (code == 'paid_plan_required' ||
+      code == 'payment_required' ||
+      lower.contains('free users') ||
+      lower.contains('library voice')) {
+    return 'المفتاح على الخطة المجانية. هالنبرات من مكتبة Eleven، والمجاني ما بيولّدها من التطبيق حتى لو العداد لسّا فيه حروف. الصق مفتاح من اشتراك مدفوع.';
+  }
+  if (code == 'invalid_api_key' || lower.contains('invalid api key') || (httpStatus == 401 && code.isEmpty && message.isEmpty)) {
+    return 'مفتاح Eleven مرفوض. بدّله من إعدادات الأدمن.';
+  }
+  if (code == 'voice_not_found' ||
+      (lower.contains('voice') && (lower.contains('not found') || lower.contains('not author') || lower.contains('unauthorized')))) {
+    return 'النبرة مش على حساب المفتاح المحفوظ. الصق مفتاح Eleven من نفس الحساب اللي فيه مورت وبورت وكورت وفورت وسورت.';
+  }
+  if (code == 'max_character_limit_exceeded') {
+    return 'الجملة أطول من المسموح بطلب واحد. قصّرها وحاول مرة ثانية.';
+  }
+  if (code == 'detected_unusual_activity') {
+    return 'Eleven أوقف الاستخدام مؤقتاً. الرصيد ما خلص.';
+  }
+  if (code.contains('paid_plan') || lower.contains('output format') || lower.contains('pcm_')) {
+    return 'صيغة الصوت مش مسموحة على هاد الاشتراك. الرصيد ما خلص.';
+  }
+  if (httpStatus == 429 || code == 'system_busy' || code.contains('concurrent')) {
+    return 'Eleven طلب انتظار لأن الطلبات كثيرة. الرصيد ما خلص. حاول بعد شوي.';
+  }
+  if (lower.contains('voice') && (lower.contains('not') || lower.contains('author'))) {
+    return 'النبرة مش على حساب المفتاح المحفوظ. الصق مفتاح Eleven من نفس الحساب اللي فيه مورت وبورت وكورت وفورت وسورت.';
+  }
+  if (httpStatus == 402 || code == 'quota_exceeded' || lower.contains('quota') || lower.contains('insufficient')) {
+    final remaining = await _characterRemaining();
+    if (remaining != null && remaining > 0) {
+      return 'الرصيد ما خلص. المتبقي ${_digits(remaining)} حرف، وEleven رفض التوليد مع هيك. ${_quotaWhy(message)}';
+    }
+    if (remaining != null) {
+      return 'الرصيد خلص فعلياً. المتبقي 0. بدّل المفتاح من إعدادات الأدمن.';
+    }
+    final why = _quotaWhy(message);
+    return why.isEmpty
+        ? 'Eleven قال إن الحصة ما بتكفي، وما قدرنا نقرأ عداد الرصيد.'
+        : 'Eleven قال إن الحصة ما بتكفي. $why';
+  }
+  if (httpStatus == 422) {
+    return message.isEmpty ? 'Eleven رفض النص. قصّر الجملة وحاول مرة ثانية.' : 'Eleven رفض النص. ${_short(message)}';
+  }
+  if (message.isEmpty) return 'Eleven ما رجّع صوت. رقم الرد $httpStatus.';
+  return 'Eleven رفض الصوت. رقم الرد $httpStatus. ${_short(message)}';
+}
+
+Future<int?> _characterRemaining() async {
+  try {
+    final response = await http
+        .get(
+          Uri.parse('https://api.elevenlabs.io/v1/user/subscription'),
+          headers: {'xi-api-key': StorySentenceVoice.activeApiKey},
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) return null;
+    final data = jsonDecode(response.body);
+    if (data is! Map) return null;
+    final used = (data['character_count'] as num?)?.toInt();
+    final limit = (data['character_limit'] as num?)?.toInt();
+    if (used == null || limit == null) return null;
+    return limit - used;
+  } catch (_) {
+    return null;
+  }
+}
+
+String _quotaWhy(String message) {
+  final lower = message.toLowerCase();
+  if (lower.contains('voice') && (lower.contains('not') || lower.contains('author'))) {
+    return 'النبرة مش على حساب المفتاح المحفوظ. الصق مفتاح Eleven من نفس الحساب اللي فيه مورت وبورت وكورت وفورت وسورت.';
+  }
+  if (lower.contains('model')) return 'موديل الصوت مش متاح على هاد الاشتراك.';
+  if (lower.contains('format') || lower.contains('pcm')) {
+    return 'صيغة ملف الصوت مش مسموحة على هاد الاشتراك.';
+  }
+  final needed = RegExp(
+    r'have\s+([\d,]+)\s+credits remaining.*?([\d,]+)\s+credits are required',
+    caseSensitive: false,
+  ).firstMatch(message);
+  if (needed != null) {
+    return 'الطلب طالب ${needed.group(2)} حرف، والعداد بيقول عندك ${needed.group(1)}.';
+  }
+  final clean = _short(message);
+  if (clean.isEmpty || clean.toLowerCase() == 'quota_exceeded') {
+    return 'الرفض مكتوب حصة، من غير سبب أوضح.';
+  }
+  return clean;
+}
+
+String _short(String text) {
+  final clean = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (clean.isEmpty) return '';
+  if (clean.length <= 160) return clean;
+  return '${clean.substring(0, 160)}…';
+}
+
+class _ElevenError {
+  const _ElevenError(this.status, this.message);
+
+  final String status;
+  final String message;
+}
+
+_ElevenError _elevenError(String body) {
+  try {
+    return _elevenErrorValue(jsonDecode(body));
+  } catch (_) {
+    return _ElevenError('', _short(body));
+  }
+}
+
+_ElevenError _elevenErrorValue(Object? value) {
+  if (value is List) {
+    final messages = value.map(_elevenErrorValue).map((error) => error.message).where((text) => text.isNotEmpty);
+    return _ElevenError('', messages.join(' '));
+  }
+  if (value is Map) {
+    final detail = value['detail'] ?? value['message'] ?? value['error'];
+    if (detail is Map) {
+      return _ElevenError(
+        '${detail['code'] ?? detail['status'] ?? ''}'.trim(),
+        '${detail['message'] ?? detail['msg'] ?? ''}'.trim(),
+      );
+    }
+    if (detail is List || detail is Map) return _elevenErrorValue(detail);
+    return _ElevenError('${value['status'] ?? value['code'] ?? ''}'.trim(), '$detail'.trim());
+  }
+  return _ElevenError('', '$value'.trim());
+}
+
+String _digits(int value) {
+  final text = value.abs().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < text.length; i++) {
+    if (i > 0 && (text.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(text[i]);
+  }
+  return value < 0 ? '-$buffer' : buffer.toString();
+}
+
 class _Voice {
-  const _Voice(
-    this.id, {
-    this.speed = 0.84,
-    this.stability = 0.8,
-    this.similarity = 0.62,
-    this.style = 0.0,
-    this.speakerBoost = false,
-    this.pitch = 1.0,
-  });
+  const _Voice(this.id, {this.pitch = 1.0});
 
   final String id;
-  final double speed;
-  final double stability;
-  final double similarity;
-  final double style;
-  final bool speakerBoost;
   final double pitch;
 }

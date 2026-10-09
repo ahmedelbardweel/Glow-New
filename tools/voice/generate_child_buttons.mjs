@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
 let key = process.env.ELEVENLABS_API_KEY;
@@ -73,9 +73,8 @@ function fileId(phrase) {
 }
 
 function pickVoice() {
-  // Lily: a soft young voice the free plan can synthesize.
-  const voiceId = 'pFZP5JQG7iQjIQuC4Bku';
-  console.log('voice Lily', voiceId);
+  const voiceId = 'Bsa1HP3wF8JGRzGouFEa';
+  console.log('voice Julia', voiceId);
   return voiceId;
 }
 
@@ -92,13 +91,6 @@ async function speak(voiceId, phrase) {
       body: JSON.stringify({
         text: phrase,
         model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.8,
-          similarity_boost: 0.62,
-          style: 0,
-          use_speaker_boost: false,
-        },
-        speed: 0.84,
       }),
     },
   );
@@ -136,15 +128,6 @@ await mkdir(outDir, { recursive: true });
 const clips = {};
 for (const phrase of unique) {
   const id = fileId(phrase);
-  const fileUrl = new URL(`${id}.mp3`, outDir);
-  try {
-    await access(fileUrl);
-    clips[phrase] = `voice/child/${id}.mp3`;
-    console.log('kept', id, phrase);
-    continue;
-  } catch {
-    // Generate only clips that are not already in the app.
-  }
   let bytes = null;
   for (let attempt = 1; attempt <= 4 && !bytes; attempt += 1) {
     bytes = await speak(voiceId, phrase);

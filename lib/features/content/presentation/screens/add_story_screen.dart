@@ -49,6 +49,7 @@ class _SentenceLine {
 
 const _sceneCharacters = <(String, String)>[
   ('fort', 'فورت'),
+  ('sort', 'سورت'),
   ('lort', 'لورت'),
   ('mort', 'مورت'),
   ('port', 'بورت'),
@@ -163,15 +164,15 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تعذر تحميل صوت القصة. ولّد الجمل من جديد.'),
+            content: Text('صوت القصة المحفوظ مش موجود على الجهاز. ولّد الجمل من جديد.'),
           ),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تعذر تحميل صوت القصة. ولّد الجمل من جديد.'),
+          SnackBar(
+            content: Text('ما قدرنا نفتح صوت القصة المحفوظ. ${StorySentenceVoice.explain(error)}'),
           ),
         );
       }
@@ -461,13 +462,13 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       }
       next.clear();
       await _playLines(_lines);
-    } catch (_) {
+    } catch (error) {
       for (final line in next) {
         line.dispose();
       }
       if (!mounted) return;
       setState(() => _scriptBusy = false);
-      _scriptError('تعذر توليد صوت الوصف. حاول مرة أخرى.');
+      _scriptError(StorySentenceVoice.explain(error));
     }
   }
 
@@ -518,11 +519,11 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         line.busy = false;
       });
       await _playLine(clip.file);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() => line.busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر توليد صوت هذه الجملة. حاول مرة أخرى.')),
+        SnackBar(content: Text(StorySentenceVoice.explain(error))),
       );
     }
   }
@@ -595,10 +596,12 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       await _initAudio(DeviceFileSource(merged.file.path));
       if (!mounted) return;
       setState(() => _step = 1);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تجهيز المشهد. حاول مرة أخرى.')),
+        SnackBar(
+          content: Text('ما قدرنا نجمع الجمل في مشهد. ${StorySentenceVoice.explain(error)}'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _joining = false);
@@ -729,25 +732,31 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     throw last ?? const MontageGeminiException('request_failed');
   }
 
-  String _montageMessage(String code) {
-    switch (code) {
-      case 'signed_out':
-        return 'سجّل الدخول أولاً ثم أعد المحاولة';
-      case 'missing_key':
-        return 'حط مفتاح الموديل من إعدادات الأدمن';
-      case 'empty_script':
-        return 'اكتب نص المشهد أولاً';
-      case 'jwt':
-        return 'تعذر تجهيز المشهد. سجّل الدخول من جديد ثم أعد المحاولة';
-      case 'quota':
-        return 'خلص رصيد هذا الموديل. بدّله من إعدادات الأدمن';
-      case 'gemini_failed':
-      case 'bad_response':
-      case 'timeout':
-      case 'request_failed':
-      default:
-        return 'المحاولة ما اكتملت. اضغط الأيقونة مرة ثانية';
-    }
+  String _montageMessage(MontageGeminiException error) {
+    final base = switch (error.code) {
+      'signed_out' => 'سجّل الدخول أولاً ثم أعد تحليل المونتاج.',
+      'missing_key' => 'مفتاح الموديل ناقص أو مرفوض. حطه من إعدادات الأدمن.',
+      'empty_script' => 'اكتب نص المشهد أولاً.',
+      'jwt' => 'جلسة الدخول انتهت. سجّل الدخول من جديد ثم أعد المحاولة.',
+      'quota' => 'خلص رصيد هذا الموديل. بدّله من إعدادات الأدمن.',
+      'unavailable' => 'الموديل المختار مش متاح. بدّله من إعدادات الأدمن.',
+      'timeout' => 'الموديل تأخر بالرد. اضغط الأيقونة مرة ثانية.',
+      'bad_response' => 'الموديل رد، بس الرد ما فيه حركات نقدر نستخدمها.',
+      'gemini_failed' => 'الموديل رفض الطلب.',
+      'request_failed' => 'الطلب ما وصل للموديل.',
+      _ => 'تحليل المونتاج وقف قبل ما يخلص.',
+    };
+    final detail = error.detail.trim();
+    if (detail.isEmpty) return base;
+    return '$base $detail';
+  }
+
+  String _plainProblem(Object error) {
+    if (error is TimeoutException) return 'الطلب تأخر أكثر من اللازم.';
+    if (error is SocketException) return 'ما في نت، فما وصل الطلب.';
+    if (error is FormatException) return 'الرد وصل بنص مش مفهوم.';
+    if (error is FileSystemException) return 'ما قدرنا نقرأ ملف الصوت من الجهاز.';
+    return 'صار خطأ غير متوقع.';
   }
 
   void _montageSnack(String text) {
@@ -858,10 +867,10 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       );
     } on MontageGeminiException catch (error) {
       if (!mounted) return;
-      _montageSnack(_montageMessage(error.code));
-    } catch (_) {
+      _montageSnack(_montageMessage(error));
+    } catch (error) {
       if (!mounted) return;
-      _montageSnack(_montageMessage('request_failed'));
+      _montageSnack('تحليل المونتاج وقف. ${_plainProblem(error)}');
     } finally {
       if (mounted) setState(() => _montageBusy = false);
     }
@@ -964,7 +973,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                             minLines: 4,
                                             maxLines: 8,
                                             decoration: const InputDecoration(
-                                              hintText: 'الوصف. كل جملة تنتهي بـ /لورت أو /بورت',
+                                              hintText: 'الوصف. كل جملة تنتهي بـ /سورت أو /بورت',
                                               alignLabelWithHint: true,
                                             ),
                                           ),

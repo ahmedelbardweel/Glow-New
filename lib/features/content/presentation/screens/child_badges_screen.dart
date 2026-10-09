@@ -21,6 +21,7 @@ class ChildBadgesScreen extends StatefulWidget {
 
 class _ChildBadgesScreenState extends State<ChildBadgesScreen> {
   late ContentBloc _contentBloc;
+  var _spokeBadges = false;
 
   @override
   void initState() {
@@ -90,6 +91,21 @@ class _ChildBadgesScreenState extends State<ChildBadgesScreen> {
                   loading: () => const ShimmerLoading(type: ShimmerType.grid),
                   error: (msg) => Center(child: Text(userMessage(msg), textAlign: TextAlign.center, style: const TextStyle(color: Colors.red))),
                   completedMissionsLoaded: (progressList) {
+                    if (!_spokeBadges) {
+                      _spokeBadges = true;
+                      final lines = <String>[
+                        'أوسمتي المكتسبة',
+                        if (progressList.isEmpty)
+                          'لم تحصل على أية أوسمة بعد. أكمل المهام لتبدأ بجمع الأوسمة'
+                        else
+                          for (final progress in progressList)
+                            progress.badgeName ?? 'وسام الإنجاز',
+                      ];
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        unawaited(ChildButtonVoice.speakLines(lines));
+                      });
+                    }
                     if (progressList.isEmpty) {
                       return Center(
                         child: Column(

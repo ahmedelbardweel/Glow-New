@@ -3,15 +3,13 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
-import '../di/injection_container.dart';
-import '../services/resource_manager.dart';
 import 'admin_phrase_voice.dart';
-import 'child_button_clips.dart';
 import 'story_sentence_voice.dart';
 
-/// Plays a clip bundled in the app, then runs the button action.
-/// Nothing is downloaded at runtime.
+/// Speaks a child button with Julia, then runs the action.
+/// The clip is saved on the device so the next tap does not ask again.
 class ChildButtonVoice {
   ChildButtonVoice._();
 
@@ -22,6 +20,7 @@ class ChildButtonVoice {
   static final speaking = ValueNotifier<bool>(false);
 
   static var _playId = 0;
+  static final _juliaJobs = <String, Future<File?>>{};
   static var _pressSerial = 0;
   static var _contextReady = false;
   static var _playerReady = false;
@@ -35,20 +34,13 @@ class ChildButtonVoice {
     bool single = false,
   }) async {
     final ticket = ++_pressSerial;
-    final gate = Completer<void>();
-    final cap = Timer(const Duration(seconds: 3), () {
-      if (!gate.isCompleted) gate.complete();
-    });
-    unawaited(() async {
-      try {
-        await _playLocal(phrase.trim());
-      } catch (_) {}
-      if (!gate.isCompleted) gate.complete();
-    }());
-    await gate.future;
-    cap.cancel();
+    final id = ++_playId;
+    final spoken = _speakOwned(id, phrase.trim());
+    await Future.any([
+      spoken,
+      Future<void>.delayed(const Duration(seconds: 8)),
+    ]);
     if (ticket != _pressSerial) return false;
-    ++_playId;
     try {
       await action();
     } catch (_) {}
@@ -78,24 +70,7 @@ class ChildButtonVoice {
       await _ensureContext();
       for (final phrase in lines) {
         if (id != _playId) return;
-        final local = _localSource(phrase);
-        if (local != null) {
-          await _playSource(
-            local,
-            id,
-            phrase,
-            maxWait: const Duration(seconds: 12),
-          );
-        } else {
-          final clip = await StorySentenceVoice.speakNarrator(phrase);
-          if (id != _playId) return;
-          await _playSource(
-            DeviceFileSource(clip.file.path),
-            id,
-            clip.file.path,
-            maxWait: Duration(milliseconds: (clip.seconds * 1000).ceil() + 250),
-          );
-        }
+        await _speakOwned(id, phrase, maxWait: const Duration(seconds: 12));
         if (id != _playId) return;
         await Future<void>.delayed(const Duration(milliseconds: 280));
       }
@@ -107,16 +82,17 @@ class ChildButtonVoice {
 
   static Future<void> playSequence(List<String> phrases) async {
     final id = ++_playId;
-    final sources = [
-      for (final phrase in phrases) _localSource(phrase.trim()),
-    ].whereType<Source>().toList();
-    if (sources.isEmpty) return;
+    final lines = [
+      for (final phrase in phrases)
+        if (phrase.trim().isNotEmpty) phrase.trim(),
+    ];
+    if (lines.isEmpty) return;
     speaking.value = true;
     try {
       await _ensureContext();
-      for (final source in sources) {
+      for (final phrase in lines) {
         if (id != _playId) return;
-        await _playSource(source, id, _sourceKey(source));
+        await _speakOwned(id, phrase);
         if (id != _playId) return;
         await Future<void>.delayed(const Duration(milliseconds: 320));
       }
@@ -124,6 +100,31 @@ class ChildButtonVoice {
     } finally {
       if (id == _playId) speaking.value = false;
     }
+  }
+
+  /// Saves Julia clips without playing them, so the splash can finish the
+  /// work before the child taps anything.
+  static Future<void> prepare(Iterable<String> phrases) async {
+    if (kIsWeb) return;
+    final pending = <String>[];
+    final seen = <String>{};
+    for (final raw in phrases) {
+      final phrase = raw.trim();
+      if (phrase.isEmpty || !seen.add(phrase)) continue;
+      pending.add(phrase);
+    }
+    if (pending.isEmpty) return;
+    var next = 0;
+    Future<void> worker() async {
+      while (true) {
+        if (next >= pending.length) return;
+        final phrase = pending[next];
+        next += 1;
+        await _juliaFile(phrase);
+      }
+    }
+
+    await Future.wait([for (var i = 0; i < 3; i++) worker()]);
   }
 
   /// Prepares the local player before the first tap so the story audio
@@ -164,15 +165,24 @@ class ChildButtonVoice {
 
   /// Plays a clip that is already on the device. A missing clip stays silent
   /// so a tap never waits on the network.
-  static Future<void> _playLocal(String phrase) async {
-    if (phrase.isEmpty) return;
-    final Source? source = _localSource(phrase);
-    if (source == null) return;
-    final id = ++_playId;
+  static Future<void> _speakOwned(
+    int id,
+    String phrase, {
+    Duration maxWait = const Duration(seconds: 8),
+  }) async {
+    if (phrase.isEmpty || id != _playId) return;
     speaking.value = true;
     try {
+      final file = await _juliaFile(phrase);
+      if (file == null || id != _playId) return;
       await _ensureContext();
-      await _playSource(source, id, phrase);
+      if (id != _playId) return;
+      await _playSource(
+        DeviceFileSource(file.path),
+        id,
+        phrase,
+        maxWait: maxWait,
+      );
     } catch (_) {
     } finally {
       if (id == _playId) speaking.value = false;
@@ -188,7 +198,7 @@ class ChildButtonVoice {
     Duration maxWait = const Duration(seconds: 4),
   }) async {
     if (id != _playId) return;
-    await _player.play(source).timeout(const Duration(seconds: 2));
+    await _player.play(source).timeout(const Duration(seconds: 8));
     if (id != _playId) return;
     var duration = _durations[cacheKey];
     if (duration == null) {
@@ -222,20 +232,34 @@ class ChildButtonVoice {
     }
   }
 
-  static String _sourceKey(Source source) {
-    if (source is AssetSource) return source.path;
-    if (source is DeviceFileSource) return source.path;
-    return source.toString();
+  /// Julia clip saved on the device. Old bundled clips and old cached phrases
+  /// are never played.
+  static Future<File?> _juliaFile(String phrase) async {
+    if (kIsWeb) return null;
+    final dir = await getApplicationDocumentsDirectory();
+    final folder = Directory('${dir.path}/julia_voice');
+    if (!folder.existsSync()) folder.createSync(recursive: true);
+    final file = File('${folder.path}/${AdminPhraseVoice.fileId(phrase)}.wav');
+    if (file.existsSync() && file.lengthSync() > 256) return file;
+    final pending = _juliaJobs[phrase];
+    if (pending != null) return pending;
+    final job = _renderJulia(phrase, file);
+    _juliaJobs[phrase] = job;
+    try {
+      return await job;
+    } finally {
+      _juliaJobs.remove(phrase);
+    }
   }
 
-  static Source? _localSource(String phrase) {
-    final asset = childButtonClips[phrase];
-    if (asset != null) return AssetSource(asset);
-    if (kIsWeb) return null;
-    final path = sl<ResourceManager>().getLocalFilePath(
-      AdminPhraseVoice.urlFor(phrase),
-    );
-    if (path == null || !File(path).existsSync()) return null;
-    return DeviceFileSource(path);
+  static Future<File?> _renderJulia(String phrase, File file) async {
+    try {
+      final clip = await StorySentenceVoice.speakNarrator(phrase);
+      await clip.file.copy(file.path);
+      return file;
+    } catch (_) {
+      if (file.existsSync()) file.deleteSync();
+      return null;
+    }
   }
 }

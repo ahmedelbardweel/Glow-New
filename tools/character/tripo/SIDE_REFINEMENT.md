@@ -19,7 +19,7 @@ Version 2 fixes the distal-arm leakage present in the first draft (version 1).
 ## Rebuild
 
 Use the unrefined original, SHA-256
-`d85aa0b2831105a718e4abdde4da7c1dfef4f83e0b4a92e29feF2bb01f3314c78`
+`d85aa0b2831105a718e4abdde4da7c1dfe4f83e0b4a92e29fef2bb01f3314c78`
 (case-insensitive). A local working copy is at
 `build/tripo/side_review/before.glb`. The original is also in Git at
 `c4058cf:web/character_rig/glow_rigged.glb`. Extract binary data with a

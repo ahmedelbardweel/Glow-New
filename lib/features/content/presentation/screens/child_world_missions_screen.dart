@@ -31,6 +31,7 @@ class ChildWorldMissionsScreen extends StatefulWidget {
 class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
   late ContentBloc _contentBloc;
   List<String> _completedMissionIds = [];
+  var _spokeMissions = false;
 
   @override
   void initState() {
@@ -123,6 +124,20 @@ class _ChildWorldMissionsScreenState extends State<ChildWorldMissionsScreen> {
                   loading: () => const ShimmerLoading(),
                   error: (msg) => Center(child: Text(userMessage(msg), textAlign: TextAlign.center, style: const TextStyle(color: Colors.red))),
                   missionsLoaded: (missions) {
+                    if (!_spokeMissions) {
+                      _spokeMissions = true;
+                      final lines = <String>[
+                        widget.world.title,
+                        if (missions.isEmpty)
+                          'لا توجد مهام في هذا العالم بعد'
+                        else
+                          for (final mission in missions) mission.title,
+                      ];
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        unawaited(ChildButtonVoice.speakLines(lines));
+                      });
+                    }
                     if (missions.isEmpty) {
                       return const Center(child: Text('لا توجد مهام في هذا العالم بعد.', style: TextStyle(fontSize: 14, color: Colors.grey)));
                     }

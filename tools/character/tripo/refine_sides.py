@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.sparse import coo_matrix
+from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation
 
 from validate_deformation import Rig
@@ -108,7 +109,14 @@ def normals(v, f):
     cross = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])
     for k in range(3):
         np.add.at(n, reverse[f[:, k]], cross)
-    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+    length = np.linalg.norm(n, axis=1)
+    valid = length > 1e-12
+    n[valid] /= length[valid, None]
+    # A few original vertices belong only to collapsed triangles. Give them
+    # the nearest valid surface normal rather than exporting a zero vector.
+    if not valid.all():
+        nearest = cKDTree(v[first][valid]).query(v[first][~valid])[1]
+        n[~valid] = n[valid][nearest]
     return n[reverse]
 
 
@@ -151,10 +159,25 @@ def main():
     joints = np.argsort(-dense, axis=1, kind='stable')[:, :4]
     weights = np.take_along_axis(dense, joints, axis=1)
     weights /= weights.sum(1, keepdims=True)
+    joints[weights == 0] = 0
     write(attr['POSITION'], sculpted)
     write(attr['NORMAL'], normals(sculpted, f))
     write(attr['JOINTS_0'], joints)
     write(attr['WEIGHTS_0'], weights)
+    # Retain accessory shading, repairing only zero normals inherited from
+    # collapsed source triangles (two each on the hat and glasses).
+    for mesh in g['meshes']:
+        for part in mesh['primitives']:
+            attrs = part['attributes']
+            if attrs['NORMAL'] == attr['NORMAL']:
+                continue
+            normal = rig.accessor(attrs['NORMAL']).copy()
+            valid = np.linalg.norm(normal, axis=1) > 1e-12
+            if not valid.all():
+                points = rig.accessor(attrs['POSITION'])
+                near = cKDTree(points[valid]).query(points[~valid])[1]
+                normal[~valid] = normal[valid][near]
+                write(attrs['NORMAL'], normal)
 
     # Two complete gentle waves in a 2s loop: position and velocity match.
     wave = lambda t, period, phase=0: np.sin(2 * np.pi * (t / period + phase))

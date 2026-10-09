@@ -67,7 +67,12 @@ jobs:
 
 
       - name: Build iOS (No Codesign)
-        run: flutter build ios --release --no-codesign
+        run: |
+          set -euo pipefail
+          # Xcode still asks for a Development Team when the identity is
+          # "iPhone Developer", even though this job does not sign the app.
+          perl -i -pe 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer";/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          flutter build ios --release --no-codesign
 
       - name: Create iOS Payload
         run: |

@@ -831,8 +831,6 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         plan = _montageCache!;
       } else {
         plan = await _loadMontagePlan(montageRequestSentences(sentences));
-        _montageCacheKey = key;
-        _montageCache = plan;
       }
       if (!mounted) return;
       final apply = placeMontage(
@@ -842,9 +840,13 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         totalDuration: timeline.totalDuration,
       );
       if (apply.placed == 0) {
+        _montageCacheKey = null;
+        _montageCache = null;
         _montageSnack('ما لقى كلمة معناها يستاهل حركة');
         return;
       }
+      _montageCacheKey = key;
+      _montageCache = plan;
       setState(() {
         _timeline = apply.timeline;
         _appliedMontage++;

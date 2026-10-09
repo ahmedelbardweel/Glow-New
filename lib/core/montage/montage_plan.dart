@@ -66,23 +66,30 @@ MontageApply placeMontage({
       final startWord = _asInt(raw['startWord']);
       final endWord = _asInt(raw['endWord']) ?? startWord;
       final quote = (raw['quote'] ?? '').toString();
-      final kind = (raw['kind'] ?? '').toString();
-      final value = (raw['value'] ?? '').toString();
-      if (sentence == null || sentence < 0 || sentence >= count) {
+      var kind = (raw['kind'] ?? '').toString();
+      var value = (raw['value'] ?? '').toString();
+      if (!_knownKind(kind) && _motions.contains(kind)) {
+        value = kind;
+        kind = 'motion';
+      }
+      final resolved = sentence != null && sentence >= 0 && sentence < count
+          ? sentence
+          : _sentenceOfQuote(sentences, count, quote);
+      if (resolved == null) {
         missed++;
         continue;
       }
-      final words = _words(sentences[sentence].text);
+      final words = _words(sentences[resolved].text);
       final range = _wordRange(words, quote, startWord, endWord);
       if (range == null) {
         missed++;
         continue;
       }
-      final block = characters[sentence];
+      final block = characters[resolved];
       final window = _timeWindow(
         blockStart: block.startTime,
         blockEnd: block.endTime,
-        textLength: sentences[sentence].text.length,
+        textLength: sentences[resolved].text.length,
         charStart: range.$1,
         charEnd: range.$2,
         minDuration: kind == 'jump' ? 0.7 : 0.55,
@@ -182,12 +189,25 @@ MontageApply placeMontage({
 
 List<Map<String, dynamic>> montageRequestSentences(List<MontageSentence> sentences) {
   return [
-    for (final sentence in sentences)
+    for (var i = 0; i < sentences.length; i++)
       {
-        'character': sentence.characterName,
-        'words': [for (final word in _words(sentence.text)) word.text],
+        'sentence': i,
+        'character': sentences[i].characterName,
+        'words': [for (final word in _words(sentences[i].text)) word.text],
       },
   ];
+}
+
+bool _knownKind(String kind) {
+  return kind == 'motion' || kind == 'jump' || kind == 'hat' || kind == 'glasses' || kind == 'muscles';
+}
+
+int? _sentenceOfQuote(List<MontageSentence> sentences, int count, String quote) {
+  if (quote.trim().isEmpty) return count == 1 ? 0 : null;
+  for (var i = 0; i < count; i++) {
+    if (_wordRange(_words(sentences[i].text), quote, null, null) != null) return i;
+  }
+  return null;
 }
 
 int? _asInt(Object? value) {

@@ -40,6 +40,14 @@ class AppTheme {
         onSurface: AppColors.onSurface,
       ),
       scaffoldBackgroundColor: AppColors.background,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: AppColors.background,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppColors.sheet_radius),
+          ),
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.onSurface,

@@ -14,6 +14,9 @@ class CharacterPose {
 class CharacterRig {
   static const modelPath = 'character_rig/glow_rigged.glb';
 
+  /// Bundled copy the phone player loads. The web studio uses [modelPath].
+  static const assetPath = 'assets/3d/glow_rigged.glb';
+
   /// Linear luminance of the baked atlas green, for [CharacterSkinPalette].
   static const skinLuminance = 0.106;
 }

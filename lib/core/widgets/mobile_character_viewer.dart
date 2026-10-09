@@ -34,10 +34,14 @@ class MobileCharacterViewer extends StatefulWidget {
     this.hatColor = const Color(0xFF2C2C2E),
     this.motion,
     this.playbackPosition,
+    this.modelAsset,
     this.onReady,
   });
 
   final String characterName, storyText;
+
+  /// Asset GLB to play instead of the shared mascot.
+  final String? modelAsset;
   final bool isPlaying, isSpeaking, interactive, showSkeleton;
   final bool showHat;
   final bool showMuscles;
@@ -111,6 +115,8 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
   }
 
   Future<Uint8List> _resolveModelBytes() async {
+    final rigged = widget.modelAsset;
+    if (rigged != null) return CharacterAssetCache.instance.load(rigged);
     final source = CharacterHelper.getModelPath(widget.characterName);
     final uri = Uri.tryParse(source);
     if (uri?.scheme == 'file') {

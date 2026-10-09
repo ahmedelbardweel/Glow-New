@@ -40,7 +40,8 @@ class SmartCharacterViewer extends StatelessWidget {
   /// Web only: the pose model is served beside the web build.
   final String? pose;
 
-  /// Shows the new rigged Glow ([CharacterRig]). Web only, like [pose].
+  /// Shows the new rigged Glow ([CharacterRig]).
+  /// Phones play it in the mobile viewer. Web uses [CharacterRig.modelPath].
   final bool rigged;
   final String storyText;
   final bool isPlaying;
@@ -63,13 +64,13 @@ class SmartCharacterViewer extends StatelessWidget {
         : rigged
         ? Uri.base.resolve(CharacterRig.modelPath).toString()
         : CharacterHelper.getModelPath(characterName);
-    if (pose == null &&
-        !rigged &&
-        !kIsWeb &&
+    final mobile = !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
-            defaultTargetPlatform == TargetPlatform.android)) {
+            defaultTargetPlatform == TargetPlatform.android);
+    if (pose == null && mobile) {
       return MobileCharacterViewer(
-        key: ValueKey(source),
+        key: ValueKey(rigged ? CharacterRig.assetPath : source),
+        modelAsset: rigged ? CharacterRig.assetPath : null,
         characterName: characterName,
         storyText: storyText,
         isPlaying: isPlaying,

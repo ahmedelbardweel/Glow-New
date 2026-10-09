@@ -188,7 +188,9 @@ class _SheetFrameState extends State<_SheetFrame> {
                 color: AppColors.background,
                 elevation: 8,
                 shadowColor: const Color(0x33001946),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppColors.sheet_radius),
+                ),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
                   children: [

@@ -4,6 +4,7 @@ class AppColors {
   AppColors._();
 
    static double border_radius = 5.0;
+   static double sheet_radius = border_radius;
    static double timeline_radius = 0;
    static const Color inputBorder = Color(0xFFE2E8F0);
 

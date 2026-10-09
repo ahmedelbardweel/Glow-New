@@ -13,7 +13,9 @@ void showAdminActionsBottomSheet({
       return Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius:  BorderRadius.all(Radius.circular(AppColors.border_radius)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppColors.sheet_radius),
+          ),
           border: Border.all(color: Colors.grey.shade300, width: 1),
         ),
         child: SafeArea(

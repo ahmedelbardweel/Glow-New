@@ -48,11 +48,16 @@ def anatomical_weights(v, names):
     weights = chain(cy, [.23, .29, .36, .43, .49, .55],
                     ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head'])
     # Soft, compact attachment envelope, not an infinite x-only arm mask.
-    arm_gate = (ramp(.145, .255, ax) * ramp(.235, .30, y)
-                * (1 - ramp(.415, .48, y)) * (1 - ramp(.065, .145, z)))
+    attachment = (ramp(.235, .30, y) * (1 - ramp(.415, .48, y))
+                  * (1 - ramp(.065, .145, z)))
+    # Beyond the shoulder, the whole cross-section is arm, including fingers
+    # below the elbow centerline. Do not fade distal vertices back to Spine.
+    distal = ramp(.225, .29, ax)
+    arm_gate = ramp(.145, .255, ax) * (attachment * (1 - distal) + distal)
+    arm_gate *= 1 - ramp(.46, .54, y)  # nearby head/ears are never arm
     for side, sign in [('Left', 1), ('Right', -1)]:
         gate = arm_gate * (x * sign > 0)
-        arm = chain(ax, [.265, .335, .425],
+        arm = chain(ax, [.245, .355, .425],
                     [side + 'Arm', side + 'ForeArm', side + 'Hand'])
         weights = weights * (1 - gate[:, None]) + arm * gate[:, None]
     leg_gate = (1 - ramp(.13, .225, y)) * ramp(.015, .075, ax)
@@ -116,6 +121,8 @@ def main():
         raise ValueError('Use a separate output; preserve the original')
     rig = Rig(args.input)
     g = rig.doc
+    if g.get('extras', {}).get('sideRefinement'):
+        raise ValueError('Input is already refined; use the untouched base GLB')
     blob = bytearray(rig.binary)
 
     def write(i, values):
@@ -183,7 +190,7 @@ def main():
                 q = Rotation.from_euler('xyz', np.column_stack(params[name]), degrees=True).as_quat()
                 write(sampler['output'], q)
     g.setdefault('extras', {})['sideRefinement'] = {
-        'version': 1, 'weights': 'anatomical-local-fields',
+        'version': 2, 'weights': 'anatomical-local-fields',
         'sculptMaxDisplacement': float(np.linalg.norm(sculpted - v, axis=1).max()),
         'wavePeriod': 1.0,
     }

@@ -840,7 +840,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         totalDuration: timeline.totalDuration,
       );
       if (apply.placed == 0) {
-        _montageCacheKey = null;
+        _montageCacheKey = '';
         _montageCache = null;
         _montageSnack('ما لقى كلمة معناها يستاهل حركة');
         return;

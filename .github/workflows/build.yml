@@ -69,10 +69,27 @@ jobs:
       - name: Build iOS (No Codesign)
         run: |
           set -euo pipefail
-          # Flutter's own build still stops and asks for an Apple team.
-          # Configure the project, then compile with signing turned off.
+          # Stay on CocoaPods. Current Flutter stable otherwise mixes in
+          # Swift packages and the unsigned xcodebuild cannot resolve them.
+          flutter config --no-enable-swift-package-manager
           flutter build ios --config-only --release --no-codesign
           (cd ios && pod install)
+          # Command-line signing flags are not enough: the project still
+          # names "iPhone Developer", and Xcode then demands a team.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("ios/Runner.xcodeproj/project.pbxproj")
+          text = path.read_text()
+          text = text.replace(
+              '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";',
+              '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";',
+          )
+          text = text.replace(
+              "CODE_SIGN_STYLE = Automatic;",
+              "CODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = \"\";\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"\";",
+          )
+          path.write_text(text)
+          PY
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
@@ -82,13 +99,17 @@ jobs:
             -derivedDataPath build/ios-derived \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=- \
-            DEVELOPMENT_TEAM= \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            VALIDATE_PRODUCT=NO \
             ONLY_ACTIVE_ARCH=NO \
             build
+          app="$(find build/ios-derived -type d -name Runner.app -print -quit)"
+          test -n "$app"
           mkdir -p build/ios/iphoneos
           rm -rf build/ios/iphoneos/Runner.app
-          cp -R build/ios-derived/Build/Products/Release-iphoneos/Runner.app build/ios/iphoneos/Runner.app
+          cp -R "$app" build/ios/iphoneos/Runner.app
 
       - name: Create iOS Payload
         run: |

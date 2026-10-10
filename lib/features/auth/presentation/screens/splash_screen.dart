@@ -250,6 +250,12 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: Stack(
         children: [
+          const Positioned.fill(
+            child: Image(
+              image: AssetImage('assets/images/splash_background.png'),
+              fit: BoxFit.cover,
+            ),
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),

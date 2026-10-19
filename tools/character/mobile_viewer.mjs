@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CharacterSkinPalette } from './character_palette.js';
 import { CharacterEyes } from './character_eyes.js';
 import { CharacterMouth } from './character_mouth.js';
@@ -198,24 +199,50 @@ async function _mountGltf(data) {
   const seen = new Set();
   const maxAniso = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
   model.traverse(object => {
-    if (object.isMesh) object.frustumCulled = false;
-    skinPalette.attach(object, seen);
-    for (const material of [object.material].flat().filter(Boolean)) {
-      if (material.map) {
-        material.map.colorSpace = THREE.SRGBColorSpace;
-        material.map.anisotropy = Math.min(16, maxAniso);
-        material.map.needsUpdate = true;
+    if (object.isMesh) {
+      object.frustumCulled = false;
+      const meshName = (object.name || '').toLowerCase();
+      for (const material of [object.material].flat().filter(Boolean)) {
+        const matName = (material.name || '').toLowerCase();
+        const isEye = meshName.includes('eye') || matName.includes('eye');
+        const isGlasses = meshName.includes('glasses') || matName.includes('glasses') || meshName.includes('spectacle') || matName.includes('spectacle');
+        const isMouth = meshName.includes('mouth') || matName.includes('mouth') || meshName.includes('jaw') || matName.includes('teeth') || matName.includes('tongue');
+
+        if (isEye) {
+          material.roughness = 0.06;
+          material.metalness = 0.0;
+          material.envMapIntensity = 1.5;
+        } else if (isGlasses) {
+          material.roughness = 0.16;
+          material.metalness = 0.15;
+          material.envMapIntensity = 1.3;
+        } else if (isMouth) {
+          material.roughness = 0.25;
+          material.metalness = 0.0;
+          material.envMapIntensity = 0.8;
+        } else {
+          material.roughness = 0.38;
+          material.metalness = 0.02;
+          material.envMapIntensity = 0.95;
+        }
+
+        if (material.map) {
+          material.map.colorSpace = THREE.SRGBColorSpace;
+          material.map.anisotropy = Math.min(16, maxAniso);
+          material.map.needsUpdate = true;
+        }
+        if (material.normalMap) {
+          material.normalMap.anisotropy = Math.min(16, maxAniso);
+          material.normalMap.needsUpdate = true;
+        }
+        if (material.roughnessMap) {
+          material.roughnessMap.anisotropy = Math.min(16, maxAniso);
+          material.roughnessMap.needsUpdate = true;
+        }
+        material.needsUpdate = true;
       }
-      if (material.normalMap) {
-        material.normalMap.anisotropy = Math.min(16, maxAniso);
-        material.normalMap.needsUpdate = true;
-      }
-      if (material.roughnessMap) {
-        material.roughnessMap.anisotropy = Math.min(16, maxAniso);
-        material.roughnessMap.needsUpdate = true;
-      }
-      material.needsUpdate = true;
     }
+    skinPalette.attach(object, seen);
   });
   eyeAnimation = new CharacterEyes(model);
   mouthAnimation = new CharacterMouth(model);
@@ -330,6 +357,7 @@ function dispose() {
       materials.add(material); for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
     }
   });
+  if (scene?.environment) textures.add(scene.environment);
   for (const texture of textures) { texture.source?.data?.close?.(); texture.dispose(); }
   for (const material of materials) material.dispose();
   for (const geometry of geometries) geometry.dispose();
@@ -347,18 +375,29 @@ try {
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.0;
   if ('physicallyCorrectLights' in renderer) renderer.physicallyCorrectLights = false;
   renderer.debug.onShaderError = () => fail(new Error('Character shader compilation failed'));
   document.body.appendChild(renderer.domElement);
   renderer.domElement.addEventListener('webglcontextlost', event => { event.preventDefault(); fail(new Error('Graphics context lost')); });
-  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(38, 1, .05, 100);
+  scene = new THREE.Scene();
+
+  // Procedural Studio Environment for rich specular reflections & gloss
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  pmremGenerator.compileEquirectangularShader();
+  const roomEnv = new RoomEnvironment();
+  scene.environment = pmremGenerator.fromScene(roomEnv, 0.04).texture;
+  if ('environmentIntensity' in scene) scene.environmentIntensity = 0.95;
+  roomEnv.dispose();
+  pmremGenerator.dispose();
+
+  camera = new THREE.PerspectiveCamera(38, 1, .05, 100);
   controls = new OrbitControls(camera, renderer.domElement); controls.enablePan = false; controls.enableZoom = true; controls.enableDamping = true; controls.minDistance = 0.7; controls.maxDistance = 20; controls.target.set(0, 1.78, 0);
   controls.addEventListener('change', () => { if (!state.playing) { draw(); schedule(); } });
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x677b6d, 2.0));
-  const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-2, 4, 5); scene.add(key);
-  const fill = new THREE.DirectionalLight(0xd5e6ff, 1.0); fill.position.set(3, 2, -2); scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffffff, 0.65); rim.position.set(0, 3, -4); scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0xfff8f2, 0x1f2e24, 0.45));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(-2, 4.5, 4.5); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xbdd7ee, 0.50); fill.position.set(3, 2, 2); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 1.35); rim.position.set(0, 3.5, -4); scene.add(rim);
   for (let i = 0; i < 5; i++) {
     const shadow = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 8), new THREE.MeshBasicMaterial({ color: 0x31483b, transparent: true, opacity: .025, depthWrite: false }));
     shadow.position.set(0, -.04 - i * .001, 0); shadow.scale.set(.6 + i * .1, .018, .38 + i * .07); scene.add(shadow);

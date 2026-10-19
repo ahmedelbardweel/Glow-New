@@ -178,7 +178,20 @@ ${shader.fragmentShader}
   float textureShade = pow(
     max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / $referenceLuminance, 0.0),
     ${shadeContrast.toStringAsFixed(3)});
-  diffuseColor.rgb = mix(diffuseColor.rgb, glowSkinTarget * textureShade, skinMask);
+
+  if (glowSkinStrength < 0.5) {
+    // Original green (Port): Boost vibrancy & contrast so it is rich emerald, never pale or washed out
+    float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+    diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 1.35);
+    diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08));
+  } else {
+    // Recolored identities: Rich, saturated, punchy hero tones
+    vec3 recolor = glowSkinTarget * textureShade;
+    float lum = dot(recolor, vec3(0.2126, 0.7152, 0.0722));
+    recolor = mix(vec3(lum), recolor, 1.30);
+    diffuseColor.rgb = mix(diffuseColor.rgb, recolor, skinMask);
+  }
+
   float muscleOn = glowMuscles;
   diffuseColor.rgb *= mix(1.0, 0.62, clamp(vGlowMuscle.x, 0.0, 1.0) * muscleOn);
   diffuseColor.rgb *= mix(1.0, 1.28, clamp(vGlowMuscle.y, 0.0, 1.0) * muscleOn);

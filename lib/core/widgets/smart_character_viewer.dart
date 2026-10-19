@@ -635,7 +635,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     if (next == null || identical(next, _activeAction)) return;
     final previous = _activeAction;
     next.reset().setEffectiveWeight(1).play();
-    if (previous != null) next.crossFadeFrom(previous, 0.75);
+    if (previous != null) next.crossFadeFrom(previous, 0.3);
     _activeAction = next;
   }
 

@@ -36,6 +36,7 @@ import '../../features/content/domain/entities/world_entity.dart';
 import '../../features/content/domain/entities/mission_entity.dart';
 import '../../features/content/domain/entities/story_entity.dart';
 import '../../features/content/domain/entities/question_entity.dart';
+import '../widgets/character_studio_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -44,6 +45,10 @@ class AppRouter {
       GoRoute(
         path: '/',
         builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/character-studio',
+        builder: (context, state) => const CharacterStudioScreen(),
       ),
       GoRoute(
         path: '/role-selection',

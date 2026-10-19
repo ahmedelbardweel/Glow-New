@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:three_js/three_js.dart' as three;
 
@@ -98,6 +99,24 @@ float glowMuscleHeight(vec3 p, vec3 n) {
 
   void attach(three.Object3D model) {
     model.traverse((object) {
+      if (object is three.Mesh &&
+          (object.name == 'EyeLeft' || object.name == 'EyeRight')) {
+        final geometry = object.geometry;
+        final uv = geometry?.attributes['uv'];
+        if (geometry != null &&
+            uv != null &&
+            geometry.attributes['_glow_skin_region'] == null) {
+          geometry.attributes['_glow_skin_region'] =
+              three.Float32BufferAttribute.fromList(
+                List<double>.generate(uv.count, (i) {
+                  final x = 2 * uv.getX(i) - 1;
+                  final y = 2 * uv.getY(i) - 1;
+                  return math.sqrt(x * x + y * y) > .80 ? 1.0 : 0.0;
+                }),
+                1,
+              );
+        }
+      }
       if (object is! three.Mesh ||
           object.geometry?.attributes['_glow_skin_region'] == null) {
         return;
@@ -113,7 +132,7 @@ float glowMuscleHeight(vec3 p, vec3 n) {
       }
       _materials.add(material);
       material.customProgramCacheKey = () =>
-          'glow-skin-palette-v8-$referenceLuminance-$shadeContrast';
+          'glow-skin-palette-v9-$referenceLuminance-$shadeContrast';
       material.onBeforeCompile = (dynamic shader, dynamic renderer) {
         shader.uniforms ??= <String, dynamic>{};
         shader.uniforms['glowSkinTarget'] = _colorUniform;
@@ -149,9 +168,8 @@ varying float vGlowSkinRegion;
 varying vec3 vGlowMuscle;
 ${shader.fragmentShader}
 '''
-                .replaceFirst('#include <map_fragment>', '''
-#include <map_fragment>
-#ifdef USE_MAP
+                .replaceFirst('#include <color_fragment>', '''
+#include <color_fragment>
   float greenDominance = (diffuseColor.g - max(diffuseColor.r, diffuseColor.b))
     / max(diffuseColor.g, 0.0001);
   float skinMask = smoothstep(0.20, 0.45, greenDominance)
@@ -165,7 +183,6 @@ ${shader.fragmentShader}
   diffuseColor.rgb *= mix(1.0, 0.62, clamp(vGlowMuscle.x, 0.0, 1.0) * muscleOn);
   diffuseColor.rgb *= mix(1.0, 1.28, clamp(vGlowMuscle.y, 0.0, 1.0) * muscleOn);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.75, 0.08), clamp(vGlowMuscle.z, 0.0, 1.0) * muscleOn);
-#endif
 ''');
       };
       material.needsUpdate = true;

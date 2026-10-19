@@ -96,6 +96,44 @@ try{
     console.log(JSON.stringify(checks.result.value));
     await new Promise(resolve=>setTimeout(resolve,100));
   }
+  if(process.argv.includes('--verify-palette')){
+    const result=await call('Runtime.evaluate',{returnByValue:true,expression:`(()=>{
+      const p=window.glowReviewPanels.find(p=>p.id==='after');
+      const assert=(ok,msg)=>{if(!ok)throw Error(msg)};
+      if(document.getElementById('play').textContent==='Pause')document.getElementById('play').click();
+      const model=p.model,action=p.action,clipTime=action.time;
+      for(const name of ['Body','Scalp','EyeSocketSkin','EyeLids']){
+        const mesh=model.getObjectByName(name);
+        assert(mesh.geometry.getAttribute('_glow_skin_region'),'Missing skin region: '+name);
+        assert(mesh.material.customProgramCacheKey().includes('palette-v9'),'Missing color shader: '+name);
+      }
+      const eye=model.getObjectByName('EyeLeft'),uv=eye.geometry.getAttribute('uv'),mask=eye.geometry.getAttribute('_glow_skin_region');
+      for(let i=0;i<uv.count;i++){
+        const r=Math.hypot(uv.getX(i)*2-1,uv.getY(i)*2-1);
+        if(r<.7)assert(mask.getX(i)===0,'Iris can be recolored');
+        if(r>.9)assert(mask.getX(i)===1,'Eye skin rim missing');
+      }
+      const select=document.getElementById('character'),snapshots=[];
+      for(const key of ['port','fort','lort','mort','qort','sort']){
+        select.value=key;select.dispatchEvent(new Event('change'));
+        assert(p.palette.strength.value===(key==='port'?0:1),'Wrong color strength');
+        p.renderer.render(p.scene,p.camera);
+        const gl=p.renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,pixels=new Uint8Array(w*h*4);
+        gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+        assert(gl.getError()===0,'WebGL palette error');snapshots.push(pixels);
+        assert(p.model===model&&p.action===action&&action.time===clipTime,'Color reset animation');
+      }
+      for(let n=1;n<snapshots.length;n++){
+        let changed=0;for(let i=0;i<snapshots[n].length;i+=4)if(Math.abs(snapshots[n][i]-snapshots[0][i])+Math.abs(snapshots[n][i+1]-snapshots[0][i+1])+Math.abs(snapshots[n][i+2]-snapshots[0][i+2])>15)changed++;
+        assert(changed>500,'Character color did not render');
+      }
+      select.value='qort';select.dispatchEvent(new Event('change'));p.renderer.render(p.scene,p.camera);
+      return {colors:6,headAndLidsCovered:true,irisProtected:true,renderedColorsDistinct:true,motionPreserved:true};
+    })()`},sessionId);
+    if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));
+    await fs.writeFile(output+'.palette-checks.json',JSON.stringify(result.result.value,null,2));
+    console.log(JSON.stringify(result.result.value));
+  }
   const shot=await call('Page.captureScreenshot',{format:'png'},sessionId);
   await fs.writeFile(output,Buffer.from(shot.data,'base64'));
   console.log(`Saved ${output}`);

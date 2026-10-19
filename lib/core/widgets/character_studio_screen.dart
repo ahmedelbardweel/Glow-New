@@ -37,6 +37,12 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   var _character = 'port';
   CharacterMotion? _selectedMotion;
   var _playing = true;
+  var _isSpeaking = false;
+  var _framing = 'body';
+  var _cameraAngle = 0.0;
+  var _autoBlink = true;
+  var _blinkClosure = 0.0;
+  var _clay = false;
   var _skeleton = false;
   var _showHat = false;
   var _showGlasses = true;
@@ -221,7 +227,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 characterName: _character,
                 storyText: _storyText,
                 isPlaying: _playing,
-                isSpeaking: false,
+                isSpeaking: _isSpeaking,
                 playbackPosition: _position,
                 motion: _selectedMotion,
                 interactive: true,
@@ -230,12 +236,17 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 hatColor: _hatColor,
                 showMuscles: _showMuscles,
                 showGlasses: _showGlasses,
+                framing: _framing,
+                cameraAngle: _cameraAngle,
+                autoBlink: _autoBlink,
+                blink: _blinkClosure,
+                clay: _clay,
                 pose: _posesMode ? _pose.id : null,
                 rigged: _rigged,
               ),
               PositionedDirectional(
-                top: 18,
-                start: 18,
+                top: 16,
+                start: 16,
                 child: _badge(
                   icon: Icons.view_in_ar_outlined,
                   label: switch (_mode) {
@@ -249,8 +260,8 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 ),
               ),
               PositionedDirectional(
-                top: 18,
-                end: 18,
+                top: 16,
+                end: 16,
                 child: _posesMode
                     ? _badge(
                         icon: Icons.accessibility_new_rounded,
@@ -269,17 +280,79 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                         ),
                       ),
               ),
+              // Floating quick actions on stage
+              PositionedDirectional(
+                top: 56,
+                start: 16,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _stageButton(
+                      icon: _framing == 'face'
+                          ? Icons.face_retouching_natural_rounded
+                          : Icons.accessibility_new_rounded,
+                      label: _framing == 'face' ? 'الوجه' : 'كامل الجسم',
+                      active: _framing == 'face',
+                      onTap: () => setState(() =>
+                          _framing = _framing == 'face' ? 'body' : 'face'),
+                    ),
+                    _stageButton(
+                      icon: _isSpeaking
+                          ? Icons.record_voice_over_rounded
+                          : Icons.voice_over_off_rounded,
+                      label: _isSpeaking ? 'يتحدث' : 'تحدث',
+                      active: _isSpeaking,
+                      onTap: () =>
+                          setState(() => _isSpeaking = !_isSpeaking),
+                    ),
+                  ],
+                ),
+              ),
+              PositionedDirectional(
+                bottom: 38,
+                start: 0,
+                end: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _angleChip('أمامي', 0),
+                        _angleChip('مائل', -45),
+                        _angleChip('جانبي', -90),
+                        _angleChip('خلفي', 180),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               const PositionedDirectional(
-                bottom: 18,
+                bottom: 14,
                 start: 0,
                 end: 0,
                 child: IgnorePointer(
                   child: Center(
                     child: Text(
-                      'اسحب لتدوير الشخصية • قرّب لاستكشاف التفاصيل',
+                      'اسحب للتدوير • قرّب للتفاصيل والدقة',
                       style: TextStyle(
                         color: Color(0xFF52665B),
-                        fontSize: 11,
+                        fontSize: 10,
                         shadows: [Shadow(color: Colors.white, blurRadius: 8)],
                       ),
                     ),
@@ -482,53 +555,69 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
             children: [
               _modeSwitch(),
               const SizedBox(height: 22),
-              _sectionTitle('لون الشخصية', Icons.palette_outlined),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              _sectionTitle('الشخصية ولونها', Icons.palette_outlined),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: CharacterHelper.characters.keys.map((key) {
                   final selected = _character == key;
-                  return Semantics(
-                    button: true,
-                    selected: selected,
-                    label: 'لون ${CharacterHelper.getCleanName(key)}',
-                    child: Tooltip(
-                      message: CharacterHelper.getCleanName(key),
-                      child: InkWell(
-                        borderRadius: BorderRadius.all(
-                          Radius.circular(AppColors.border_radius),
-                        ),
-                        onTap: () => setState(() => _character = key),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          height: 46,
-                          width: 46,
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: selected ? _ink : Colors.transparent,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: CharacterHelper.getColor(key),
-                            ),
-                            child: selected
-                                ? const Icon(
-                                    Icons.check_rounded,
-                                    size: 20,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ),
+                  return ChoiceChip(
+                    label: Text(CharacterHelper.getCleanName(key)),
+                    avatar: CircleAvatar(
+                      backgroundColor: CharacterHelper.getColor(key),
+                      radius: 11,
                     ),
+                    selected: selected,
+                    selectedColor: const Color(0xFFE0EDE4),
+                    onSelected: (_) => setState(() => _character = key),
                   );
                 }).toList(),
+              ),
+              const SizedBox(height: 22),
+              _sectionTitle('زاوية الكاميرا والعرض', Icons.camera_alt_outlined),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 'body',
+                      icon: Icon(Icons.accessibility_new_rounded, size: 16),
+                      label: Text('كامل الجسم'),
+                    ),
+                    ButtonSegment(
+                      value: 'face',
+                      icon: Icon(Icons.face_retouching_natural_rounded, size: 16),
+                      label: Text('تركيز على الوجه'),
+                    ),
+                  ],
+                  selected: {_framing},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (val) =>
+                      setState(() => _framing = val.first),
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor: _accent,
+                    selectedForegroundColor: Colors.white,
+                    foregroundColor: _ink,
+                    side: const BorderSide(color: Color(0xFFDBE5DD)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _angleChip('أمامي 0°', 0),
+                  _angleChip('مائل -45°', -45),
+                  _angleChip('جانبي -90°', -90),
+                  _angleChip('مائل 45°', 45),
+                  _angleChip('خلفي 180°', 180),
+                ],
               ),
               if (_posesMode) ...[
                 const SizedBox(height: 22),
@@ -538,7 +627,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
               ] else ...[
                 const SizedBox(height: 22),
                 _sectionTitle(
-                  'الحركة والتعبير',
+                  'الحركة والتعبير (10 حركات)',
                   Icons.accessibility_new_rounded,
                 ),
                 const SizedBox(height: 12),
@@ -613,34 +702,69 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                     }).toList(),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 SwitchListTile.adaptive(
-                  value: _skeleton,
-                  onChanged: (value) => setState(() => _skeleton = value),
+                  value: _isSpeaking,
+                  onChanged: (value) => setState(() => _isSpeaking = value),
                   contentPadding: EdgeInsets.zero,
                   activeTrackColor: _accent,
                   title: const Text(
-                    'إظهار العظام',
-                    style: TextStyle(color: _ink, fontSize: 13),
+                    'حركة التحدث ونبضات الفم',
+                    style: TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'تفعيل حركة الشفاه والفك بنبضات الكلام للمعاينة',
+                    style: TextStyle(color: _muted, fontSize: 11),
                   ),
                 ),
-                if (!_rigged) ...[
-                  const SizedBox(height: 8),
-                  SwitchListTile.adaptive(
-                    value: _showMuscles,
-                    onChanged: (value) => setState(() => _showMuscles = value),
-                    contentPadding: EdgeInsets.zero,
-                    activeTrackColor: _accent,
-                    title: const Text(
-                      'عضلات البطن',
-                      style: TextStyle(color: _ink, fontSize: 13),
-                    ),
-                    subtitle: const Text(
-                      'صدر وبطن على الجسم، وتقدر تشيلها',
-                      style: TextStyle(color: _muted, fontSize: 11),
-                    ),
+                const SizedBox(height: 16),
+                _sectionTitle('العيون والجفون', Icons.remove_red_eye_outlined),
+                const SizedBox(height: 8),
+                SwitchListTile.adaptive(
+                  value: _autoBlink,
+                  onChanged: (value) => setState(() => _autoBlink = value),
+                  contentPadding: EdgeInsets.zero,
+                  activeTrackColor: _accent,
+                  title: const Text(
+                    'رمش تلقائي للعيون',
+                    style: TextStyle(color: _ink, fontSize: 13),
+                  ),
+                  subtitle: const Text(
+                    'حركات رمش طبيعية وتتبع النظر',
+                    style: TextStyle(color: _muted, fontSize: 11),
+                  ),
+                ),
+                if (!_autoBlink) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'إغلاق الجفن يدوياً: ${(_blinkClosure * 100).round()}%',
+                    style: const TextStyle(color: _ink, fontSize: 12),
+                  ),
+                  Slider(
+                    value: _blinkClosure,
+                    min: 0.0,
+                    max: 1.0,
+                    activeColor: _accent,
+                    onChanged: (val) => setState(() => _blinkClosure = val),
                   ),
                 ],
+                const SizedBox(height: 16),
+                _sectionTitle('المظهر والمؤثرات', Icons.tune_rounded),
+                const SizedBox(height: 8),
+                SwitchListTile.adaptive(
+                  value: _clay,
+                  onChanged: (value) => setState(() => _clay = value),
+                  contentPadding: EdgeInsets.zero,
+                  activeTrackColor: _accent,
+                  title: const Text(
+                    'وضع الطين (Clay Shading)',
+                    style: TextStyle(color: _ink, fontSize: 13),
+                  ),
+                  subtitle: const Text(
+                    'فحص نحت الجسم والمجسم بدون خامات ملونة',
+                    style: TextStyle(color: _muted, fontSize: 11),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 SwitchListTile.adaptive(
                   value: _showGlasses,
@@ -671,6 +795,34 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                     style: TextStyle(color: _muted, fontSize: 11),
                   ),
                 ),
+                const SizedBox(height: 8),
+                SwitchListTile.adaptive(
+                  value: _skeleton,
+                  onChanged: (value) => setState(() => _skeleton = value),
+                  contentPadding: EdgeInsets.zero,
+                  activeTrackColor: _accent,
+                  title: const Text(
+                    'إظهار العظام',
+                    style: TextStyle(color: _ink, fontSize: 13),
+                  ),
+                ),
+                if (!_rigged) ...[
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: _showMuscles,
+                    onChanged: (value) => setState(() => _showMuscles = value),
+                    contentPadding: EdgeInsets.zero,
+                    activeTrackColor: _accent,
+                    title: const Text(
+                      'عضلات البطن',
+                      style: TextStyle(color: _ink, fontSize: 13),
+                    ),
+                    subtitle: const Text(
+                      'صدر وبطن على الجسم، وتقدر تشيلها',
+                      style: TextStyle(color: _muted, fontSize: 11),
+                    ),
+                  ),
+                ],
                 if (_showHat && !_rigged) ...[
                   const SizedBox(height: 10),
                   const Text(
@@ -834,4 +986,67 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
     CharacterMotion.smile => Icons.sentiment_satisfied_alt_rounded,
     CharacterMotion.laugh => Icons.sentiment_very_satisfied_rounded,
   };
+
+  Widget _stageButton({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) =>
+      Material(
+        color: active ? _ink : Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(20),
+        elevation: active ? 2 : 1,
+        shadowColor: Colors.black.withValues(alpha: 0.1),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 14,
+                  color: active ? Colors.white : _accent,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: active ? Colors.white : _ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _angleChip(String label, double angle) {
+    final active = _cameraAngle == angle;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => setState(() => _cameraAngle = angle),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: active ? _ink : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: active ? Colors.white : _ink,
+          ),
+        ),
+      ),
+    );
+  }
 }

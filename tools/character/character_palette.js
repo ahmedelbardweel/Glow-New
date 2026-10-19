@@ -93,10 +93,12 @@ attach(mesh, seen) {
     mesh.geometry.setAttribute('_glow_skin_region',new THREE.BufferAttribute(mask,1));
   }
   if (!mesh.geometry?.getAttribute('_glow_skin_region')) return;
+  const isScalp = mesh.name === 'Scalp';
   for (const material of [mesh.material].flat()) {
     if (!material || seen.has(material) || HAT_MATERIALS.has(material.name)) continue;
     seen.add(material);
-    material.customProgramCacheKey = () => `glow-skin-palette-v9-${this.referenceLuminance}-${this.shadeContrast}`;
+    const scalpMat = isScalp || material.name === 'GlowScalpSkin';
+    material.customProgramCacheKey = () => `glow-skin-palette-v12-${scalpMat ? 'scalp' : 'body'}`;
     material.onBeforeCompile = shader => {
       shader.uniforms.glowSkinTarget = target;
       shader.uniforms.glowSkinStrength = strength;
@@ -106,9 +108,10 @@ attach(mesh, seen) {
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlowSkinRegion = _glow_skin_region;\nvGlowMuscle = glowMuscleDraw(position, normal);\ntransformed += normal * glowMuscleHeight(position, normal) * glowMuscles;');
       shader.fragmentShader = 'uniform vec3 glowSkinTarget;\nuniform float glowSkinStrength;\nuniform float glowMuscles;\nvarying float vGlowSkinRegion;\nvarying vec3 vGlowMuscle;\n' + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        ${scalpMat ? 'diffuseColor.rgb *= (0.07652005545 / 0.1952802);' : ''}
         float greenDominance = (diffuseColor.g - max(diffuseColor.r, diffuseColor.b)) / max(diffuseColor.g, 0.0001);
         float mask = smoothstep(0.20, 0.45, greenDominance) * clamp(vGlowSkinRegion, 0.0, 1.0) * glowSkinStrength;
-        float shade = pow(max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / ${this.referenceLuminance}, 0.0), ${this.shadeContrast.toFixed(3)});
+        float shade = pow(max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / 0.07652005545, 0.0), 0.75);
 
         if (glowSkinStrength < 0.5) {
           // Original green (Port): Boost vibrancy & contrast so it is rich emerald, never pale or washed out
@@ -116,10 +119,8 @@ attach(mesh, seen) {
           diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 1.35);
           diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08));
         } else {
-          // Recolored identities: Rich, saturated, punchy hero tones
+          // Recolored identities: Preserves user's exact character colors with seamless scalp matching
           vec3 recolor = glowSkinTarget * shade;
-          float lum = dot(recolor, vec3(0.2126, 0.7152, 0.0722));
-          recolor = mix(vec3(lum), recolor, 1.30);
           diffuseColor.rgb = mix(diffuseColor.rgb, recolor, mask);
         }
 

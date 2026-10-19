@@ -194,8 +194,6 @@ function _resourceManager() {
 async function _mountGltf(data) {
   if (disposed) return;
   model = data.scene; scene.add(model);
-  skinPalette.referenceLuminance = model.getObjectByName('Scalp') ? .106 : .07652005545;
-  skinPalette.shadeContrast = model.getObjectByName('Scalp') ? .75 : 1;
   const seen = new Set();
   const maxAniso = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
   model.traverse(object => {
@@ -207,6 +205,7 @@ async function _mountGltf(data) {
         const isEye = meshName.includes('eye') || matName.includes('eye');
         const isGlasses = meshName.includes('glasses') || matName.includes('glasses') || meshName.includes('spectacle') || matName.includes('spectacle');
         const isMouth = meshName.includes('mouth') || matName.includes('mouth') || meshName.includes('jaw') || matName.includes('teeth') || matName.includes('tongue');
+        const isScalp = meshName.includes('scalp') || matName.includes('scalp');
 
         if (isEye) {
           material.roughness = 0.06;
@@ -220,6 +219,12 @@ async function _mountGltf(data) {
           material.roughness = 0.25;
           material.metalness = 0.0;
           material.envMapIntensity = 0.8;
+        } else if (isScalp) {
+          // Remove roughness map and match Body properties identically
+          material.roughnessMap = null;
+          material.roughness = 0.38;
+          material.metalness = 0.02;
+          material.envMapIntensity = 0.95;
         } else {
           material.roughness = 0.38;
           material.metalness = 0.02;

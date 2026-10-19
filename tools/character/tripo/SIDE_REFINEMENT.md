@@ -186,3 +186,24 @@ sadness and idle closure. `head_material_review.html?mouth=sad` (or open, smile,
 round, laugh) isolates a mouth shape from skeletal poses for visual inspection.
 Older deformation validators intentionally reject animated morph channels;
 use `check_mouth.py` and the browser checks on this stage.
+## Palm-facing Wave and identity colors
+
+`refine_wave.py` changes only the Wave forearm and wrist rotation outputs.
+An 80-degree roll is distributed 72/28 percent around the actual bone axes.
+`check_wave.py` verifies unchanged geometry, materials, other clips and mouth
+morphs, seamless looping, 61 Wave poses and 18 crossfade poses. The installed
+model preserves the latest mouth revision.
+
+The skin palette now runs after `color_fragment`, so atlas and vertex colors
+are combined before recoloring. This fixes Scalp, EyeSocketSkin and EyeLids
+remaining green. EyeLeft/Right receive a runtime skin-region attribute only
+on the outer eye rim; the iris and pupil are excluded. Dart and JS both apply
+this rule. `character_palette.js` is shared by the mobile bundle and preview.
+Rigged models use luminance 0.106 / contrast 0.75 in both renderers.
+
+Studio identity controls show all six existing names and their color swatches.
+The review adds the same six choices, with original green on the left and the
+selected identity on the right. `--verify-palette` checks all six rendered
+colors, skin-region coverage, iris exclusion and preserved playback. Blue and
+red renders with partially closed eyelids were inspected. Rebuild the mobile
+bundle after JS palette edits and the Flutter studio after Dart edits.

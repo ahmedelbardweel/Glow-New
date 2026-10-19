@@ -20,6 +20,14 @@ class RoleSelectionScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'استوديو الشخصية 3D',
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              context.push('/character-studio');
+            },
+            icon: const Icon(Icons.view_in_ar_rounded, color: AppColors.primary),
+          ),
+          IconButton(
             tooltip: 'مسح نقل الحساب',
             onPressed: () async {
               HapticFeedback.lightImpact();

@@ -31,6 +31,11 @@ class SmartCharacterViewer extends StatelessWidget {
     this.showMuscles = false,
     this.showGlasses = true,
     this.cameraFit = 1.10,
+    this.framing = 'body',
+    this.cameraAngle,
+    this.autoBlink = true,
+    this.blink = 0.0,
+    this.clay = false,
     this.pose,
     this.rigged = true,
     this.onReady,
@@ -56,6 +61,11 @@ class SmartCharacterViewer extends StatelessWidget {
   final bool showMuscles;
   final bool showGlasses;
   final double cameraFit;
+  final String framing;
+  final double? cameraAngle;
+  final bool autoBlink;
+  final double blink;
+  final bool clay;
   final VoidCallback? onReady;
 
   @override
@@ -84,6 +94,11 @@ class SmartCharacterViewer extends StatelessWidget {
         showMuscles: showMuscles,
         showGlasses: showGlasses,
         cameraFit: cameraFit,
+        framing: framing,
+        cameraAngle: cameraAngle,
+        autoBlink: autoBlink,
+        blink: blink,
+        clay: clay,
         motion: motion,
         playbackPosition: playbackPosition,
         onReady: onReady,

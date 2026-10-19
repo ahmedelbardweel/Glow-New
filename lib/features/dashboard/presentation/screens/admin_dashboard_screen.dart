@@ -95,6 +95,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         await showCreateOrganizationSheet(context);
                       },
                     ),
+                    StaffSetting(
+                      title: 'استوديو الشخصية 3D',
+                      subtitle: 'معاينة شخصيات Glow وحركاتها وألوانها بدقة عالية',
+                      onTap: (sheetContext) async {
+                        Navigator.of(sheetContext).pop();
+                        if (context.mounted) {
+                          context.push('/character-studio');
+                        }
+                      },
+                    ),
                   ],
                   onLogout: () async {
                     await sl<AuthLocalDataSource>().clearCache();

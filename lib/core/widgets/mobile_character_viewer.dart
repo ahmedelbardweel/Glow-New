@@ -13,6 +13,7 @@ import '../services/character_asset_cache.dart';
 import '../services/character_offline_pack.dart';
 import '../services/resource_manager.dart';
 import '../utils/character_helper.dart';
+import '../utils/character_poses.dart';
 
 /// Offline WebView character viewer for iOS and Android.
 ///
@@ -31,6 +32,11 @@ class MobileCharacterViewer extends StatefulWidget {
     this.showMuscles = false,
     this.showGlasses = true,
     this.cameraFit = 1.10,
+    this.framing = 'body',
+    this.cameraAngle,
+    this.autoBlink = true,
+    this.blink = 0.0,
+    this.clay = false,
     this.hatColor = const Color(0xFF2C2C2E),
     this.motion,
     this.playbackPosition,
@@ -47,6 +53,11 @@ class MobileCharacterViewer extends StatefulWidget {
   final bool showMuscles;
   final bool showGlasses;
   final double cameraFit;
+  final String framing;
+  final double? cameraAngle;
+  final bool autoBlink;
+  final double blink;
+  final bool clay;
   final Color hatColor;
   final CharacterMotion? motion;
   final ValueListenable<Duration>? playbackPosition;
@@ -255,7 +266,10 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
           CharacterHelper.getModelPath(widget.characterName);
       if (!_isRemoteOrFileSource(source)) {
         // Fast-path: local model load directly from the offline pack
-        await controller.runJavaScript("GlowViewer.loadLocal('glow_mascot.glb');");
+        final fileName = widget.modelAsset == CharacterRig.assetPath
+            ? 'glow_rigged.glb'
+            : 'glow_mascot.glb';
+        await controller.runJavaScript("GlowViewer.loadLocal('$fileName');");
         return;
       }
       await _streamFallback(controller, generation);
@@ -320,6 +334,11 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
       'muscles': widget.showMuscles,
       'glasses': widget.showGlasses,
       'cameraFit': widget.cameraFit,
+      'framing': widget.framing,
+      'angle': widget.cameraAngle ?? 0,
+      'autoBlink': widget.autoBlink,
+      'blink': widget.blink,
+      'clay': widget.clay,
       'hatColor':
           '#${(widget.hatColor.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
       'visible': _visible,
@@ -451,6 +470,12 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
         oldWidget.showHat != widget.showHat ||
         oldWidget.showMuscles != widget.showMuscles ||
         oldWidget.showGlasses != widget.showGlasses ||
+        oldWidget.cameraFit != widget.cameraFit ||
+        oldWidget.framing != widget.framing ||
+        oldWidget.cameraAngle != widget.cameraAngle ||
+        oldWidget.autoBlink != widget.autoBlink ||
+        oldWidget.blink != widget.blink ||
+        oldWidget.clay != widget.clay ||
         oldWidget.hatColor != widget.hatColor ||
         oldWidget.interactive != widget.interactive ||
         oldWidget.playbackPosition != widget.playbackPosition) {

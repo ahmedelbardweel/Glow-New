@@ -6,6 +6,7 @@
 <script type="module">
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {CharacterSkinPalette} from '/tools/character/character_palette.js';
 const query=new URLSearchParams(location.search);
 const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth,innerHeight);
@@ -26,6 +27,10 @@ if(query.get('framing')==='body'){
 }
 const gltf=await new GLTFLoader().loadAsync(query.get('model')||'/build/tripo/side_review/candidate.glb');
 const model=gltf.scene;scene.add(model);
+if(query.has('color')){
+ const palette=new CharacterSkinPalette(),seen=new Set();
+ model.traverse(o=>palette.attach(o,seen));palette.setColor('#'+query.get('color'));
+}
 model.traverse(o=>{
   if(o.name==='Hat')o.visible=query.get('hat')==='1';
   if(o.name==='Glasses')o.visible=query.get('glasses')!=='0';

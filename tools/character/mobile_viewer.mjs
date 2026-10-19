@@ -24,6 +24,71 @@ const skinPalette = new CharacterSkinPalette();
 let jawRestPos = null;
 const jawRotation = new THREE.Quaternion();
 const jawAxis = new THREE.Vector3(1, 0, 0);
+
+let bones = {
+  spine: null, spine1: null, spine2: null, neck: null, head: null,
+  leftShoulder: null, rightShoulder: null, leftArm: null, rightArm: null,
+};
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _deltaQ = new THREE.Quaternion();
+
+function _applyBoneDelta(bone, pitch, yaw, roll) {
+  if (!bone) return;
+  _euler.set(pitch, yaw, roll);
+  _deltaQ.setFromEuler(_euler);
+  bone.quaternion.multiply(_deltaQ);
+}
+
+function applyOrganicLife(dt) {
+  if (!bones.head) return;
+  const t = time;
+
+  // 1. Natural Deep Organic Respiration (تنفس حيوي منتظم)
+  const breath = Math.sin(t * 1.95);
+  const breathHarmonic = Math.sin(t * 3.9 + 0.6);
+  const chestExpansion = breath * 0.022 + breathHarmonic * 0.006;
+  const spineExpansion = breath * 0.012;
+
+  // Spine and Chest breathing
+  _applyBoneDelta(bones.spine2, chestExpansion, 0, 0);
+  _applyBoneDelta(bones.spine1, spineExpansion, 0, 0);
+
+  // 2. Continuous Organic Head & Neck Living Micro-Drift (حركة الرأس الطبيعية المستمرة لمنع الجمود)
+  const isSpeaking = state.speaking || state.motion === 'Talk';
+  const headPitch = Math.sin(t * 1.15) * 0.024 + Math.cos(t * 0.48) * 0.012;
+  const headYaw = Math.sin(t * 0.72 + 1.2) * 0.028 + Math.cos(t * 1.35) * 0.010;
+  const headRoll = Math.sin(t * 0.55 + 2.1) * 0.016;
+
+  // Conversational speech cadence (إيماءات التعبير أثناء التحدث)
+  let speechNod = 0;
+  let speechTilt = 0;
+  let speechTurn = 0;
+  if (isSpeaking) {
+    const st = t * 6.2;
+    speechNod = Math.sin(st) * 0.042 + Math.sin(st * 0.5) * 0.024;
+    speechTilt = Math.cos(st * 0.68) * 0.028;
+    speechTurn = Math.sin(st * 0.35 + 0.8) * 0.022;
+  }
+
+  _applyBoneDelta(bones.head, headPitch + speechNod, headYaw + speechTurn, headRoll + speechTilt);
+  _applyBoneDelta(bones.neck, (headPitch + speechNod) * 0.4, (headYaw + speechTurn) * 0.35, headRoll * 0.3);
+
+  // 3. Pelvis & Torso Organic Weight Shift (تمايل وتوزيع وزن الجذع لمنع الوقوف الجامد)
+  const hipSway = Math.sin(t * 0.52) * 0.015;
+  const hipTurn = Math.cos(t * 0.41) * 0.012;
+  _applyBoneDelta(bones.spine, 0, hipTurn, hipSway);
+
+  // 4. Subtle Living Damping on Arms during resting/talking motions (حركة طبيعية في الأكتاف واليدين)
+  const isResting = ['Idle', 'Talk', 'Thinking', 'Smile', 'Sad'].includes(state.motion);
+  if (isResting) {
+    const armBreathe = breath * 0.009;
+    _applyBoneDelta(bones.leftArm, 0, 0, armBreathe);
+    _applyBoneDelta(bones.rightArm, 0, 0, -armBreathe);
+    if (bones.leftShoulder) _applyBoneDelta(bones.leftShoulder, chestExpansion * 0.35, 0, 0);
+    if (bones.rightShoulder) _applyBoneDelta(bones.rightShoulder, chestExpansion * 0.35, 0, 0);
+  }
+}
+
 function applyTalkingMouth(dt) {
   if (mouthAnimation) {
     mouthAnimation.update(dt, state.motion, state.speaking, time);
@@ -77,12 +142,41 @@ function updateCameraPosition() {
   controls.target.set(0, targetY, 0);
   controls.update();
 }
+
+let currentMotionName = 'Idle';
+const GESTURE_MOTIONS = new Set(['Wave', 'Victory', 'Happy', 'Laugh', 'Walk', 'Thinking']);
+
+function getTransitionDuration(prevMotion, nextMotion) {
+  if (GESTURE_MOTIONS.has(prevMotion) || GESTURE_MOTIONS.has(nextMotion)) {
+    return 0.85; // 850ms smooth cinematic ease-out / ease-in
+  }
+  return 0.60; // 600ms conversational blend
+}
+
 function selectMotion() {
-  const next = actions.get(state.motion) ?? actions.get('Idle') ?? actions.values().next().value;
+  const targetName = state.motion || 'Idle';
+  const next = actions.get(targetName) ?? actions.get('Idle') ?? actions.values().next().value;
   if (!next || next === active) return;
-  next.reset().setEffectiveWeight(1).play();
-  if (active) next.crossFadeFrom(active, .3, false);
+
+  const prev = active;
+  const prevName = currentMotionName;
+  currentMotionName = targetName;
   active = next;
+
+  const duration = getTransitionDuration(prevName, targetName);
+
+  next.enabled = true;
+  next.setEffectiveTimeScale(1);
+  next.setEffectiveWeight(1);
+
+  if (GESTURE_MOTIONS.has(targetName)) {
+    next.time = 0;
+  }
+  next.play();
+
+  if (prev) {
+    next.crossFadeFrom(prev, duration, true);
+  }
 }
 function applyGlasses() {
   if (!model) return;
@@ -155,6 +249,7 @@ function tick(now) {
     if (state.playing) {
       selectMotion();
       mixer?.update(dt);
+      applyOrganicLife(dt);
     }
     if (state.autoBlink === false && state.blink !== undefined) {
       eyeAnimation?.setClosure(Number(state.blink) || 0);
@@ -252,6 +347,17 @@ async function _mountGltf(data) {
   eyeAnimation = new CharacterEyes(model);
   mouthAnimation = new CharacterMouth(model);
   jaw = model.getObjectByName('Jaw'); jawRest = jaw?.quaternion.clone(); jawRestPos = jaw?.position.clone();
+  bones = {
+    spine: model.getObjectByName('Spine'),
+    spine1: model.getObjectByName('Spine1'),
+    spine2: model.getObjectByName('Spine2'),
+    neck: model.getObjectByName('Neck'),
+    head: model.getObjectByName('Head'),
+    leftShoulder: model.getObjectByName('LeftShoulder'),
+    rightShoulder: model.getObjectByName('RightShoulder'),
+    leftArm: model.getObjectByName('LeftArm'),
+    rightArm: model.getObjectByName('RightArm'),
+  };
   const bounds = new THREE.Box3().setFromObject(model), size = bounds.getSize(new THREE.Vector3()), center = bounds.getCenter(new THREE.Vector3());
   if (!(size.y > 0)) throw new Error('Empty model bounds');
   const scale = 3.5 / size.y;
@@ -366,6 +472,7 @@ function dispose() {
   for (const texture of textures) { texture.source?.data?.close?.(); texture.dispose(); }
   for (const material of materials) material.dispose();
   for (const geometry of geometries) geometry.dispose();
+  bones = { spine: null, spine1: null, spine2: null, neck: null, head: null, leftShoulder: null, rightShoulder: null, leftArm: null, rightArm: null };
   renderer?.dispose(); renderer?.forceContextLoss();
 }
 window.GlowViewer = { loadLocal, loadFromBase64, begin, appendBatch, loadBuffered, update, dispose };

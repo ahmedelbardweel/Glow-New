@@ -72,7 +72,7 @@ class CharacterOfflinePack {
       jsFileName: await _assetLength(jsAsset),
       modelFileName: await _assetLength(modelAsset),
       'glow_rigged.glb': await _assetLength(CharacterRig.assetPath),
-      'inlineScript': 5,
+      'inlineScript': 6,
     };
     final stampFile = File('${dir.path}/$stampFileName');
     if (await _stampMatches(stampFile, planned) &&

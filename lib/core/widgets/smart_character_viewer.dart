@@ -318,6 +318,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
               meshName.contains('jaw') ||
               matName.contains('teeth') ||
               matName.contains('tongue');
+          final isScalp = meshName.contains('scalp') || matName.contains('scalp');
           if (isEye) {
             material.roughness = 0.06;
             material.metalness = 0.0;
@@ -327,6 +328,10 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
           } else if (isMouth) {
             material.roughness = 0.25;
             material.metalness = 0.0;
+          } else if (isScalp) {
+            material.roughnessMap = null;
+            material.roughness = 0.38;
+            material.metalness = 0.02;
           } else {
             material.roughness = 0.38;
             material.metalness = 0.02;

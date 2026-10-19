@@ -248,62 +248,52 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     final overhang = MediaQuery.viewPaddingOf(context).top + 16;
     return Scaffold(
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: Image(
-              image: AssetImage('assets/images/splash_background.png'),
-              fit: BoxFit.cover,
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _HangingLogo(
-                      overhang: overhang,
-                      onFinished: () {
-                        if (!_logoDone.isCompleted) _logoDone.complete();
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _HangingLogo(
+                  overhang: overhang,
+                  onFinished: () {
+                    if (!_logoDone.isCompleted) _logoDone.complete();
+                  },
+                ),
+              ),
+              AnimatedOpacity(
+                opacity: _showButton ? 1 : 0,
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOut,
+                child: IgnorePointer(
+                  ignoring: !_showButton,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        ChildButtonVoice.press('ابدأ الرحلة', () async {
+                          if (context.mounted) context.go('/role-selection');
+                        });
                       },
-                    ),
-                  ),
-                  AnimatedOpacity(
-                    opacity: _showButton ? 1 : 0,
-                    duration: const Duration(milliseconds: 420),
-                    curve: Curves.easeOut,
-                    child: IgnorePointer(
-                      ignoring: !_showButton,
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            ChildButtonVoice.press('ابدأ الرحلة', () async {
-                              if (context.mounted) context.go('/role-selection');
-                            });
-                          },
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'ابدأ الرحلة',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text(
+                        'ابدأ الرحلة',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

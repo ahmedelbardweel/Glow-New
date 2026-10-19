@@ -70,6 +70,13 @@ def anatomical_weights(v, names):
     tail = ramp(.085, .20, -z) * (1 - ramp(.24, .34, y))
     weights *= 1 - tail[:, None]
     weights[:, index['Tail']] += tail
+    # The broad lower cheeks sit much lower than the Head joint. Their rest
+    # silhouette is already round; blending them with Arm/Spine pulled them
+    # into two squared flaps when the arms came down. Protect the whole lower
+    # head cross-section, with a soft neck transition below the cheek line.
+    head = ramp(.405, .43, y) * (1 - ramp(.265, .30, ax))
+    weights *= 1 - head[:, None]
+    weights[:, index['Head']] += head
     return weights / weights.sum(1, keepdims=True)
 
 
@@ -179,6 +186,27 @@ def main():
                 normal[~valid] = normal[valid][near]
                 write(attrs['NORMAL'], normal)
 
+    # The mesh is already symmetric to sub-millimetre sampling error, but the
+    # generated left shoulder/elbow/wrist pivots were offset from the right.
+    # Those offsets lengthened the posed left arm. Mirror the right pivots and
+    # rebuild inverse binds so the untouched mesh remains identical at rest.
+    mirrored_world = rig.rest_world.copy()
+    left_nodes = []
+    for suffix in ('Shoulder', 'Arm', 'ForeArm', 'Hand', 'HandEnd'):
+        left = rig.names['Left' + suffix]
+        right = rig.names['Right' + suffix]
+        assert np.allclose(rig.rest_world[left, :3, :3], np.eye(3))
+        mirrored_world[left, :3, 3] = rig.rest_world[right, :3, 3] * [-1, 1, 1]
+        left_nodes.append(left)
+    for left in left_nodes:
+        parent = rig.parents[left]
+        g['nodes'][left]['translation'] = (
+            mirrored_world[left, :3, 3] - mirrored_world[parent, :3, 3]
+        ).tolist()
+    for skin in g['skins']:
+        inverse = np.linalg.inv(mirrored_world[skin['joints']])
+        write(skin['inverseBindMatrices'], inverse.transpose(0, 2, 1).reshape(-1, 16))
+
     # Two complete gentle waves in a 2s loop: position and velocity match.
     wave = lambda t, period, phase=0: np.sin(2 * np.pi * (t / period + phase))
     for anim in g['animations']:
@@ -213,9 +241,10 @@ def main():
                 q = Rotation.from_euler('xyz', np.column_stack(params[name]), degrees=True).as_quat()
                 write(sampler['output'], q)
     g.setdefault('extras', {})['sideRefinement'] = {
-        'version': 2, 'weights': 'anatomical-local-fields',
+        'version': 4, 'weights': 'anatomical-local-fields',
         'sculptMaxDisplacement': float(np.linalg.norm(sculpted - v, axis=1).max()),
         'wavePeriod': 1.0,
+        'leftArmPivots': 'mirrored-from-right',
     }
     js = json.dumps(g, separators=(',', ':')).encode()
     js += b' ' * (-len(js) % 4)

@@ -6,6 +6,7 @@ import 'package:three_js/three_js.dart' as three;
 import '../animation/story_motion.dart';
 import '../animation/character_skin_palette.dart';
 import '../animation/character_eye_animation.dart';
+import '../animation/character_mouth_animation.dart';
 import '../animation/character_sleeve_morph.dart';
 import '../services/character_asset_cache.dart';
 import '../utils/character_helper.dart';
@@ -28,10 +29,10 @@ class SmartCharacterViewer extends StatelessWidget {
     this.showHat = false,
     this.hatColor = const Color(0xFF2C2C2E),
     this.showMuscles = false,
-    this.showGlasses = false,
+    this.showGlasses = true,
     this.cameraFit = 1.10,
     this.pose,
-    this.rigged = false,
+    this.rigged = true,
     this.onReady,
   });
   final String characterName;
@@ -64,7 +65,8 @@ class SmartCharacterViewer extends StatelessWidget {
         : rigged
         ? Uri.base.resolve(CharacterRig.modelPath).toString()
         : CharacterHelper.getModelPath(characterName);
-    final mobile = !kIsWeb &&
+    final mobile =
+        !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.android);
     if (pose == null && mobile) {
@@ -140,6 +142,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       : CharacterSkinPalette();
   bool _paletteAttached = false;
   final _eyeAnimation = CharacterEyeAnimation();
+  final _mouthAnimation = CharacterMouthAnimation();
   final _sleeveMorph = CharacterSleeveMorph();
   three.Object3D? _model;
   three.AnimationMixer? _mixer;
@@ -284,7 +287,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     view.scene.add(_model!);
     _model!.traverse((object) {
       if (object is three.Bone) _bones.add(object);
-      if (object is three.SkinnedMesh) object.frustumCulled = false;
+      if (object is three.Mesh) object.frustumCulled = false;
     });
     for (final pose in CharacterPoses.all) {
       final node = _model!.getObjectByName(pose.nodeName);
@@ -293,10 +296,13 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     if (widget.source == CharacterHelper.sharedModelPath) {
       _skinPalette.attach(_model!);
       _eyeAnimation.attach(_model!);
+      _mouthAnimation.attach(_model!);
       _sleeveMorph.attach(_model!);
       _paletteAttached = true;
     } else if (config.rigged) {
       _skinPalette.attach(_model!);
+      _eyeAnimation.attach(_model!);
+      _mouthAnimation.attach(_model!);
       _paletteAttached = true;
     } else if (_poseNodes.isNotEmpty) {
       _skinPalette.attach(_model!);
@@ -420,12 +426,15 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   void _buildLighting() {
     final view = _view;
     if (view == null) return;
-    view.scene.add(three.HemisphereLight(0xEAF6FF, 0x8D8270, 0.75));
+    view.scene.add(three.HemisphereLight(0xFFFFFF, 0x677B6D, 1.8));
     view.scene.add(
-      three.DirectionalLight(0xFFF2DC, 1.7)..position.setValues(-3, 6, 6),
+      three.DirectionalLight(0xFFFFFF, 2.2)..position.setValues(-2, 5, 5),
     );
     view.scene.add(
-      three.DirectionalLight(0xD7EFFF, 0.65)..position.setValues(4, 3, -3),
+      three.DirectionalLight(0xD5E6FF, 0.95)..position.setValues(3, 2, -2),
+    );
+    view.scene.add(
+      three.DirectionalLight(0xFFFFFF, 0.60)..position.setValues(0, 3, -4),
     );
     // Layered ellipses make a soft contact shadow without a shadow-map pass.
     for (var i = 0; i < 5; i++) {
@@ -473,7 +482,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
 
   void _applyGlasses() {
     _model?.traverse((object) {
-      if (object.material?.name != 'Glasses') return;
+      if (object.name != 'Glasses' && object.material?.name != 'Glasses') return;
       object.visible = config.showGlasses;
     });
   }
@@ -494,6 +503,11 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _model?.traverse((object) {
       final material = object.material;
       final name = material?.name;
+      // The new rig identifies accessories by node; its atlas material is
+      // shared with the body, so visibility must not recolor that material.
+      if (object.name == 'Hat') {
+        object.visible = config.showHat;
+      }
       if (name != 'Hat' &&
           name != 'HatBand' &&
           name != 'HatTrim' &&
@@ -606,6 +620,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       _sleeveMorph.update();
       final motion = config.motion ?? _plan.motionAt(_position);
       _eyeAnimation.update(dt, motion);
+      _mouthAnimation.update(dt, motion, isSpeaking: config.isSpeaking);
       _applyTalkingMouth(motion);
       _breathe();
     }
@@ -725,6 +740,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _loadTimeout?.cancel();
     _skinPalette.dispose();
     _eyeAnimation.dispose();
+    _mouthAnimation.dispose();
     _sleeveMorph.dispose();
     _orbit?.dispose();
     _orbit = null;

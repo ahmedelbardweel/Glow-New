@@ -19,7 +19,10 @@ import struct
 from pathlib import Path
 
 import numpy as np
-from scipy.spatial.transform import Rotation
+try:
+    from scipy.spatial.transform import Rotation
+except ImportError:
+    from frame_math import Rotation
 
 
 DTYPES = {5120: '<i1', 5121: '<u1', 5122: '<i2', 5123: '<u2', 5125: '<u4', 5126: '<f4'}

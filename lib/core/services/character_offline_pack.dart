@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../utils/character_helper.dart';
+import '../utils/character_poses.dart';
 
 /// Stages the mobile Three.js shell and shared GLB under app support so the
 /// WebView loads them as local files — no base64 bridge, fully offline.
@@ -70,8 +71,7 @@ class CharacterOfflinePack {
       htmlFileName: await _assetLength(htmlAsset),
       jsFileName: await _assetLength(jsAsset),
       modelFileName: await _assetLength(modelAsset),
-      // Bumps the stamp when the shell is rewritten as one offline file.
-      'inlineScript': 1,
+      'inlineScript': 4,
     };
     final stampFile = File('${dir.path}/$stampFileName');
     if (await _stampMatches(stampFile, planned) &&
@@ -82,6 +82,7 @@ class CharacterOfflinePack {
 
     await _writeOfflineShell(htmlFile(dir));
     await _copyAsset(modelAsset, modelFile(dir));
+    await _copyAsset(CharacterRig.assetPath, File('${dir.path}/glow_rigged.glb'));
     await stampFile.writeAsString(jsonEncode(planned), flush: true);
     return dir;
   }

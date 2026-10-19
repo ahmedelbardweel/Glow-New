@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Glow head material review</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/tools/character/node_modules/three/build/three.module.js","three/addons/":"/tools/character/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const query=new URLSearchParams(location.search);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(1);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#eef2ef');
+scene.add(new THREE.HemisphereLight(0xffffff,0x677b6d,2));
+const key=new THREE.DirectionalLight(0xffffff,2.4);key.position.set(-2,4,5);scene.add(key);
+const fill=new THREE.DirectionalLight(0xd5e6ff,1);fill.position.set(3,2,-2);scene.add(fill);
+const camera=new THREE.PerspectiveCamera(28,innerWidth/innerHeight,.01,20);
+const angle=Number(query.get('angle')||0)*Math.PI/180;
+camera.position.set(1.25*Math.sin(angle),.71,1.25*Math.cos(angle));camera.lookAt(0,.665,0);
+if(query.get('framing')==='body'){
+ camera.position.set(2.4*Math.sin(angle),.62,2.4*Math.cos(angle));camera.lookAt(0,.48,0);
+}
+const gltf=await new GLTFLoader().loadAsync(query.get('model')||'/build/tripo/side_review/candidate.glb');
+const model=gltf.scene;scene.add(model);
+model.traverse(o=>{
+  if(o.name==='Hat')o.visible=query.get('hat')==='1';
+  if(o.name==='Glasses')o.visible=query.get('glasses')!=='0';
+  if(o.name==='Scalp' && query.has('roughness')){o.material=o.material.clone();o.material.roughness=Number(query.get('roughness'));}
+  if(o.isMesh){o.frustumCulled=false;if(query.has('clay'))o.material=new THREE.MeshStandardMaterial({color:0x84a996,roughness:.78,side:THREE.DoubleSide});}
+});
+const mixer=new THREE.AnimationMixer(model);
+mixer.clipAction(gltf.animations.find(c=>c.name===(query.get('clip')||'Idle'))).play();mixer.update(Number(query.get('time')||0));
+if(query.has('mouth')){
+ const mouth=model.getObjectByName('ExpressiveMouth');
+ const poses={open:[1,0,0,0],smile:[0,1,0,0],sad:[0,0,1,0],round:[0,0,0,1],laugh:[.7,.7,0,0]};
+ if(mouth&&poses[query.get('mouth')])mouth.morphTargetInfluences.splice(0,4,...poses[query.get('mouth')]);
+}
+for(const name of ['EyeLeft','EyeRight']){const eye=model.getObjectByName(name);if(eye)eye.rotation.set(Number(query.get('gazeY')||0),Number(query.get('gazeX')||0),0);}
+if(query.has('blink')){
+ const lids=model.getObjectByName('EyeLids'),c=Math.max(0,Math.min(1,Number(query.get('blink'))));
+ if(lids)lids.morphTargetInfluences.splice(0,4,Math.min(2*c,2-2*c),Math.max(0,2*c-1),Math.min(2*c,2-2*c),Math.max(0,2*c-1));
+}
+renderer.render(scene,camera);
+document.title='Ready — Glow head material review';
+</script>

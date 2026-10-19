@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Glow — Eyes and glasses review</title>
+<style>body{margin:0;height:100vh;display:flex;flex-direction:column;background:#eef2ef;font:15px Arial;color:#18372f}header{padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}button,select,input{padding:7px}main{display:flex;flex:1;min-height:0}section{width:50%;min-width:0;position:relative}h3{position:absolute;top:0;left:20px;pointer-events:none}canvas{display:block;width:100%;height:100%}#status{font-size:12px}</style>
+<script type="importmap">{"imports":{"three":"/tools/character/node_modules/three/build/three.module.js","three/addons/":"/tools/character/node_modules/three/examples/jsm/"}}</script></head>
+<body><header><b>Glow · حركة التحية</b><select id="clip"><option>Idle</option><option>Wave</option><option>Talk</option><option>Victory</option><option>Happy</option><option>Thinking</option><option>Walk</option><option>Sad</option><option>Smile</option><option>Laugh</option></select><button id="play">Pause</button><input id="time" type="range" min="0" max="4" step="0.01" value="0"><select id="angle"><option value="0">Front</option><option value="-50">Right three-quarter</option><option value="-90">Right side</option><option value="50">Left three-quarter</option><option value="90">Left side</option><option value="180">Back</option></select><button id="reload">Reload result</button><label><input id="clay" type="checkbox">Clay</label><label dir="rtl" style="white-space:nowrap"><input id="hat" type="checkbox" autocomplete="off">إظهار الطاقية</label><label dir="rtl"><input id="glasses" type="checkbox" checked autocomplete="off">إظهار النظارة</label><label dir="rtl"><input id="autoBlink" type="checkbox" checked autocomplete="off">رمش تلقائي</label><label dir="rtl">الجفن <input id="blink" type="range" min="0" max="1" step="0.01" value="0"></label><select id="framing"><option value="face">الوجه</option><option value="body">الجسم كاملًا</option></select><span id="status">Loading…</span></header><main><section id="before"><h3>قبل — اليد من الجانب</h3></section><section id="after"><h3>بعد — راحة اليد للأمام</h3></section></main>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {CharacterEyes} from '/tools/character/character_eyes.js';
+const panels=[]; let playing=true, t=0, current=new URLSearchParams(location.search).get('clip')||'Idle'; document.querySelector('#clip').value=current; const loader=new GLTFLoader();
+for(const id of ['before','after']){
+ const host=document.getElementById(id),scene=new THREE.Scene();scene.background=new THREE.Color('#eef2ef');
+ const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;host.append(renderer.domElement);
+ const camera=new THREE.PerspectiveCamera(32,1,.01,20);camera.position.set(0,.69,1.45);
+ const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,.64,0);controls.enablePan=false;controls.update();
+ scene.add(new THREE.HemisphereLight(0xffffff,0x677b6d,2));const key=new THREE.DirectionalLight(0xffffff,2.4);key.position.set(-2,4,5);scene.add(key);const fill=new THREE.DirectionalLight(0xd5e6ff,1);fill.position.set(3,2,-2);scene.add(fill);
+ const p={id,host,scene,renderer,camera,controls};panels.push(p);
+ new ResizeObserver(()=>{renderer.setSize(host.clientWidth,host.clientHeight);camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix()}).observe(host);
+ await load(p);
+}
+async function load(p){
+ const url=p.id==='before'?'/build/tripo/wave_review/before.glb':'/build/tripo/side_review/candidate.glb';
+ const gltf=await loader.loadAsync(url+'?v='+Date.now());if(p.model)p.scene.remove(p.model);p.model=gltf.scene;p.scene.add(p.model);p.mixer=new THREE.AnimationMixer(p.model);p.clips=gltf.animations;p.eyes=new CharacterEyes(p.model);
+ p.model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.userData.original=o.material;o.userData.clay=new THREE.MeshStandardMaterial({color:['Body','Scalp','EyeLids','EyeSocketSkin'].includes(o.name)?0x84a996:0x686b70,roughness:.85,side:THREE.DoubleSide});if(document.querySelector('#clay').checked)o.material=o.userData.clay}});applyHat(p);applyGlasses(p);select(p);
+}
+function applyHat(p){p.model.traverse(o=>{if(o.name==='Hat')o.visible=document.querySelector('#hat').checked})}
+function applyGlasses(p){if(p.id==='after'){const frame=p.model.getObjectByName('Glasses');if(frame)frame.visible=document.querySelector('#glasses').checked}}
+function select(p){p.mixer.stopAllAction();const clip=p.clips.find(c=>c.name===current);p.action=p.mixer.clipAction(clip).play();document.querySelector('#time').max=clip.duration;p.action.time=t%clip.duration;p.mixer.update(0);}
+document.querySelector('#clip').onchange=e=>{current=e.target.value;t=0;panels.forEach(select)};
+document.querySelector('#play').onclick=e=>{playing=!playing;e.target.textContent=playing?'Pause':'Play'};
+document.querySelector('#time').oninput=e=>{t=+e.target.value;playing=false;document.querySelector('#play').textContent='Play'};
+function frameCamera(){const a=+document.querySelector('#angle').value*Math.PI/180,face=document.querySelector('#framing').value==='face',distance=face?1.45:3.0;panels.forEach(p=>{p.camera.position.set(distance*Math.sin(a),face?.69:.48,distance*Math.cos(a));p.controls.target.set(0,face?.64:.48,0);p.controls.update()})}
+document.querySelector('#angle').onchange=frameCamera;
+document.querySelector('#framing').onchange=frameCamera;
+if(new URLSearchParams(location.search).get('framing')==='body'){document.querySelector('#framing').value='body';frameCamera()}
+document.querySelector('#glasses').onchange=()=>panels.forEach(applyGlasses);
+document.querySelector('#blink').oninput=()=>{document.querySelector('#autoBlink').checked=false;panels.forEach(p=>p.eyes.setClosure(+document.querySelector('#blink').value))};
+document.querySelector('#reload').onclick=async()=>{await load(panels[1]);document.querySelector('#status').textContent='Result reloaded'};
+document.querySelector('#clay').onchange=e=>panels.forEach(p=>p.model.traverse(o=>{if(o.isMesh)o.material=e.target.checked?o.userData.clay:o.userData.original}));
+document.querySelector('#hat').onchange=()=>panels.forEach(applyHat);
+let last=performance.now();function frame(now){const dt=Math.min((now-last)/1000,.06);last=now;if(playing)t+=dt;panels.forEach(p=>{if(p.action){p.action.time=t%p.action.getClip().duration;p.mixer.update(0)}if(document.querySelector('#autoBlink').checked){if(playing)p.eyes.update(dt,current)}else p.eyes.setClosure(+document.querySelector('#blink').value);p.controls.update();p.renderer.render(p.scene,p.camera)});document.querySelector('#time').value=t%(panels[0].action?.getClip().duration||4);requestAnimationFrame(frame)}requestAnimationFrame(frame);document.querySelector('#status').textContent='Ready';document.title='Ready — Glow eyes and glasses review';
+if(new URLSearchParams(location.search).has('test'))window.glowReviewPanels=panels;
+</script></body></html>

@@ -9,6 +9,7 @@ class CharacterEyeAnimation {
   final _rotation = three.Euler();
   final _eyes = <three.Object3D>[];
   three.Mesh? _lids;
+  bool _keepOpenLids = false;
   CharacterMotion? _motion;
   double _time = 0, _motionTime = 0;
   double _nextBlink = 0.7, _blinkStart = -10, _blinkDuration = .26;
@@ -27,7 +28,8 @@ class CharacterEyeAnimation {
               object.morphTargetDictionary?.containsKey('BlinkLeftClosed') ==
                   true)) {
         _lids = object;
-        object.visible = false;
+        _keepOpenLids = object.userData['keepOpenLids'] == true;
+        object.visible = _keepOpenLids;
       }
     });
   }
@@ -103,7 +105,7 @@ class CharacterEyeAnimation {
     _squint += (squint - _squint) * (1 - math.exp(-dt * 9));
     final left = math.max(_squint, _blink(0));
     final right = math.max(_squint, _blink(.012));
-    _lids!.visible = math.max(left, right) > .002;
+    _lids!.visible = _keepOpenLids || math.max(left, right) > .002;
     for (var i = 0; i < 2; i++) {
       final close = i == 0 ? left : right;
       // Settle gaze behind the lids to prevent an iris grazing a closing lid.
@@ -118,6 +120,7 @@ class CharacterEyeAnimation {
   void dispose() {
     _eyes.clear();
     _lids = null;
+    _keepOpenLids = false;
     _motion = null;
     _time = _motionTime = 0;
     _gazeX = _gazeY = _squint = _lookX = _lookY = 0;

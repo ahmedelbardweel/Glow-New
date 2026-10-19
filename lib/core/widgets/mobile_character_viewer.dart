@@ -29,7 +29,7 @@ class MobileCharacterViewer extends StatefulWidget {
     required this.showSkeleton,
     this.showHat = false,
     this.showMuscles = false,
-    this.showGlasses = false,
+    this.showGlasses = true,
     this.cameraFit = 1.10,
     this.hatColor = const Color(0xFF2C2C2E),
     this.motion,
@@ -227,6 +227,13 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
         widget.onReady?.call();
       case 'loaded':
         _timeout?.cancel();
+      case 'localLoadFailed':
+        if (kDebugMode) {
+          debugPrint(
+            'Character localLoadFailed, streaming bytes: ${payload['message']}',
+          );
+        }
+        unawaited(_streamFallback(controller, generation));
       case 'error':
         _fail(payload['message'] ?? 'WebGL initialization failed', generation);
       case 'sample':
@@ -244,6 +251,24 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
       if (!mounted || generation != _generation) return;
       final state = jsonEncode(_state(seek: true));
       await controller.runJavaScript('GlowViewer.update($state);');
+      final source = widget.modelAsset ??
+          CharacterHelper.getModelPath(widget.characterName);
+      if (!_isRemoteOrFileSource(source)) {
+        // Fast-path: local model load directly from the offline pack
+        await controller.runJavaScript("GlowViewer.loadLocal('glow_mascot.glb');");
+        return;
+      }
+      await _streamFallback(controller, generation);
+    } catch (error) {
+      _fail(error, generation);
+    }
+  }
+
+  Future<void> _streamFallback(
+    WebViewController controller,
+    int generation,
+  ) async {
+    try {
       final bytes = await (_modelBytesFuture ?? _resolveModelBytes());
       _modelBytesFuture = null;
       if (!mounted || generation != _generation) return;
@@ -259,7 +284,7 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
     int generation,
   ) async {
     await controller.runJavaScript('GlowViewer.begin(${bytes.length});');
-    const chunkSize = 512 * 1024;
+    const chunkSize = 1024 * 1024;
     const batchSize = 2;
     final parts = <String>[];
     for (var offset = 0; offset < bytes.length; offset += chunkSize) {

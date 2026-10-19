@@ -487,7 +487,7 @@ try {
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.95;
   if ('physicallyCorrectLights' in renderer) renderer.physicallyCorrectLights = false;
   renderer.debug.onShaderError = () => fail(new Error('Character shader compilation failed'));
   document.body.appendChild(renderer.domElement);

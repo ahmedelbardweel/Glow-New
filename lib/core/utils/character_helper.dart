@@ -5,27 +5,27 @@ class CharacterHelper {
   static const sharedModelPath = 'assets/3d/glow_mascot.glb';
   static const Map<String, Map<String, dynamic>> characters = {
     'fort': {
-      'color': Color(0xFFA63352), // Red/Coral
+      'color': Color(0xFF912740), // Rich Ruby / Crimson
       'model': 'glow_mascot.glb',
     },
     'lort': {
-      'color': Color(0xFF8FA685), // Golden/Yellow
+      'color': Color(0xFF6E8B62), // Rich Sage Green
       'model': 'glow_mascot.glb',
     },
     'mort': {
-      'color': Color(0xFFD9A9B2), // Deep Magenta/Red
+      'color': Color(0xFFB55D75), // Deep Berry / Rose Mauve
       'model': 'glow_mascot.glb',
     },
     'port': {
-      'color': Color(0xFF36593C), // Darker Green
+      'color': Color(0xFF28542F), // Deep Emerald Forest Green
       'model': 'glow_mascot.glb',
     },
     'qort': {
-      'color': Color(0xFFAAD7E9), // Blue
+      'color': Color(0xFF4A90B8), // Deep Vibrant Cyan Sky Blue
       'model': 'glow_mascot.glb',
     },
     'sort': {
-      'color': Color(0xFFE2B15A),
+      'color': Color(0xFFD09236), // Rich Golden Amber
       'model': 'glow_mascot.glb',
     },
   };

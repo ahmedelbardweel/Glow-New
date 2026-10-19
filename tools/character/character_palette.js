@@ -109,7 +109,20 @@ attach(mesh, seen) {
         float greenDominance = (diffuseColor.g - max(diffuseColor.r, diffuseColor.b)) / max(diffuseColor.g, 0.0001);
         float mask = smoothstep(0.20, 0.45, greenDominance) * clamp(vGlowSkinRegion, 0.0, 1.0) * glowSkinStrength;
         float shade = pow(max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / ${this.referenceLuminance}, 0.0), ${this.shadeContrast.toFixed(3)});
-        diffuseColor.rgb = mix(diffuseColor.rgb, glowSkinTarget * shade, mask);
+
+        if (glowSkinStrength < 0.5) {
+          // Original green (Port): Boost vibrancy & contrast so it is rich emerald, never pale or washed out
+          float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 1.35);
+          diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08));
+        } else {
+          // Recolored identities: Rich, saturated, punchy hero tones
+          vec3 recolor = glowSkinTarget * shade;
+          float lum = dot(recolor, vec3(0.2126, 0.7152, 0.0722));
+          recolor = mix(vec3(lum), recolor, 1.30);
+          diffuseColor.rgb = mix(diffuseColor.rgb, recolor, mask);
+        }
+
         float muscleOn = glowMuscles;
         diffuseColor.rgb *= mix(1.0, 0.62, clamp(vGlowMuscle.x, 0.0, 1.0) * muscleOn);
         diffuseColor.rgb *= mix(1.0, 1.28, clamp(vGlowMuscle.y, 0.0, 1.0) * muscleOn);

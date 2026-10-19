@@ -302,7 +302,38 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     view.scene.add(_model!);
     _model!.traverse((object) {
       if (object is three.Bone) _bones.add(object);
-      if (object is three.Mesh) object.frustumCulled = false;
+      if (object is three.Mesh) {
+        object.frustumCulled = false;
+        final meshName = object.name.toLowerCase();
+        final material = object.material;
+        if (material is three.MeshStandardMaterial) {
+          final matName = material.name.toLowerCase();
+          final isEye = meshName.contains('eye') || matName.contains('eye');
+          final isGlasses = meshName.contains('glasses') ||
+              matName.contains('glasses') ||
+              meshName.contains('spectacle') ||
+              matName.contains('spectacle');
+          final isMouth = meshName.contains('mouth') ||
+              matName.contains('mouth') ||
+              meshName.contains('jaw') ||
+              matName.contains('teeth') ||
+              matName.contains('tongue');
+          if (isEye) {
+            material.roughness = 0.06;
+            material.metalness = 0.0;
+          } else if (isGlasses) {
+            material.roughness = 0.16;
+            material.metalness = 0.15;
+          } else if (isMouth) {
+            material.roughness = 0.25;
+            material.metalness = 0.0;
+          } else {
+            material.roughness = 0.38;
+            material.metalness = 0.02;
+          }
+          material.needsUpdate = true;
+        }
+      }
     });
     for (final pose in CharacterPoses.all) {
       final node = _model!.getObjectByName(pose.nodeName);
@@ -441,15 +472,15 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   void _buildLighting() {
     final view = _view;
     if (view == null) return;
-    view.scene.add(three.HemisphereLight(0xFFFFFF, 0x677B6D, 1.8));
+    view.scene.add(three.HemisphereLight(0xFFF8F2, 0x1F2E24, 0.45));
     view.scene.add(
-      three.DirectionalLight(0xFFFFFF, 2.2)..position.setValues(-2, 5, 5),
+      three.DirectionalLight(0xFFFFFF, 1.6)..position.setValues(-2, 4.5, 4.5),
     );
     view.scene.add(
-      three.DirectionalLight(0xD5E6FF, 0.95)..position.setValues(3, 2, -2),
+      three.DirectionalLight(0xBDD7EE, 0.50)..position.setValues(3, 2, 2),
     );
     view.scene.add(
-      three.DirectionalLight(0xFFFFFF, 0.60)..position.setValues(0, 3, -4),
+      three.DirectionalLight(0xFFFFFF, 1.35)..position.setValues(0, 3.5, -4),
     );
     // Layered ellipses make a soft contact shadow without a shadow-map pass.
     for (var i = 0; i < 5; i++) {

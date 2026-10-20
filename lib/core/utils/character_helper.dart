@@ -34,15 +34,16 @@ class CharacterHelper {
 
   static String getCleanName(String rawName) {
     if (rawName.trim().isEmpty) return 'شخصية';
+    try {
+      final custom = sl<CustomCharacterRepository>().findCharacter(rawName);
+      if (custom != null) return custom.name;
+    } catch (_) {}
+
     if (rawName.startsWith('custom|')) {
       final parts = rawName.split('|');
       if (parts.length >= 3 && parts[2].trim().isNotEmpty) {
         return parts[2].trim();
       }
-      try {
-        final custom = sl<CustomCharacterRepository>().getCharacterById(parts[1]);
-        if (custom != null) return custom.name;
-      } catch (_) {}
       return 'شخصية مخصصة';
     }
 
@@ -80,6 +81,11 @@ class CharacterHelper {
   }
 
   static Color getColor(String rawName) {
+    try {
+      final custom = sl<CustomCharacterRepository>().findCharacter(rawName);
+      if (custom != null) return custom.bodyColor;
+    } catch (_) {}
+
     if (rawName.startsWith('custom|')) {
       final parts = rawName.split('|');
       if (parts.length >= 2) {
@@ -91,10 +97,6 @@ class CharacterHelper {
             if (clean.length == 8) return Color(int.parse(clean, radix: 16));
           } catch (_) {}
         }
-        try {
-          final custom = sl<CustomCharacterRepository>().getCharacterById(idOrHex);
-          if (custom != null) return custom.bodyColor;
-        } catch (_) {}
       }
     }
 

@@ -121,6 +121,47 @@ class CustomCharacterRepository {
     return null;
   }
 
+  CustomCharacterModel? getCharacterByName(String name) {
+    final list = getCachedCharacters();
+    final clean = name.trim().toLowerCase();
+    for (final char in list) {
+      if (char.name.trim().toLowerCase() == clean) return char;
+    }
+    return null;
+  }
+
+  CustomCharacterModel? findCharacter(String identifier) {
+    final trimmed = identifier.trim();
+    if (trimmed.isEmpty) return null;
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.queryParameters.containsKey('name')) {
+      final paramName = uri.queryParameters['name']!;
+      final byParam = getCharacterByName(paramName);
+      if (byParam != null) return byParam;
+    }
+
+    if (trimmed.startsWith('custom|')) {
+      final parts = trimmed.split('|');
+      if (parts.length > 1) {
+        final byId = getCharacterById(parts[1]);
+        if (byId != null) return byId;
+        final byName = getCharacterByName(parts[1]);
+        if (byName != null) return byName;
+      }
+      if (parts.length > 2) {
+        final byId = getCharacterById(parts[2]);
+        if (byId != null) return byId;
+        final byName = getCharacterByName(parts[2]);
+        if (byName != null) return byName;
+      }
+    }
+    final byId = getCharacterById(trimmed);
+    if (byId != null) return byId;
+
+    return getCharacterByName(trimmed);
+  }
+
   Future<void> _saveToCache(List<CustomCharacterModel> list) async {
     try {
       final raw = jsonEncode(list.map((c) => c.toJson()).toList());

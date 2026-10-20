@@ -12,6 +12,9 @@ import '../services/character_asset_cache.dart';
 import '../utils/character_helper.dart';
 import '../utils/character_poses.dart';
 import 'mobile_character_viewer.dart';
+import '../di/injection_container.dart';
+import '../../features/content/data/models/custom_character_model.dart';
+import '../../features/content/data/repositories/custom_character_repository.dart';
 
 /// One skinned GLB with reusable animations and five material colors.
 /// Speaking uses a stylized cadence, not phoneme-based lip synchronization.
@@ -72,6 +75,18 @@ class SmartCharacterViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    CustomCharacterModel? customChar;
+    try {
+      customChar = sl<CustomCharacterRepository>().findCharacter(characterName);
+    } catch (_) {}
+
+    final effectiveShowHat = showHat || (customChar?.hasHat == true);
+    final effectiveHatColor = showHat
+        ? hatColor
+        : (customChar?.hasHat == true ? customChar!.hatColor : hatColor);
+    final effectiveShowGlasses = customChar != null ? customChar.hasGlasses : showGlasses;
+    final effectiveBellyColor = bellyColor ?? customChar?.bellyColor;
+
     final source = pose != null
         ? Uri.base.resolve(CharacterPoses.modelPath).toString()
         : rigged
@@ -91,11 +106,11 @@ class SmartCharacterViewer extends StatelessWidget {
         isSpeaking: isSpeaking,
         interactive: interactive,
         showSkeleton: showSkeleton,
-        showHat: showHat,
-        hatColor: hatColor,
-        bellyColor: bellyColor,
+        showHat: effectiveShowHat,
+        hatColor: effectiveHatColor,
+        bellyColor: effectiveBellyColor,
         showMuscles: showMuscles,
-        showGlasses: showGlasses,
+        showGlasses: effectiveShowGlasses,
         cameraFit: cameraFit,
         framing: framing,
         cameraAngle: cameraAngle,
@@ -107,6 +122,31 @@ class SmartCharacterViewer extends StatelessWidget {
         onReady: onReady,
       );
     }
+    final resolvedConfig = SmartCharacterViewer(
+      key: key,
+      characterName: characterName,
+      storyText: storyText,
+      isPlaying: isPlaying,
+      isSpeaking: isSpeaking,
+      playbackPosition: playbackPosition,
+      motion: motion,
+      interactive: interactive,
+      showSkeleton: showSkeleton,
+      showHat: effectiveShowHat,
+      hatColor: effectiveHatColor,
+      bellyColor: effectiveBellyColor,
+      showMuscles: showMuscles,
+      showGlasses: effectiveShowGlasses,
+      cameraFit: cameraFit,
+      framing: framing,
+      cameraAngle: cameraAngle,
+      autoBlink: autoBlink,
+      blink: blink,
+      clay: clay,
+      pose: pose,
+      rigged: rigged,
+      onReady: onReady,
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(
@@ -119,7 +159,7 @@ class SmartCharacterViewer extends StatelessWidget {
           key: ValueKey(source),
           source: source,
           size: size,
-          configuration: this,
+          configuration: resolvedConfig,
         );
       },
     );

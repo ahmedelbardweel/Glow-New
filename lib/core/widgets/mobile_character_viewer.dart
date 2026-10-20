@@ -483,6 +483,7 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
         oldWidget.blink != widget.blink ||
         oldWidget.clay != widget.clay ||
         oldWidget.hatColor != widget.hatColor ||
+        oldWidget.bellyColor != widget.bellyColor ||
         oldWidget.interactive != widget.interactive ||
         oldWidget.playbackPosition != widget.playbackPosition) {
       _sendState();

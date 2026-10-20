@@ -2240,23 +2240,19 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     Color hatColor = hat?.color ?? const Color(0xFF2C2C2E);
     bool showGlasses = _glassesOnAt(time);
 
-    if (character.startsWith('custom|')) {
-      final parts = character.split('|');
-      final id = parts.length > 1 ? parts[1] : '';
-      try {
-        final customChar = sl<CustomCharacterRepository>().getCharacterById(id);
-        if (customChar != null) {
-          customBellyColor = customChar.bellyColor;
-          if (hat == null && customChar.hasHat) {
-            showHat = true;
-            hatColor = customChar.hatColor;
-          }
-          if (!showGlasses && customChar.hasGlasses) {
-            showGlasses = true;
-          }
+    try {
+      final customChar = sl<CustomCharacterRepository>().findCharacter(character);
+      if (customChar != null) {
+        customBellyColor = customChar.bellyColor;
+        if (hat == null && customChar.hasHat) {
+          showHat = true;
+          hatColor = customChar.hatColor;
         }
-      } catch (_) {}
-    }
+        if (!showGlasses && customChar.hasGlasses) {
+          showGlasses = true;
+        }
+      }
+    } catch (_) {}
 
     return SmartCharacterViewer(
       characterName: character,

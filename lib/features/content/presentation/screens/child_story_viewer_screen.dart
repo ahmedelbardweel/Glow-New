@@ -22,6 +22,8 @@ import 'dart:convert';
 import '../../../../core/models/story_timeline.dart';
 import '../../../../core/widgets/story_transition_frame.dart';
 import '../../../../core/animation/story_motion.dart';
+import '../../data/models/custom_character_model.dart';
+import '../../data/repositories/custom_character_repository.dart';
 
 class ChildStoryViewerScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -75,6 +77,11 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     _contentBloc.add(
       ContentEvent.getStories(widget.mission.id),
     );
+    try {
+      sl<CustomCharacterRepository>().fetchCharacters(forceRefresh: true).then((_) {
+        if (mounted) setState(() {});
+      }).catchError((_) {});
+    } catch (_) {}
     ChildButtonVoice.speaking.addListener(_onButtonVoice);
     _positionNotifier.addListener(_onTimelineLook);
   }
@@ -91,14 +98,34 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
   String _timelineLookKey(Duration position) {
     final timeline = _currentTimeline;
-    if (timeline == null) return '';
     final t = position.inMilliseconds / 1000.0;
-    final hat = timeline.getActiveHatAt(t);
-    return '${timeline.getActiveCharacterAt(t) ?? ''}|'
-        '${timeline.getActiveMotionAt(t) ?? ''}|'
-        '${hat?.colorHex ?? ''}|'
-        '${timeline.glassesOnAt(t)}|'
-        '${timeline.musclesOnAt(t)}';
+    final activeChar = timeline?.getActiveCharacterAt(t) ??
+        (timeline?.blocks.isNotEmpty == true
+            ? timeline!.blocks.first.characterId
+            : (_stories.isNotEmpty && _currentIndex < _stories.length
+                ? _stories[_currentIndex].characterName
+                : ''));
+    CustomCharacterModel? customChar;
+    try {
+      customChar = sl<CustomCharacterRepository>().findCharacter(activeChar);
+    } catch (_) {}
+
+    final hat = timeline?.getActiveHatAt(t);
+    final hasHat = hat != null ||
+        (timeline != null && timeline.hatBlocks.isEmpty && (customChar?.hasHat ?? false)) ||
+        (timeline == null && (customChar?.hasHat ?? false));
+    final hatCol = hat?.colorHex ??
+        (customChar?.hasHat == true
+            ? '#${(customChar!.hatColor.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}'
+            : '');
+    final hasGlasses = timeline != null && timeline.glassesBlocks.isNotEmpty
+        ? timeline.glassesOnAt(t)
+        : (customChar?.hasGlasses ?? false);
+
+    return '$activeChar|'
+        '${timeline?.getActiveMotionAt(t) ?? ''}|'
+        '$hatCol|$hasHat|$hasGlasses|'
+        '${timeline?.musclesOnAt(t) ?? false}';
   }
 
   void _onButtonVoice() {
@@ -828,10 +855,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                               final position = _positionNotifier.value;
                               String activeChar = story.characterName;
                               CharacterMotion? activeMotion;
-                              var showHat = false;
-                              var showGlasses = false;
-                              var showMuscles = false;
-                              var hatColor = const Color(0xFF2C2C2E);
+
                               if (_currentTimeline != null) {
                                 final t = position.inMilliseconds / 1000.0;
                                 activeChar =
@@ -851,12 +875,31 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                         orElse: () => CharacterMotion.idle,
                                       );
                                 }
-                                final hat = _currentTimeline!.getActiveHatAt(t);
-                                if (hat != null) {
-                                  showHat = true;
-                                  hatColor = hat.color;
+                              }
+
+                              CustomCharacterModel? customChar;
+                              try {
+                                customChar = sl<CustomCharacterRepository>().findCharacter(activeChar);
+                              } catch (_) {}
+
+                              var showHat = customChar?.hasHat ?? false;
+                              var hatColor = customChar?.hatColor ?? const Color(0xFF2C2C2E);
+                              var showGlasses = customChar?.hasGlasses ?? false;
+                              var bellyColor = customChar?.bellyColor;
+                              var showMuscles = false;
+
+                              if (_currentTimeline != null) {
+                                final t = position.inMilliseconds / 1000.0;
+                                if (_currentTimeline!.hatBlocks.isNotEmpty) {
+                                  final hat = _currentTimeline!.getActiveHatAt(t);
+                                  showHat = hat != null;
+                                  if (hat != null) {
+                                    hatColor = hat.color;
+                                  }
                                 }
-                                showGlasses = _currentTimeline!.glassesOnAt(t);
+                                if (_currentTimeline!.glassesBlocks.isNotEmpty) {
+                                  showGlasses = _currentTimeline!.glassesOnAt(t);
+                                }
                                 showMuscles = _currentTimeline!.musclesOnAt(t);
                               }
 
@@ -907,6 +950,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                                             hatColor: hatColor,
                                                             showGlasses: showGlasses,
                                                             showMuscles: showMuscles,
+                                                            bellyColor: bellyColor,
                                                             cameraFit: 1.45,
                                                             onReady: () => _onCharacterReady(_sceneGeneration),
                                                           ),

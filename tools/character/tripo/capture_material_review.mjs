@@ -105,7 +105,7 @@ try{
       for(const name of ['Body','Scalp','EyeSocketSkin','EyeLids']){
         const mesh=model.getObjectByName(name);
         assert(mesh.geometry.getAttribute('_glow_skin_region'),'Missing skin region: '+name);
-        assert(mesh.material.customProgramCacheKey().includes('palette-v9'),'Missing color shader: '+name);
+        assert(mesh.material.customProgramCacheKey().startsWith('glow-skin-palette-'),'Missing color shader: '+name);
       }
       const eye=model.getObjectByName('EyeLeft'),uv=eye.geometry.getAttribute('uv'),mask=eye.geometry.getAttribute('_glow_skin_region');
       for(let i=0;i<uv.count;i++){

@@ -207,3 +207,28 @@ selected identity on the right. `--verify-palette` checks all six rendered
 colors, skin-region coverage, iris exclusion and preserved playback. Blue and
 red renders with partially closed eyelids were inspected. Rebuild the mobile
 bundle after JS palette edits and the Flutter studio after Dart edits.
+
+## Continuous head surface
+
+Run `smooth_head.py` on the latest mouth/Wave model. It fits one rounded
+surface through Body and Scalp and applies the same spatial deformation to
+EyeSocketSkin, whose glasses repair also wraps around the sides and back.
+Leaving that backing unchanged creates a raised band even when the main
+scalp seam matches. A small clearance prevents coincident patch triangles.
+The deformation fades below the head and preserves the front facial features.
+
+The scalp, body head region and socket backing share a consistent skin tone
+and roughness. A separate Body atlas preserves the original hat and glasses
+material. The existing palette shader still recolors all three skin surfaces.
+
+```powershell
+python tools/character/tripo/smooth_head.py build/tripo/head_smooth_review/before.glb build/tripo/head_smooth_review/candidate.glb
+python tools/character/tripo/check_head_smoothing.py build/tripo/head_smooth_review/before.glb build/tripo/head_smooth_review/candidate.glb --output build/tripo/head_smooth_review/validation.json
+```
+
+The validator preserves original binary data, topology, skin weights, rig,
+animations, mouth and accessories, and checks 1,918 shared boundary vertices
+through 90 animated poses. The side review compares before/after smoothing
+with synchronized colors and accessory controls. Inspect front, both sides
+and back, then verify palette/accessory controls before installing the GLB
+into both shipped paths and rebuilding the studio.

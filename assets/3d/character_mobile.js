@@ -4291,7 +4291,7 @@ float glowMuscleHeight(vec3 p, vec3 n) {
   h -= exp(-(p.y - 0.222) * (p.y - 0.222) / 0.000030) * 0.002 * reach;
   return h * gate;
 }
-`,dl=class{constructor({referenceLuminance:e=.106,shadeContrast:t=.75}={}){this.referenceLuminance=e,this.shadeContrast=t,this.target={value:new Me},this.strength={value:0},this.muscles={value:0},this.bellyTarget={value:new Me("#efece6")},this.bellyCustom={value:0}}setColor(e,t=!1){this.target.value.set(e),this.strength.value=t?0:1}setBellyColor(e,t=!0){e&&t?(this.bellyTarget.value.set(e),this.bellyCustom.value=1):this.bellyCustom.value=0}setMuscles(e){this.muscles.value=e?1:0}attach(e,t){let{target:n,strength:i,muscles:r,bellyTarget:a,bellyCustom:o}=this;if(["EyeLeft","EyeRight"].includes(e.name)&&e.geometry?.getAttribute("uv")&&!e.geometry.getAttribute("_glow_skin_region")){let l=e.geometry.getAttribute("uv"),h=Float32Array.from({length:l.count},(u,d)=>Math.hypot(2*l.getX(d)-1,2*l.getY(d)-1)>.8?1:0);e.geometry.setAttribute("_glow_skin_region",new vt(h,1))}if(!e.geometry?.getAttribute("_glow_skin_region"))return;let c=e.name==="Scalp";for(let l of[e.material].flat()){if(!l||t.has(l)||Fx.has(l.name))continue;t.add(l);let h=c||l.name==="GlowScalpSkin";l.customProgramCacheKey=()=>`glow-skin-palette-v15-${h?"scalp":"body"}`,l.onBeforeCompile=u=>{u.uniforms.glowSkinTarget=n,u.uniforms.glowSkinStrength=i,u.uniforms.glowMuscles=r,u.uniforms.glowBellyTarget=a,u.uniforms.glowBellyCustom=o,u.vertexShader=`attribute float _glow_skin_region;
+`,dl=class{constructor({referenceLuminance:e=.106,shadeContrast:t=.75}={}){this.referenceLuminance=e,this.shadeContrast=t,this.target={value:new Me},this.strength={value:0},this.muscles={value:0},this.bellyTarget={value:new Me("#efece6")},this.bellyCustom={value:0}}setColor(e,t=!1){this.target.value.set(e),this.strength.value=t?0:1}setBellyColor(e,t=!0){e&&t?(this.bellyTarget.value.set(e),this.bellyCustom.value=1):this.bellyCustom.value=0}setMuscles(e){this.muscles.value=e?1:0}attach(e,t){let{target:n,strength:i,muscles:r,bellyTarget:a,bellyCustom:o}=this;if(["EyeLeft","EyeRight"].includes(e.name)&&e.geometry?.getAttribute("uv")&&!e.geometry.getAttribute("_glow_skin_region")){let l=e.geometry.getAttribute("uv"),h=Float32Array.from({length:l.count},(u,d)=>Math.hypot(2*l.getX(d)-1,2*l.getY(d)-1)>.8?1:0);e.geometry.setAttribute("_glow_skin_region",new vt(h,1))}if(!e.geometry?.getAttribute("_glow_skin_region"))return;let c=e.name==="Scalp";for(let l of[e.material].flat()){if(!l||t.has(l)||Fx.has(l.name))continue;t.add(l);let h=c||l.name==="GlowScalpSkin";l.customProgramCacheKey=()=>`glow-skin-palette-v16-${h?"scalp":"body"}`,l.onBeforeCompile=u=>{u.uniforms.glowSkinTarget=n,u.uniforms.glowSkinStrength=i,u.uniforms.glowMuscles=r,u.uniforms.glowBellyTarget=a,u.uniforms.glowBellyCustom=o,u.vertexShader=`attribute float _glow_skin_region;
 varying float vGlowSkinRegion;
 varying vec3 vGlowMuscle;
 uniform float glowMuscles;
@@ -4321,10 +4321,10 @@ varying vec3 vGlowMuscle;
           diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 1.30);
           diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.05));
         } else {
-          // Recolored identities: 100% UNIFORM rich color across head, scalp, and body.
+          // Use the same shading on both sides of the completed scalp seam.
           float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
           float ao = clamp(lum / 0.16, 0.82, 1.0);
-          vec3 recolor = glowSkinTarget * (${h?"1.0":"ao"});
+          vec3 recolor = glowSkinTarget * ao;
           diffuseColor.rgb = mix(diffuseColor.rgb, recolor, mask);
         }
 

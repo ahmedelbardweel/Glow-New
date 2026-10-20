@@ -21,14 +21,15 @@ def refine(source,destination):
         g['bufferViews'].append(dict(buffer=0,byteOffset=len(blob),byteLength=data.nbytes,target=34962));blob.extend(data.tobytes());ai=len(g['accessors'])
         g['accessors'].append(dict(bufferView=vi,componentType=5126,count=len(data),type=kind,min=data.min(0).tolist(),max=data.max(0).tolist()));return ai
     prim=[];positions=[];faces=[];normals=[];offset=0
-    for name in ['Body','Scalp']:
+    for name in ['Body','Scalp','EyeSocketSkin']:
         node=next(n for n in g['nodes'] if n.get('name')==name);p=g['meshes'][node['mesh']]['primitives'][0];prim.append(p)
         v=get(p['attributes']['POSITION']);positions.append(v);normals.append(get(p['attributes']['NORMAL']))
         faces.append(get(p['indices']).reshape(-1,3)+offset);offset+=len(v)
     old=np.concatenate(positions);oldn=np.concatenate(normals);f=np.concatenate(faces)
     # Fit one smooth ellipsoid to both surfaces; protect nose, brows and eyes.
     # A continuous spatial field avoids pulling apart the source's open UV edges.
-    fit=old[(old[:,1]>.55)&((old[:,2]<.12)|(old[:,1]>.74))]
+    shell=np.concatenate(positions[:2])
+    fit=shell[(shell[:,1]>.55)&((shell[:,2]<.12)|(shell[:,1]>.74))]
     x,y,z=fit.T
     coef=np.linalg.lstsq(np.c_[x*x,z*z,y*y,y,z],np.ones(len(fit)),rcond=None)[0]
     cy=-coef[3]/(2*coef[2]);cz=-coef[4]/(2*coef[1])
@@ -38,13 +39,17 @@ def refine(source,destination):
     radius=np.sqrt(np.clip(1-((old[:,1]-cy)/ry)**2,0,1))
     target=np.c_[rx*radius*np.sin(angle),old[:,1],cz+rz*radius*np.cos(angle)]
     front=smooth((old[:,2]-.03)/.15)
-    lower=.50+.18*front
+    lower=.43+.25*front
     weight=smooth((old[:,1]-lower)/.07)
     new=old*(1-weight[:,None])+target*weight[:,None]
     n=(target-[0,cy,cz])/[rx*rx,ry*ry,rz*rz]
     n/=np.maximum(np.linalg.norm(n,axis=1,keepdims=True),1e-15)
     normal=oldn*(1-weight[:,None])+n*weight[:,None]
     normal/=np.maximum(np.linalg.norm(normal,axis=1,keepdims=True),1e-15)
+    # The removable-glasses backing wraps around the sides and rear too.
+    # Deform it with the head and retain a tiny clearance at overlapping edges.
+    socket_start=sum(map(len,positions[:2]))
+    new[socket_start:]+=n[socket_start:]*weight[socket_start:,None]*.00008
     offset=0
     for p,original in zip(prim,positions):
         count=len(original);p['attributes']['POSITION']=put(new[offset:offset+count]);p['attributes']['NORMAL']=put(normal[offset:offset+count]);offset+=count
@@ -56,7 +61,7 @@ def refine(source,destination):
     uv=get(prim[0]['attributes']['TEXCOORD_0']);rgb=sample(atlas,uv)
     clean=(rgb[:,1]>1.5*np.maximum(rgb[:,0],rgb[:,2]))&(positions[0][:,1]>.59)&(positions[0][:,1]<.67)
     tone=np.median(rgb[clean],axis=0)
-    bp=positions[0];cw=smooth((bp[:,1]-(.50+.13*smooth((bp[:,2]-.03)/.15)))/.075)
+    bp=positions[0];cw=smooth((bp[:,1]-(.42+.18*smooth((bp[:,2]-.03)/.15)))/.075)
     h,w=atlas.shape[:2];mask=np.zeros((h,w),dtype=np.float32)
     for face in faces[0][cw[faces[0]].max(1)>.001]:
         xy=uv[face]*[w,h]-.5;x,y=xy.T
@@ -83,6 +88,10 @@ def refine(source,destination):
     scalpbase=texture_image(g['materials'][prim[1]['material']]['pbrMetallicRoughness']['baseColorTexture']['index'])
     reference=linear(sample(scalpbase,get(prim[1]['attributes']['TEXCOORD_0'])))
     prim[1]['attributes']['COLOR_0']=put(np.clip(linear(tone)/np.maximum(reference,1e-8),0,1))
+    socket=positions[2]
+    blend=smooth((socket[:,1]-(.42+.18*smooth((socket[:,2]-.03)/.15)))/.075)
+    color=get(prim[2]['attributes']['COLOR_0'])
+    prim[2]['attributes']['COLOR_0']=put(color*(1-blend[:,None])+linear(tone)*blend[:,None])
     # One consistent soft surface response instead of a separate glossy cap.
     material=g['materials'][prim[1]['material']]['pbrMetallicRoughness']
     material['roughnessFactor']=.78;material.pop('metallicRoughnessTexture',None)

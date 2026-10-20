@@ -107,7 +107,7 @@ attach(mesh, seen) {
     if (!material || seen.has(material) || HAT_MATERIALS.has(material.name)) continue;
     seen.add(material);
     const scalpMat = isScalp || material.name === 'GlowScalpSkin';
-    material.customProgramCacheKey = () => `glow-skin-palette-v15-${scalpMat ? 'scalp' : 'body'}`;
+    material.customProgramCacheKey = () => `glow-skin-palette-v16-${scalpMat ? 'scalp' : 'body'}`;
     material.onBeforeCompile = shader => {
       shader.uniforms.glowSkinTarget = target;
       shader.uniforms.glowSkinStrength = strength;
@@ -131,10 +131,10 @@ attach(mesh, seen) {
           diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 1.30);
           diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.05));
         } else {
-          // Recolored identities: 100% UNIFORM rich color across head, scalp, and body.
+          // Use the same shading on both sides of the completed scalp seam.
           float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
           float ao = clamp(lum / 0.16, 0.82, 1.0);
-          vec3 recolor = glowSkinTarget * (${scalpMat ? '1.0' : 'ao'});
+          vec3 recolor = glowSkinTarget * ao;
           diffuseColor.rgb = mix(diffuseColor.rgb, recolor, mask);
         }
 

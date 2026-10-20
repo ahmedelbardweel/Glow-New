@@ -19,6 +19,9 @@ class CharacterSkinPalette {
   late final Map<String, dynamic> _colorUniform = {'value': _target};
   final Map<String, dynamic> _strengthUniform = {'value': 0.0};
   final Map<String, dynamic> _muscleUniform = {'value': 0.0};
+  final _bellyTarget = three.Color(0xefece6);
+  late final Map<String, dynamic> _bellyColorUniform = {'value': _bellyTarget};
+  final Map<String, dynamic> _bellyCustomUniform = {'value': 0.0};
   final _materials = <three.Material>[];
 
   static const _muscleGlsl = '''
@@ -133,12 +136,14 @@ float glowMuscleHeight(vec3 p, vec3 n) {
       final scalpMat = object.name == 'Scalp' || name == 'GlowScalpSkin';
       _materials.add(material);
       material.customProgramCacheKey = () =>
-          'glow-skin-palette-v14-${scalpMat ? "scalp" : "body"}';
+          'glow-skin-palette-v15-${scalpMat ? "scalp" : "body"}';
       material.onBeforeCompile = (dynamic shader, dynamic renderer) {
         shader.uniforms ??= <String, dynamic>{};
         shader.uniforms['glowSkinTarget'] = _colorUniform;
         shader.uniforms['glowSkinStrength'] = _strengthUniform;
         shader.uniforms['glowMuscles'] = _muscleUniform;
+        shader.uniforms['glowBellyTarget'] = _bellyColorUniform;
+        shader.uniforms['glowBellyCustom'] = _bellyCustomUniform;
         shader.vertexShader =
             '''
 attribute float _glow_skin_region;
@@ -165,6 +170,8 @@ transformed += normal * glowMuscleHeight(position, normal) * glowMuscles;
 uniform vec3 glowSkinTarget;
 uniform float glowSkinStrength;
 uniform float glowMuscles;
+uniform vec3 glowBellyTarget;
+uniform float glowBellyCustom;
 varying float vGlowSkinRegion;
 varying vec3 vGlowMuscle;
 ${shader.fragmentShader}
@@ -176,6 +183,8 @@ ${shader.fragmentShader}
     / max(diffuseColor.g, 0.0001);
   float mask = smoothstep(0.20, 0.42, greenDominance)
     * clamp(vGlowSkinRegion, 0.0, 1.0) * glowSkinStrength;
+  float bellyMask = (1.0 - smoothstep(0.04, 0.20, greenDominance))
+    * clamp(vGlowSkinRegion, 0.0, 1.0) * glowBellyCustom;
   '''}
 
   if (glowSkinStrength < 0.5) {
@@ -190,6 +199,15 @@ ${shader.fragmentShader}
     vec3 recolor = glowSkinTarget * ${scalpMat ? '1.0' : 'ao'};
     diffuseColor.rgb = mix(diffuseColor.rgb, recolor, mask);
   }
+
+  ${scalpMat ? '' : '''
+  if (glowBellyCustom > 0.5) {
+    float bellyLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float bellyAo = clamp(bellyLum / 0.65, 0.85, 1.0);
+    vec3 bellyRecolor = glowBellyTarget * bellyAo;
+    diffuseColor.rgb = mix(diffuseColor.rgb, bellyRecolor, bellyMask);
+  }
+  '''}
 
   float muscleOn = glowMuscles;
   diffuseColor.rgb *= mix(1.0, 0.62, clamp(vGlowMuscle.x, 0.0, 1.0) * muscleOn);
@@ -211,6 +229,18 @@ ${shader.fragmentShader}
   void setColor(Color color, {required bool originalGreen}) {
     _target.setRGB(color.r, color.g, color.b).convertSRGBToLinear();
     _strengthUniform['value'] = originalGreen ? 0.0 : 1.0;
+    for (final material in _materials) {
+      material.uniformsNeedUpdate = true;
+    }
+  }
+
+  void setBellyColor(Color? color) {
+    if (color != null) {
+      _bellyTarget.setRGB(color.r, color.g, color.b).convertSRGBToLinear();
+      _bellyCustomUniform['value'] = 1.0;
+    } else {
+      _bellyCustomUniform['value'] = 0.0;
+    }
     for (final material in _materials) {
       material.uniformsNeedUpdate = true;
     }

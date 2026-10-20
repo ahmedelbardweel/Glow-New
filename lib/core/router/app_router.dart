@@ -36,6 +36,8 @@ import '../../features/content/domain/entities/world_entity.dart';
 import '../../features/content/domain/entities/mission_entity.dart';
 import '../../features/content/domain/entities/story_entity.dart';
 import '../../features/content/domain/entities/question_entity.dart';
+import '../../features/content/data/models/custom_character_model.dart';
+import '../../features/content/presentation/screens/custom_character_creator_screen.dart';
 import '../widgets/character_studio_screen.dart';
 
 class AppRouter {
@@ -264,6 +266,13 @@ class AppRouter {
           }
           final mission = state.extra as MissionEntity;
           return AddQuestionScreen(mission: mission);
+        },
+      ),
+      GoRoute(
+        path: '/custom-character-creator',
+        builder: (context, state) {
+          final character = state.extra as CustomCharacterModel?;
+          return CustomCharacterCreatorScreen(characterToEdit: character);
         },
       ),
     ],

@@ -28,6 +28,7 @@ class SmartCharacterViewer extends StatelessWidget {
     this.showSkeleton = false,
     this.showHat = false,
     this.hatColor = const Color(0xFF2C2C2E),
+    this.bellyColor,
     this.showMuscles = false,
     this.showGlasses = true,
     this.cameraFit = 1.10,
@@ -58,6 +59,7 @@ class SmartCharacterViewer extends StatelessWidget {
   final bool showSkeleton;
   final bool showHat;
   final Color hatColor;
+  final Color? bellyColor;
   final bool showMuscles;
   final bool showGlasses;
   final double cameraFit;
@@ -91,6 +93,7 @@ class SmartCharacterViewer extends StatelessWidget {
         showSkeleton: showSkeleton,
         showHat: showHat,
         hatColor: hatColor,
+        bellyColor: bellyColor,
         showMuscles: showMuscles,
         showGlasses: showGlasses,
         cameraFit: cameraFit,
@@ -513,6 +516,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         originalGreen:
             CharacterHelper.getColorKey(config.characterName) == 'port',
       );
+      _skinPalette.setBellyColor(config.bellyColor);
     }
     if (widget.source == CharacterHelper.sharedModelPath) {
       _model?.traverse((object) {
@@ -720,6 +724,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
           if (mounted) config.onReady?.call();
         });
       }
+    }
+    if (old.bellyColor != config.bellyColor) {
+      _skinPalette.setBellyColor(config.bellyColor);
     }
     if (old.showHat != config.showHat || old.hatColor != config.hatColor) {
       _applyHat();

@@ -26,6 +26,7 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/content/data/datasources/content_remote_data_source.dart';
 import '../../features/content/data/datasources/content_local_data_source.dart';
 import '../../features/content/data/repositories/content_repository_impl.dart';
+import '../../features/content/data/repositories/custom_character_repository.dart';
 import '../../features/content/data/services/sync_service.dart';
 import '../../features/dashboard/data/child_activity.dart';
 import '../../features/dashboard/data/parent_children_repository_impl.dart';
@@ -149,6 +150,13 @@ Future<void> init() async {
       localDataSource: sl(),
       networkInfo: sl(),
       resourceManager: sl(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => CustomCharacterRepository(
+      supabase: sl(),
+      prefs: sl(),
     ),
   );
 

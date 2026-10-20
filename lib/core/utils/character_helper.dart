@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../di/injection_container.dart';
+import '../../features/content/data/repositories/custom_character_repository.dart';
 
 class CharacterHelper {
   /// The five identities share one mesh, skeleton and animation library.
@@ -32,6 +34,18 @@ class CharacterHelper {
 
   static String getCleanName(String rawName) {
     if (rawName.trim().isEmpty) return 'شخصية';
+    if (rawName.startsWith('custom|')) {
+      final parts = rawName.split('|');
+      if (parts.length >= 3 && parts[2].trim().isNotEmpty) {
+        return parts[2].trim();
+      }
+      try {
+        final custom = sl<CustomCharacterRepository>().getCharacterById(parts[1]);
+        if (custom != null) return custom.name;
+      } catch (_) {}
+      return 'شخصية مخصصة';
+    }
+
     String lower = rawName.toLowerCase();
 
     // Find matching key
@@ -66,6 +80,24 @@ class CharacterHelper {
   }
 
   static Color getColor(String rawName) {
+    if (rawName.startsWith('custom|')) {
+      final parts = rawName.split('|');
+      if (parts.length >= 2) {
+        final idOrHex = parts[1];
+        if (idOrHex.startsWith('#')) {
+          try {
+            final clean = idOrHex.replaceAll('#', '').trim();
+            if (clean.length == 6) return Color(int.parse('FF$clean', radix: 16));
+            if (clean.length == 8) return Color(int.parse(clean, radix: 16));
+          } catch (_) {}
+        }
+        try {
+          final custom = sl<CustomCharacterRepository>().getCharacterById(idOrHex);
+          if (custom != null) return custom.bodyColor;
+        } catch (_) {}
+      }
+    }
+
     if (rawName.startsWith('http')) {
       try {
         final uri = Uri.parse(rawName);

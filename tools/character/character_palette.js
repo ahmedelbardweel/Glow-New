@@ -81,11 +81,20 @@ export class CharacterSkinPalette {
  constructor({referenceLuminance=.106,shadeContrast=.75}={}) {
   this.referenceLuminance=referenceLuminance;this.shadeContrast=shadeContrast;
   this.target={value:new THREE.Color()};this.strength={value:0};this.muscles={value:0};
+  this.bellyTarget={value:new THREE.Color('#efece6')};this.bellyCustom={value:0};
  }
  setColor(color,originalGreen=false){this.target.value.set(color);this.strength.value=originalGreen?0:1;}
+ setBellyColor(color, custom=true){
+  if (color && custom) {
+    this.bellyTarget.value.set(color);
+    this.bellyCustom.value = 1.0;
+  } else {
+    this.bellyCustom.value = 0.0;
+  }
+ }
  setMuscles(enabled){this.muscles.value=enabled?1:0;}
 attach(mesh, seen) {
-  const {target,strength,muscles}=this;
+  const {target,strength,muscles,bellyTarget,bellyCustom}=this;
   // The eye atlas has a green skin rim outside the white. Exclude the iris.
   if(['EyeLeft','EyeRight'].includes(mesh.name)&&mesh.geometry?.getAttribute('uv')&&!mesh.geometry.getAttribute('_glow_skin_region')){
     const uv=mesh.geometry.getAttribute('uv');
@@ -98,19 +107,22 @@ attach(mesh, seen) {
     if (!material || seen.has(material) || HAT_MATERIALS.has(material.name)) continue;
     seen.add(material);
     const scalpMat = isScalp || material.name === 'GlowScalpSkin';
-    material.customProgramCacheKey = () => `glow-skin-palette-v14-${scalpMat ? 'scalp' : 'body'}`;
+    material.customProgramCacheKey = () => `glow-skin-palette-v15-${scalpMat ? 'scalp' : 'body'}`;
     material.onBeforeCompile = shader => {
       shader.uniforms.glowSkinTarget = target;
       shader.uniforms.glowSkinStrength = strength;
       shader.uniforms.glowMuscles = muscles;
+      shader.uniforms.glowBellyTarget = bellyTarget;
+      shader.uniforms.glowBellyCustom = bellyCustom;
       shader.vertexShader = 'attribute float _glow_skin_region;\nvarying float vGlowSkinRegion;\nvarying vec3 vGlowMuscle;\nuniform float glowMuscles;\n' + MUSCLE_GLSL + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nfloat glowHdx = glowMuscleHeight(position + vec3(0.004, 0.0, 0.0), normal) - glowMuscleHeight(position - vec3(0.004, 0.0, 0.0), normal);\nfloat glowHdy = glowMuscleHeight(position + vec3(0.0, 0.004, 0.0), normal) - glowMuscleHeight(position - vec3(0.0, 0.004, 0.0), normal);\nobjectNormal = normalize(objectNormal - vec3(glowHdx, glowHdy, 0.0) * (36.0 * glowMuscles));');
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlowSkinRegion = _glow_skin_region;\nvGlowMuscle = glowMuscleDraw(position, normal);\ntransformed += normal * glowMuscleHeight(position, normal) * glowMuscles;');
-      shader.fragmentShader = 'uniform vec3 glowSkinTarget;\nuniform float glowSkinStrength;\nuniform float glowMuscles;\nvarying float vGlowSkinRegion;\nvarying vec3 vGlowMuscle;\n' + shader.fragmentShader;
+      shader.fragmentShader = 'uniform vec3 glowSkinTarget;\nuniform float glowSkinStrength;\nuniform float glowMuscles;\nuniform vec3 glowBellyTarget;\nuniform float glowBellyCustom;\nvarying float vGlowSkinRegion;\nvarying vec3 vGlowMuscle;\n' + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
         ${scalpMat ? 'float mask = glowSkinStrength;' : `
         float greenDominance = (diffuseColor.g - max(diffuseColor.r, diffuseColor.b)) / max(diffuseColor.g, 0.0001);
         float mask = smoothstep(0.20, 0.42, greenDominance) * clamp(vGlowSkinRegion, 0.0, 1.0) * glowSkinStrength;
+        float bellyMask = (1.0 - smoothstep(0.04, 0.20, greenDominance)) * clamp(vGlowSkinRegion, 0.0, 1.0) * glowBellyCustom;
         `}
 
         if (glowSkinStrength < 0.5) {
@@ -125,6 +137,15 @@ attach(mesh, seen) {
           vec3 recolor = glowSkinTarget * (${scalpMat ? '1.0' : 'ao'});
           diffuseColor.rgb = mix(diffuseColor.rgb, recolor, mask);
         }
+
+        ${scalpMat ? '' : `
+        if (glowBellyCustom > 0.5) {
+          float bellyLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          float bellyAo = clamp(bellyLum / 0.65, 0.85, 1.0);
+          vec3 bellyRecolor = glowBellyTarget * bellyAo;
+          diffuseColor.rgb = mix(diffuseColor.rgb, bellyRecolor, bellyMask);
+        }
+        `}
 
         float muscleOn = glowMuscles;
         diffuseColor.rgb *= mix(1.0, 0.62, clamp(vGlowMuscle.x, 0.0, 1.0) * muscleOn);

@@ -16,6 +16,7 @@ let state = {
   motion: 'Idle', playing: true, speaking: false, visible: true, interactive: true,
   skeleton: false, hat: false, hatColor: '#2c2c2e', muscles: false, glasses: true,
   cameraFit: 1.10, originalGreen: true, color: '#22592a', position: 0,
+  bellyColor: '#efece6', customBelly: false,
   framing: 'body', angle: 0, autoBlink: true, blink: 0, clay: false,
 };
 const actions = new Map();
@@ -330,6 +331,7 @@ function update(next) {
   const blinkChanged = next.autoBlink !== undefined || next.blink !== undefined;
   state = { ...state, ...next };
   skinPalette.setColor(state.color, state.originalGreen);
+  skinPalette.setBellyColor(state.bellyColor, state.customBelly);
   skinPalette.setMuscles(state.muscles);
   if (next.muscles !== undefined || next.seek === true) hideFittedMesh();
   if (controls) controls.enabled = state.interactive;

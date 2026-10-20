@@ -38,6 +38,7 @@ class MobileCharacterViewer extends StatefulWidget {
     this.blink = 0.0,
     this.clay = false,
     this.hatColor = const Color(0xFF2C2C2E),
+    this.bellyColor,
     this.motion,
     this.playbackPosition,
     this.modelAsset,
@@ -59,6 +60,7 @@ class MobileCharacterViewer extends StatefulWidget {
   final double blink;
   final bool clay;
   final Color hatColor;
+  final Color? bellyColor;
   final CharacterMotion? motion;
   final ValueListenable<Duration>? playbackPosition;
   final VoidCallback? onReady;
@@ -341,6 +343,10 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
       'clay': widget.clay,
       'hatColor':
           '#${(widget.hatColor.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
+      'bellyColor': widget.bellyColor != null
+          ? '#${(widget.bellyColor!.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}'
+          : '#efece6',
+      'customBelly': widget.bellyColor != null,
       'visible': _visible,
       'originalGreen':
           CharacterHelper.getColorKey(widget.characterName) == 'port',

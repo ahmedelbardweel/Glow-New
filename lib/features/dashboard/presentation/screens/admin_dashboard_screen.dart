@@ -66,6 +66,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           title: const Text('إدارة العوالم'),
           centerTitle: false,
           actions: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: FilledButton.tonalIcon(
+                onPressed: () {
+                  context.push('/custom-character-creator');
+                },
+                icon: const Icon(Icons.palette_outlined, size: 18),
+                label: const Text('اصنع شخصية', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryContainer,
+                  foregroundColor: AppColors.onPrimaryContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
             IconButton(
               tooltip: 'الإعدادات',
               icon: const Icon(Icons.more_vert),

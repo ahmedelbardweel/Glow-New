@@ -7,6 +7,10 @@ import 'package:audioplayers/audioplayers.dart';
 import '../models/story_timeline.dart';
 import '../utils/character_helper.dart';
 import 'app_bottom_sheet.dart';
+import 'package:go_router/go_router.dart';
+import '../di/injection_container.dart';
+import '../../features/content/data/repositories/custom_character_repository.dart';
+import '../../features/content/data/models/custom_character_model.dart';
 import 'smart_character_viewer.dart';
 import 'story_transition_frame.dart';
 
@@ -85,14 +89,30 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   int? _selectedJumpBlockIndex;
   int? _selectedTransitionIndex;
   int _paletteCategory = 0;
-  static const _paletteCategoryNames = ['الشخصية', 'الحركة', 'القبعة', 'النظارة', 'العضلات', 'التأثير'];
+  static const _paletteCategoryNames = ['الشخصية', 'الشخصيات الجاهزة', 'الحركة', 'القبعة', 'النظارة', 'العضلات', 'التأثير'];
+  List<CustomCharacterModel> _customCharacters = [];
   String? _lastPreviewCharacter;
   String? _lastPreviewMotion;
+
+  void _loadCustomCharacters() {
+    try {
+      final repo = sl<CustomCharacterRepository>();
+      _customCharacters = repo.getCachedCharacters();
+      repo.getAllCharacters().then((list) {
+        if (mounted) {
+          setState(() {
+            _customCharacters = list;
+          });
+        }
+      }).catchError((_) {});
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
     _localAudioPlayer = AudioPlayer();
+    _loadCustomCharacters();
     if (widget.initialTimeline != null) {
       if (widget.initialTimeline!.blocks.isNotEmpty) {
         _blocks = List.from(widget.initialTimeline!.blocks);
@@ -1466,6 +1486,76 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                           ),
                           if (_paletteCategory == 1)
                           _PaletteLane(
+                            key: const ValueKey('custom_character'),
+                            labeled: false,
+                            title: 'الشخصيات الجاهزة',
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: InkWell(
+                                  onTap: () async {
+                                    await context.push('/custom-character-creator');
+                                    _loadCustomCharacters();
+                                  },
+                                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    height: _paletteChipHeight,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.secondaryContainer,
+                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                                      border: Border.all(color: AppColors.secondary),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.add_circle_outline, size: 16, color: AppColors.secondary),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'اصنع شخصية +',
+                                          style: TextStyle(
+                                            color: AppColors.secondary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_customCharacters.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  child: Center(
+                                    child: Text(
+                                      'لا توجد شخصيات جاهزة بعد، اضغط + لصنع شخصية',
+                                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                                    ),
+                                  ),
+                                ),
+                              ..._customCharacters.map((c) {
+                                final dragKey = 'custom|${c.id}|${c.name}';
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Draggable<String>(
+                                    data: dragKey,
+                                    feedback: Material(
+                                      color: Colors.transparent,
+                                      child: _buildCustomCharacterPaletteItem(c),
+                                    ),
+                                    childWhenDragging: Opacity(
+                                      opacity: 0.3,
+                                      child: _buildCustomCharacterPaletteItem(c),
+                                    ),
+                                    child: _buildCustomCharacterPaletteItem(c),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                          if (_paletteCategory == 2)
+                          _PaletteLane(
                             key: const ValueKey('motion'),
                             labeled: false,
                             title: 'الحركة',
@@ -1511,7 +1601,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               );
                             }).toList(),
                           ),
-                          if (_paletteCategory == 2)
+                          if (_paletteCategory == 3)
                           _PaletteLane(
                             key: const ValueKey('hat'),
                             labeled: false,
@@ -1552,7 +1642,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               );
                             }).toList(),
                           ),
-                          if (_paletteCategory == 3)
+                          if (_paletteCategory == 4)
                           _PaletteLane(
                             key: const ValueKey('glasses'),
                             labeled: false,
@@ -1575,7 +1665,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               ),
                             ],
                           ),
-                          if (_paletteCategory == 4)
+                          if (_paletteCategory == 5)
                           _PaletteLane(
                             key: const ValueKey('muscles'),
                             labeled: false,
@@ -1598,7 +1688,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               ),
                             ],
                           ),
-                          if (_paletteCategory == 5)
+                          if (_paletteCategory == 6)
                           _PaletteLane(
                             key: const ValueKey('transition'),
                             labeled: false,
@@ -1778,7 +1868,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                               height: _trackHeight,
                               child: DragTarget<String>(
                                 onAcceptWithDetails: (details) {
-                                  if (CharacterHelper.characters.keys.contains(details.data)) {
+                                  if (CharacterHelper.characters.keys.contains(details.data) || details.data.startsWith('custom|')) {
                                     if (_trackKey.currentContext != null) {
                                       final RenderBox box = _trackKey.currentContext!.findRenderObject() as RenderBox;
                                       final Offset localOffset = box.globalToLocal(details.offset);
@@ -2144,6 +2234,30 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     if (character == null) return const SizedBox.shrink();
     final motionName = _getActiveMotionAt(time);
     final hat = _getActiveHatAt(time);
+
+    Color? customBellyColor;
+    bool showHat = hat != null;
+    Color hatColor = hat?.color ?? const Color(0xFF2C2C2E);
+    bool showGlasses = _glassesOnAt(time);
+
+    if (character.startsWith('custom|')) {
+      final parts = character.split('|');
+      final id = parts.length > 1 ? parts[1] : '';
+      try {
+        final customChar = sl<CustomCharacterRepository>().getCharacterById(id);
+        if (customChar != null) {
+          customBellyColor = customChar.bellyColor;
+          if (hat == null && customChar.hasHat) {
+            showHat = true;
+            hatColor = customChar.hatColor;
+          }
+          if (!showGlasses && customChar.hasGlasses) {
+            showGlasses = true;
+          }
+        }
+      } catch (_) {}
+    }
+
     return SmartCharacterViewer(
       characterName: character,
       isPlaying: widget.isPlaying,
@@ -2152,9 +2266,10 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
       motion: motionName != null
           ? CharacterMotion.values.firstWhere((m) => m.name == motionName, orElse: () => CharacterMotion.idle)
           : null,
-      showHat: hat != null,
-      hatColor: hat?.color ?? const Color(0xFF2C2C2E),
-      showGlasses: _glassesOnAt(time),
+      showHat: showHat,
+      hatColor: hatColor,
+      bellyColor: customBellyColor,
+      showGlasses: showGlasses,
       showMuscles: _musclesOnAt(time),
     );
   }
@@ -2302,6 +2417,50 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
           CharacterHelper.getCleanName(key),
           style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCustomCharacterPaletteItem(CustomCharacterModel c) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      height: _paletteChipHeight,
+      decoration: BoxDecoration(
+        color: c.bodyColor,
+        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: c.bellyColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            c.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (c.hasHat) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.face_retouching_natural, size: 14, color: Colors.white70),
+          ],
+          if (c.hasGlasses) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.visibility, size: 14, color: Colors.white70),
+          ],
+        ],
       ),
     );
   }

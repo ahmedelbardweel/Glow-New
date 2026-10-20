@@ -23,6 +23,8 @@ import '../../../../core/widgets/admin_voice_field.dart';
 import '../../../../core/montage/montage_gemini.dart';
 import '../../../../core/montage/montage_plan.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
+import '../../data/models/custom_character_model.dart';
+import '../../data/repositories/custom_character_repository.dart';
 
 class _SentenceLine {
   _SentenceLine() {
@@ -95,13 +97,49 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   StreamSubscription? _playerStateSubscription;
   StreamSubscription? _positionSubscription;
 
+  List<CustomCharacterModel> _customCharacters = [];
+  bool _isOpeningCharacterSheet = false;
+  String _previousScriptText = '';
+
+  void _loadCustomCharacters() {
+    try {
+      final repo = sl<CustomCharacterRepository>();
+      _customCharacters = repo.getCachedCharacters();
+      repo.fetchCharacters().then((list) {
+        if (mounted) {
+          setState(() {
+            _customCharacters = list;
+          });
+        }
+      }).catchError((_) {});
+    } catch (_) {}
+  }
+
+  void _onScriptChanged() {
+    if (!mounted) return;
+    setState(() {});
+    if (_isOpeningCharacterSheet) return;
+
+    final text = _scriptController.text;
+    final selection = _scriptController.selection;
+    if (text.length > _previousScriptText.length && selection.isValid && selection.isCollapsed) {
+      final cursor = selection.baseOffset;
+      if (cursor > 0 && text[cursor - 1] == '/') {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _openCharacterPickerBottomSheet(isAutoSlash: true);
+        });
+      }
+    }
+    _previousScriptText = text;
+  }
+
   @override
   void initState() {
     super.initState();
     _contentBloc = sl<ContentBloc>();
-    _scriptController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _loadCustomCharacters();
+    _previousScriptText = _scriptController.text;
+    _scriptController.addListener(_onScriptChanged);
     final story = widget.storyToEdit;
     if (story == null) return;
     _titleController.text = story.title;
@@ -113,6 +151,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     }
     _hydrateLines(story);
     _scriptController.text = _scriptFromLines(_lines);
+    _previousScriptText = _scriptController.text;
     final url = story.audioUrl?.trim() ?? '';
     if (url.isNotEmpty) {
       _preparingEdit = true;
@@ -131,11 +170,11 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       final line = _SentenceLine();
       line.controller.text = texts[i];
       final fromBlock = i < blocks.length ? blocks[i].characterId : '';
-      if (_sceneCharacters.any((character) => character.$1 == fromBlock)) {
+      if (_sceneCharacters.any((character) => character.$1 == fromBlock) || fromBlock.startsWith('custom|')) {
         line.characterId = fromBlock;
       } else if (_sceneCharacters.any(
         (character) => character.$1 == story.characterName,
-      )) {
+      ) || story.characterName.startsWith('custom|')) {
         line.characterId = story.characterName;
       }
       line.controller.addListener(() {
@@ -311,6 +350,12 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
   }
 
   String _characterName(String characterId) {
+    if (characterId.startsWith('custom|')) {
+      final parts = characterId.split('|');
+      if (parts.length >= 3 && parts[2].trim().isNotEmpty) return parts[2].trim();
+      final c = sl<CustomCharacterRepository>().getCharacterById(parts.length > 1 ? parts[1] : '');
+      if (c != null) return c.name;
+    }
     for (final character in _sceneCharacters) {
       if (character.$1 == characterId) return character.$2;
     }
@@ -322,12 +367,83 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     for (final character in _sceneCharacters) {
       if (character.$2 == cleaned || character.$1 == cleaned) return character.$1;
     }
+    for (final c in _customCharacters) {
+      if (c.name.trim() == cleaned || c.id == cleaned) {
+        return 'custom|${c.id}|${c.name}';
+      }
+    }
+    try {
+      final cached = sl<CustomCharacterRepository>().getCachedCharacters();
+      for (final c in cached) {
+        if (c.name.trim() == cleaned || c.id == cleaned) {
+          return 'custom|${c.id}|${c.name}';
+        }
+      }
+    } catch (_) {}
     return null;
+  }
+
+  Future<void> _openCharacterPickerBottomSheet({bool isAutoSlash = false}) async {
+    if (_isOpeningCharacterSheet) return;
+    _isOpeningCharacterSheet = true;
+    _loadCustomCharacters();
+
+    final selectedName = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _CharacterPickerSheet(
+          customCharacters: _customCharacters,
+          onOpenCreator: () async {
+            Navigator.pop(sheetContext);
+            await context.push('/custom-character-creator');
+            _loadCustomCharacters();
+          },
+        );
+      },
+    );
+
+    _isOpeningCharacterSheet = false;
+
+    if (selectedName != null && mounted) {
+      _insertCharacterTag(selectedName, hadSlashAlready: isAutoSlash);
+    }
+  }
+
+  void _insertCharacterTag(String characterName, {required bool hadSlashAlready}) {
+    final text = _scriptController.text;
+    final selection = _scriptController.selection;
+    final cursor = selection.isValid ? selection.baseOffset : text.length;
+
+    String before;
+    String after;
+
+    if (hadSlashAlready) {
+      if (cursor > 0 && text[cursor - 1] == '/') {
+        before = '${text.substring(0, cursor)}$characterName\n';
+        after = text.substring(cursor);
+      } else {
+        before = '${text.substring(0, cursor)}/$characterName\n';
+        after = text.substring(cursor);
+      }
+    } else {
+      final space = (cursor > 0 && text[cursor - 1] != ' ' && text[cursor - 1] != '\n') ? ' ' : '';
+      before = '${text.substring(0, cursor)}$space/$characterName\n';
+      after = text.substring(cursor);
+    }
+
+    final newText = before + after;
+    _previousScriptText = newText;
+    _scriptController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: before.length),
+    );
   }
 
   List<({String text, String characterId})>? _parseScript(String raw) {
     final pieces = <({String text, String characterId})>[];
-    final pattern = RegExp(r'([^/\n]+?)\s*/\s*(\S+)');
+    final pattern = RegExp(r'([^/\n]+?)\s*/\s*([^\n\r]+)');
     final lines = raw.split('\n');
     for (var index = 0; index < lines.length; index++) {
       final line = lines[index].trim();
@@ -340,7 +456,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       var consumed = 0;
       for (final match in matches) {
         final spoken = match.group(1)!.trim();
-        final name = match.group(2)!.replaceAll(RegExp(r'[.،,!！?؟:]+$'), '');
+        final name = match.group(2)!.replaceAll(RegExp(r'[.،,!！?؟:]+$'), '').trim();
         final characterId = _characterId(name);
         if (spoken.isEmpty || characterId == null) {
           _scriptError('السطر ${index + 1}: الشخصية «$name» غير معروفة');
@@ -392,7 +508,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
 
   List<({String text, String characterId})>? _parseScriptQuiet(String raw) {
     final pieces = <({String text, String characterId})>[];
-    final pattern = RegExp(r'([^/\n]+?)\s*/\s*(\S+)');
+    final pattern = RegExp(r'([^/\n]+?)\s*/\s*([^\n\r]+)');
     for (final rawLine in raw.split('\n')) {
       final line = rawLine.trim();
       if (line.isEmpty) continue;
@@ -401,7 +517,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       var consumed = 0;
       for (final match in matches) {
         final spoken = match.group(1)!.trim();
-        final name = match.group(2)!.replaceAll(RegExp(r'[.،,!！?؟:]+$'), '');
+        final name = match.group(2)!.replaceAll(RegExp(r'[.،,!！?؟:]+$'), '').trim();
         final characterId = _characterId(name);
         if (spoken.isEmpty || characterId == null) return null;
         pieces.add((text: spoken, characterId: characterId));
@@ -635,6 +751,43 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                           character.$2,
                           style: TextStyle(
                             color: CharacterHelper.getColor(character.$1),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    for (final custom in _customCharacters)
+                      DropdownMenuItem(
+                        value: 'custom|${custom.id}|${custom.name}',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: custom.bodyColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              custom.name,
+                              style: TextStyle(
+                                color: custom.bodyColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (line.characterId.startsWith('custom|') &&
+                        !_customCharacters.any((c) => 'custom|${c.id}|${c.name}' == line.characterId))
+                      DropdownMenuItem(
+                        value: line.characterId,
+                        child: Text(
+                          _characterName(line.characterId),
+                          style: TextStyle(
+                            color: CharacterHelper.getColor(line.characterId),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -972,9 +1125,14 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                             controller: _scriptController,
                                             minLines: 4,
                                             maxLines: 8,
-                                            decoration: const InputDecoration(
-                                              hintText: 'الوصف. كل جملة تنتهي بـ /سورت أو /بورت',
+                                            decoration: InputDecoration(
+                                              hintText: 'الوصف. كل جملة تنتهي بـ /اسم_الشخصية\nمثال: في يوم من الأيام كان الأصدقاء يلعبون /سورت',
                                               alignLabelWithHint: true,
+                                              suffixIcon: IconButton(
+                                                icon: const Icon(Icons.person_add_alt_1_rounded, color: AppColors.primary),
+                                                tooltip: 'اختر شخصية /',
+                                                onPressed: () => _openCharacterPickerBottomSheet(isAutoSlash: false),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -991,6 +1149,29 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                                   child: CircularProgressIndicator(strokeWidth: 2),
                                                 )
                                               : Text(_scriptReady ? 'اسمع' : 'اعمل الصوت'),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        ActionChip(
+                                          avatar: const Icon(Icons.alternate_email, size: 16, color: AppColors.primary),
+                                          label: const Text(
+                                            'اختر شخصية للسطر (/)',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                          ),
+                                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                                          onPressed: () => _openCharacterPickerBottomSheet(isAutoSlash: false),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'اكتب / مباشرة في النص لفتح قائمة الشخصيات',
+                                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -1104,6 +1285,241 @@ class _MontageAiVeilState extends State<_MontageAiVeil> with SingleTickerProvide
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+class _CharacterPickerSheet extends StatelessWidget {
+  final List<CustomCharacterModel> customCharacters;
+  final VoidCallback onOpenCreator;
+
+  const _CharacterPickerSheet({
+    required this.customCharacters,
+    required this.onOpenCreator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 48,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.alternate_email, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ربط الجملة بشخصية (/)',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                    Text(
+                      'اختر الشخصية التي ستنطق وتمثل هذه الجملة',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.black45),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                const Text(
+                  'شخصيات Glow الأساسية',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _sceneCharacters.map((char) {
+                    final color = CharacterHelper.getColor(char.$1);
+                    return InkWell(
+                      onTap: () => Navigator.pop(context, char.$2),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              char.$2,
+                              style: TextStyle(
+                                color: color,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'الشخصيات الجاهزة (المصممة)',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
+                    ),
+                    TextButton.icon(
+                      onPressed: onOpenCreator,
+                      icon: const Icon(Icons.add, size: 16, color: AppColors.secondary),
+                      label: const Text(
+                        'اصنع شخصية +',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (customCharacters.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.palette_outlined, size: 32, color: Colors.grey.shade400),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'لم تصنع شخصيات خاصة بعد',
+                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
+                          const SizedBox(height: 4),
+                          TextButton(
+                            onPressed: onOpenCreator,
+                            child: const Text('اضغط هنا لتصميم شخصيتك الأولى ثلاثية الأبعاد'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: customCharacters.map((c) {
+                      return InkWell(
+                        onTap: () => Navigator.pop(context, c.name),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: c.bodyColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: c.bodyColor.withValues(alpha: 0.35), width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: c.bodyColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: c.bellyColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                c.name,
+                                style: TextStyle(
+                                  color: c.bodyColor.computeLuminance() > 0.4 ? Colors.black87 : c.bodyColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              if (c.hasHat) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.face_retouching_natural, size: 14, color: Colors.black54),
+                              ],
+                              if (c.hasGlasses) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.visibility, size: 14, color: Colors.black54),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

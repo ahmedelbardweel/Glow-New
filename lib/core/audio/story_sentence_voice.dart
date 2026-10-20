@@ -34,10 +34,8 @@ class StorySentenceVoice {
     required String characterId,
     required String text,
   }) {
-    final voice = _voices[characterId];
-    if (voice == null) {
-      throw const StoryVoiceException('هالشخصية ما إلها نبرة محفوظة.');
-    }
+    final cleanId = characterId.startsWith('custom|') ? 'qort' : characterId;
+    final voice = _voices[cleanId] ?? _voices['qort']!;
     return _render(voice, text);
   }
 

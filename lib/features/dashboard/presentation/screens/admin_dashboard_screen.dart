@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -67,27 +66,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           title: const Text('إدارة العوالم'),
           centerTitle: false,
           actions: [
-            if (kIsWeb) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: FilledButton.tonalIcon(
-                  onPressed: () {
-                    context.push('/custom-character-creator');
-                  },
-                  icon: const Icon(Icons.palette_outlined, size: 18),
-                  label: const Text('اصنع شخصية', style: TextStyle(fontWeight: FontWeight.bold)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.onPrimaryContainer,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppColors.border_radius),
-                    ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: FilledButton.tonalIcon(
+                onPressed: () {
+                  context.push('/custom-character-creator');
+                },
+                icon: const Icon(Icons.palette_outlined, size: 18),
+                label: const Text('اصنع شخصيتك', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryContainer,
+                  foregroundColor: AppColors.onPrimaryContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
-            ],
+            ),
+            const SizedBox(width: 4),
             IconButton(
               tooltip: 'الإعدادات',
               icon: const Icon(Icons.more_vert),
@@ -117,17 +114,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         await showCreateOrganizationSheet(context);
                       },
                     ),
-                    if (kIsWeb)
-                      StaffSetting(
-                        title: 'استوديو الشخصية 3D (مطور الويب)',
-                        subtitle: 'معاينة شخصيات Glow وحركاتها وألوانها بدقة عالية',
-                        onTap: (sheetContext) async {
-                          Navigator.of(sheetContext).pop();
-                          if (context.mounted) {
-                            context.push('/character-studio');
-                          }
-                        },
-                      ),
                   ],
                   onLogout: () async {
                     await sl<AuthLocalDataSource>().clearCache();

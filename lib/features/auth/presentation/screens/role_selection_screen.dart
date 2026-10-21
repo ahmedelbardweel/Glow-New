@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -19,14 +20,15 @@ class RoleSelectionScreen extends StatelessWidget {
         ),
         elevation: 0,
         actions: [
-          IconButton(
-            tooltip: 'استوديو الشخصية 3D',
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              context.push('/character-studio');
-            },
-            icon: const Icon(Icons.view_in_ar_rounded, color: AppColors.primary),
-          ),
+          if (kIsWeb)
+            IconButton(
+              tooltip: 'استوديو الشخصية 3D (مطور الويب)',
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                context.push('/character-studio');
+              },
+              icon: const Icon(Icons.view_in_ar_rounded, color: AppColors.primary),
+            ),
           IconButton(
             tooltip: 'مسح نقل الحساب',
             onPressed: () async {

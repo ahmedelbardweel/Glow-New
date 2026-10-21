@@ -25,6 +25,9 @@ camera.position.set(1.25*Math.sin(angle),.71,1.25*Math.cos(angle));camera.lookAt
 if(query.get('framing')==='body'){
  camera.position.set(2.4*Math.sin(angle),.62,2.4*Math.cos(angle));camera.lookAt(0,.48,0);
 }
+if(query.get('framing')==='mouth'){
+ camera.position.set(.65*Math.sin(angle),.52,.65*Math.cos(angle));camera.lookAt(0,.505,.20);
+}
 const gltf=await new GLTFLoader().loadAsync(query.get('model')||'/build/tripo/side_review/candidate.glb');
 const model=gltf.scene;scene.add(model);
 if(query.has('color')){
@@ -40,9 +43,8 @@ model.traverse(o=>{
 const mixer=new THREE.AnimationMixer(model);
 mixer.clipAction(gltf.animations.find(c=>c.name===(query.get('clip')||'Idle'))).play();mixer.update(Number(query.get('time')||0));
 if(query.has('mouth')){
- const mouth=model.getObjectByName('ExpressiveMouth');
- const poses={open:[1,0,0,0],smile:[0,1,0,0],sad:[0,0,1,0],round:[0,0,0,1],laugh:[.7,.7,0,0]};
- if(mouth&&poses[query.get('mouth')])mouth.morphTargetInfluences.splice(0,4,...poses[query.get('mouth')]);
+ const poses={closed:[0,0,0,0],open:[1,0,0,0],smile:[.12,.95,0,0],sad:[0,0,.95,0],round:[0,0,0,1],laugh:[.7,.8,0,0]};
+ model.traverse(o=>{if(o.morphTargetDictionary?.MouthOpen!==undefined&&poses[query.get('mouth')])o.morphTargetInfluences.splice(0,4,...poses[query.get('mouth')]);});
 }
 for(const name of ['EyeLeft','EyeRight']){const eye=model.getObjectByName(name);if(eye)eye.rotation.set(Number(query.get('gazeY')||0),Number(query.get('gazeX')||0),0);}
 if(query.has('blink')){

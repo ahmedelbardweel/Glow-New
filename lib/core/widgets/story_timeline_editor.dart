@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:Glow/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import '../animation/story_motion.dart';
@@ -1490,40 +1491,41 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                             labeled: false,
                             title: 'الشخصيات الجاهزة',
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                child: InkWell(
-                                  onTap: () async {
-                                    await context.push('/custom-character-creator');
-                                    _loadCustomCharacters();
-                                  },
-                                  borderRadius: BorderRadius.circular(AppColors.timeline_radius),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                                    height: _paletteChipHeight,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.secondaryContainer,
-                                      borderRadius: BorderRadius.circular(AppColors.timeline_radius),
-                                      border: Border.all(color: AppColors.secondary),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.add_circle_outline, size: 16, color: AppColors.secondary),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'اصنع شخصية +',
-                                          style: TextStyle(
-                                            color: AppColors.secondary,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                              if (kIsWeb)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: InkWell(
+                                    onTap: () async {
+                                      await context.push('/custom-character-creator');
+                                      _loadCustomCharacters();
+                                    },
+                                    borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      height: _paletteChipHeight,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.secondaryContainer,
+                                        borderRadius: BorderRadius.circular(AppColors.timeline_radius),
+                                        border: Border.all(color: AppColors.secondary),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.add_circle_outline, size: 16, color: AppColors.secondary),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'اصنع شخصية +',
+                                            style: TextStyle(
+                                              color: AppColors.secondary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
                               if (_customCharacters.isEmpty)
                                 const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),

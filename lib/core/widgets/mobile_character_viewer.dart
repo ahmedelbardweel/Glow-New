@@ -12,13 +12,14 @@ import '../di/injection_container.dart';
 import '../services/character_asset_cache.dart';
 import '../services/character_offline_pack.dart';
 import '../services/resource_manager.dart';
+import '../theme/app_colors.dart';
 import '../utils/character_helper.dart';
 import '../utils/character_poses.dart';
 
 /// Offline WebView character viewer for iOS and Android.
 ///
-/// Loads the HTML/JS shell from Flutter assets, then injects the GLB as
-/// binary chunks. This avoids WKWebView/Chromium file→file fetch limits.
+/// Loads the HTML/JS shell from Flutter assets, then loads the local GLB from
+/// the offline pack (or injects binary chunks as fallback).
 class MobileCharacterViewer extends StatefulWidget {
   const MobileCharacterViewer({
     super.key,
@@ -37,6 +38,7 @@ class MobileCharacterViewer extends StatefulWidget {
     this.autoBlink = true,
     this.blink = 0.0,
     this.clay = false,
+    this.bodyColor,
     this.hatColor = const Color(0xFF2C2C2E),
     this.bellyColor,
     this.motion,
@@ -59,6 +61,7 @@ class MobileCharacterViewer extends StatefulWidget {
   final bool autoBlink;
   final double blink;
   final bool clay;
+  final Color? bodyColor;
   final Color hatColor;
   final Color? bellyColor;
   final CharacterMotion? motion;
@@ -93,7 +96,11 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
     widget.playbackPosition?.addListener(_positionChanged);
     _clock.start();
     if (widget.isPlaying) _playbackClock.start();
-    _modelBytesFuture = _resolveModelBytes();
+    final source =
+        widget.modelAsset ?? CharacterHelper.getModelPath(widget.characterName);
+    if (_isRemoteOrFileSource(source)) {
+      _modelBytesFuture = _resolveModelBytes();
+    }
     unawaited(_initialize());
     _visibilityTimer = Timer.periodic(
       const Duration(milliseconds: 250),
@@ -321,11 +328,15 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
     await controller.runJavaScript('GlowViewer.loadBuffered();');
   }
 
+  Color get _effectiveBodyColor =>
+      widget.bodyColor ?? CharacterHelper.getColor(widget.characterName);
+
   Map<String, Object> _state({bool seek = false}) {
     final position =
         widget.playbackPosition?.value ?? _playbackClock.elapsed;
-    final color =
-        CharacterHelper.getColor(widget.characterName).toARGB32() & 0xFFFFFF;
+    final color = _effectiveBodyColor.toARGB32() & 0xFFFFFF;
+    final includeDynamicPosition =
+        seek || widget.playbackPosition != null || _plan.cues.isNotEmpty;
     return {
       'motion': (widget.motion ?? _plan.motionAt(position)).clipName,
       'playing': widget.isPlaying,
@@ -348,10 +359,10 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
           : '#efece6',
       'customBelly': widget.bellyColor != null,
       'visible': _visible,
-      'originalGreen':
+      'originalGreen': widget.bodyColor == null &&
           CharacterHelper.getColorKey(widget.characterName) == 'port',
       'color': '#${color.toRadixString(16).padLeft(6, '0')}',
-      'position': position.inMilliseconds / 1000,
+      if (includeDynamicPosition) 'position': position.inMilliseconds / 1000,
       'seek': seek,
       'diagnostics': const bool.fromEnvironment('GLOW_CHARACTER_DIAGNOSTICS'),
     };
@@ -413,7 +424,11 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
       _syncPlaybackClock();
       _sendState();
     }
-    if (widget.playbackPosition == null && widget.isPlaying && visible) {
+    if (widget.playbackPosition == null &&
+        widget.isPlaying &&
+        visible &&
+        widget.motion == null &&
+        _plan.cues.isNotEmpty) {
       _sendState();
     }
   }
@@ -450,7 +465,7 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
           !_isRemoteOrFileSource(oldSource) &&
           !_isRemoteOrFileSource(newSource);
       if (sameSharedModel && _booted && _controller != null && _error == null) {
-        _sendState(seek: true);
+        _sendState(seek: false);
         if (_ready) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) widget.onReady?.call();
@@ -458,15 +473,19 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
         }
         return;
       }
-      unawaited(_release(_controller));
-      setState(() {
-        _controller = null;
-        _error = null;
-        _ready = false;
-      });
-      _modelBytesFuture = _resolveModelBytes();
-      unawaited(_initialize());
-      return;
+      if (!sameSharedModel) {
+        unawaited(_release(_controller));
+        setState(() {
+          _controller = null;
+          _error = null;
+          _ready = false;
+        });
+        if (_isRemoteOrFileSource(newSource)) {
+          _modelBytesFuture = _resolveModelBytes();
+        }
+        unawaited(_initialize());
+        return;
+      }
     }
     if (oldWidget.storyText != widget.storyText ||
         oldWidget.motion != widget.motion ||
@@ -482,6 +501,7 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
         oldWidget.autoBlink != widget.autoBlink ||
         oldWidget.blink != widget.blink ||
         oldWidget.clay != widget.clay ||
+        oldWidget.bodyColor != widget.bodyColor ||
         oldWidget.hatColor != widget.hatColor ||
         oldWidget.bellyColor != widget.bellyColor ||
         oldWidget.interactive != widget.interactive ||
@@ -525,7 +545,11 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
       _controller = null;
       _error = null;
     });
-    _modelBytesFuture = _resolveModelBytes();
+    final source =
+        widget.modelAsset ?? CharacterHelper.getModelPath(widget.characterName);
+    if (_isRemoteOrFileSource(source)) {
+      _modelBytesFuture = _resolveModelBytes();
+    }
     unawaited(_initialize());
   }
 
@@ -567,14 +591,14 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
           _characterSurface(_controller!),
         if (!_ready && _error == null)
           ColoredBox(
-            color: Colors.white,
+            color: AppColors.surface,
             child: _GlowingLoader(
-              color: CharacterHelper.getColor(widget.characterName),
+              color: _effectiveBodyColor,
             ),
           ),
         if (_error != null)
           ColoredBox(
-            color: Colors.white,
+            color: AppColors.surface,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -584,10 +608,18 @@ class _MobileCharacterViewerState extends State<MobileCharacterViewer>
                     const Text(
                       'تعذّر عرض الشخصية الآن. أعد المحاولة.',
                       textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.onSurface),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
                       onPressed: _retry,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppColors.border_radius),
+                        ),
+                      ),
                       icon: const Icon(Icons.refresh),
                       label: const Text('إعادة المحاولة'),
                     ),

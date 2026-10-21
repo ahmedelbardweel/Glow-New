@@ -9,6 +9,7 @@ import '../animation/character_eye_animation.dart';
 import '../animation/character_mouth_animation.dart';
 import '../animation/character_sleeve_morph.dart';
 import '../services/character_asset_cache.dart';
+import '../theme/app_colors.dart';
 import '../utils/character_helper.dart';
 import '../utils/character_poses.dart';
 import 'mobile_character_viewer.dart';
@@ -30,6 +31,7 @@ class SmartCharacterViewer extends StatelessWidget {
     this.interactive = true,
     this.showSkeleton = false,
     this.showHat = false,
+    this.bodyColor,
     this.hatColor = const Color(0xFF2C2C2E),
     this.bellyColor,
     this.showMuscles = false,
@@ -61,6 +63,7 @@ class SmartCharacterViewer extends StatelessWidget {
   final bool interactive;
   final bool showSkeleton;
   final bool showHat;
+  final Color? bodyColor;
   final Color hatColor;
   final Color? bellyColor;
   final bool showMuscles;
@@ -76,16 +79,25 @@ class SmartCharacterViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     CustomCharacterModel? customChar;
-    try {
-      customChar = sl<CustomCharacterRepository>().findCharacter(characterName);
-    } catch (_) {}
+    if (bodyColor == null) {
+      try {
+        customChar = sl<CustomCharacterRepository>().findCharacter(characterName);
+      } catch (_) {}
+    }
 
-    final effectiveShowHat = showHat || (customChar?.hasHat == true);
-    final effectiveHatColor = showHat
+    final effectiveBodyColor = bodyColor ?? customChar?.bodyColor;
+    final effectiveShowHat = bodyColor != null
+        ? showHat
+        : (showHat || (customChar?.hasHat == true));
+    final effectiveHatColor = bodyColor != null || showHat
         ? hatColor
         : (customChar?.hasHat == true ? customChar!.hatColor : hatColor);
-    final effectiveShowGlasses = customChar != null ? customChar.hasGlasses : showGlasses;
-    final effectiveBellyColor = bellyColor ?? customChar?.bellyColor;
+    final effectiveShowGlasses = bodyColor != null
+        ? showGlasses
+        : (customChar != null ? customChar.hasGlasses : showGlasses);
+    final effectiveBellyColor = bodyColor != null
+        ? bellyColor
+        : (bellyColor ?? customChar?.bellyColor);
 
     final source = pose != null
         ? Uri.base.resolve(CharacterPoses.modelPath).toString()
@@ -107,6 +119,7 @@ class SmartCharacterViewer extends StatelessWidget {
         interactive: interactive,
         showSkeleton: showSkeleton,
         showHat: effectiveShowHat,
+        bodyColor: effectiveBodyColor,
         hatColor: effectiveHatColor,
         bellyColor: effectiveBellyColor,
         showMuscles: showMuscles,
@@ -133,6 +146,7 @@ class SmartCharacterViewer extends StatelessWidget {
       interactive: interactive,
       showSkeleton: showSkeleton,
       showHat: effectiveShowHat,
+      bodyColor: effectiveBodyColor,
       hatColor: effectiveHatColor,
       bellyColor: effectiveBellyColor,
       showMuscles: showMuscles,
@@ -228,6 +242,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   final _startup = Stopwatch();
   static const _canvasSize = Size.square(512);
   SmartCharacterViewer get config => widget.configuration;
+
+  Color get _effectiveBodyColor =>
+      config.bodyColor ?? CharacterHelper.getColor(config.characterName);
 
   @override
   void initState() {
@@ -427,17 +444,16 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       final action = _mixer!.clipAction(clip);
       if (action != null) _actions[clip.name] = action;
     }
-    _frameModel();
-    _buildLighting();
-    if (config.showSkeleton) _buildSkeleton();
     _orbit = three.OrbitControls(view.camera, view.globalKey)
       ..enabled = config.interactive
       ..enablePan = false
       ..enableZoom = true
       ..enableDamping = true
-      ..minDistance = 3
+      ..minDistance = 0.7
       ..maxDistance = 16;
-    _orbit!.target.setValues(0, 1.78, 0);
+    _frameModel();
+    _buildLighting();
+    if (config.showSkeleton) _buildSkeleton();
     view.addAnimationEvent(_animate);
     _selectMotion();
     _mixer!.update(0);
@@ -509,12 +525,22 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     if (camera == null) return;
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
-    final distance =
-        math.max(3.5, _modelWidth / aspect) /
-        (2 * math.tan(38 * math.pi / 360)) *
-        config.cameraFit;
-    camera.position.setValues(0.32, 2.06, distance);
-    camera.lookAt(three.Vector3(0, 1.78, 0));
+    final isFace = config.framing == 'face';
+    final targetY = isFace ? 2.4 : 1.78;
+    final fit = config.cameraFit > 0 ? config.cameraFit : 1.1;
+    final distance = isFace
+        ? 1.65 * fit
+        : math.max(3.5, _modelWidth / aspect) /
+            (2 * math.tan(38 * math.pi / 360)) *
+            fit;
+    final camY = isFace ? 2.45 : 2.06;
+    final rad = (config.cameraAngle ?? 0) * math.pi / 180;
+    final camX = distance * math.sin(rad) + (isFace ? 0 : 0.32);
+    final camZ = distance * math.cos(rad);
+    camera.position.setValues(camX, camY, camZ);
+    camera.lookAt(three.Vector3(0, targetY, 0));
+    _orbit?.target.setValues(0, targetY, 0);
+    _orbit?.update();
   }
 
   void _buildLighting() {
@@ -549,11 +575,11 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 
   void _recolor() {
-    final color = CharacterHelper.getColor(config.characterName);
+    final color = _effectiveBodyColor;
     if (_paletteAttached) {
       _skinPalette.setColor(
         color,
-        originalGreen:
+        originalGreen: config.bodyColor == null &&
             CharacterHelper.getColorKey(config.characterName) == 'port',
       );
       _skinPalette.setBellyColor(config.bellyColor);
@@ -594,7 +620,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
 
   void _applyHat() {
     final hatColor = config.hatColor;
-    final skinColor = CharacterHelper.getColor(config.characterName);
+    final skinColor = _effectiveBodyColor;
     _model?.traverse((object) {
       final material = object.material;
       final name = material?.name;
@@ -754,12 +780,16 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   void didUpdateWidget(covariant _CharacterSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     final old = oldWidget.configuration;
-    if (oldWidget.size != widget.size || old.cameraFit != config.cameraFit) {
+    if (oldWidget.size != widget.size ||
+        old.cameraFit != config.cameraFit ||
+        old.framing != config.framing ||
+        old.cameraAngle != config.cameraAngle) {
       _fitCamera();
     }
-    if (old.characterName != config.characterName) {
+    if (old.characterName != config.characterName ||
+        old.bodyColor != config.bodyColor) {
       _recolor();
-      if (_ready) {
+      if (_ready && old.characterName != config.characterName) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) config.onReady?.call();
         });
@@ -780,8 +810,6 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     if (old.pose != config.pose) {
       _applyPose();
       _fitCamera();
-      _orbit?.target.setValues(0, 1.78, 0);
-      _orbit?.update();
     }
     if (old.storyText != config.storyText) {
       _plan = StoryMotionPlan.fromText(config.storyText);
@@ -899,12 +927,12 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
               ),
             ),
           if (_error != null)
-            Center(
+            const Center(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(16.0),
                 child: Text(
                   'تعذّر عرض الشخصية الآن. أعد المحاولة.',
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(fontSize: 14, color: AppColors.onSurface),
                   textAlign: TextAlign.center,
                   textDirection: TextDirection.rtl,
                 ),
@@ -912,9 +940,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
             ),
           if (!_ready && _error == null)
             ColoredBox(
-              color: Colors.white,
+              color: AppColors.surface,
               child: _GlowingLoader(
-                color: CharacterHelper.getColor(config.characterName),
+                color: _effectiveBodyColor,
               ),
             ),
           if (_error != null)
@@ -924,6 +952,13 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
                 padding: const EdgeInsets.all(10),
                 child: FilledButton.tonalIcon(
                   onPressed: _retry,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryContainer,
+                    foregroundColor: AppColors.onPrimaryContainer,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                    ),
+                  ),
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('تشغيل العرض ثلاثي الأبعاد'),
                 ),

@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../../core/animation/story_motion.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/color_wheel_picker.dart';
@@ -7,6 +9,56 @@ import '../../data/models/custom_character_model.dart';
 import '../../data/repositories/custom_character_repository.dart';
 
 enum _ColorTarget { body, belly, hat }
+
+enum _CreatorSection { colors, accessories, saved }
+
+class _CharacterDraft {
+  final Color bodyColor;
+  final Color bellyColor;
+  final Color hatColor;
+  final bool customBelly;
+  final bool hasHat;
+  final bool hasGlasses;
+  final String framing;
+  final double cameraAngle;
+  final CharacterMotion motion;
+
+  const _CharacterDraft({
+    required this.bodyColor,
+    required this.bellyColor,
+    required this.hatColor,
+    required this.customBelly,
+    required this.hasHat,
+    required this.hasGlasses,
+    this.framing = 'body',
+    this.cameraAngle = 0.0,
+    this.motion = CharacterMotion.idle,
+  });
+
+  _CharacterDraft copyWith({
+    Color? bodyColor,
+    Color? bellyColor,
+    Color? hatColor,
+    bool? customBelly,
+    bool? hasHat,
+    bool? hasGlasses,
+    String? framing,
+    double? cameraAngle,
+    CharacterMotion? motion,
+  }) {
+    return _CharacterDraft(
+      bodyColor: bodyColor ?? this.bodyColor,
+      bellyColor: bellyColor ?? this.bellyColor,
+      hatColor: hatColor ?? this.hatColor,
+      customBelly: customBelly ?? this.customBelly,
+      hasHat: hasHat ?? this.hasHat,
+      hasGlasses: hasGlasses ?? this.hasGlasses,
+      framing: framing ?? this.framing,
+      cameraAngle: cameraAngle ?? this.cameraAngle,
+      motion: motion ?? this.motion,
+    );
+  }
+}
 
 class CustomCharacterCreatorScreen extends StatefulWidget {
   final CustomCharacterModel? characterToEdit;
@@ -17,92 +69,276 @@ class CustomCharacterCreatorScreen extends StatefulWidget {
   });
 
   @override
-  State<CustomCharacterCreatorScreen> createState() => _CustomCharacterCreatorScreenState();
+  State<CustomCharacterCreatorScreen> createState() =>
+      _CustomCharacterCreatorScreenState();
 }
 
-class _CustomCharacterCreatorScreenState extends State<CustomCharacterCreatorScreen> {
+class _CustomCharacterCreatorScreenState
+    extends State<CustomCharacterCreatorScreen> {
+  static const Color _defaultBodyColor = Color(0xFF28542F);
+  static const Color _defaultBellyColor = Color(0xFFEFECE6);
+  static const Color _defaultHatColor = Color(0xFF001946);
+
+  static const List<Color> _bodyPresets = [
+    Color(0xFF28542F), // Emerald
+    Color(0xFF912740), // Ruby
+    Color(0xFF4A90B8), // Sky Blue
+    Color(0xFFD09236), // Golden Amber
+    Color(0xFFB55D75), // Berry Rose
+    Color(0xFF6E8B62), // Sage
+    Color(0xFFFFB300), // App Primary
+    Color(0xFF001946), // App Secondary
+    Color(0xFF34A853), // App Tertiary
+    Color(0xFFFF9800), // Orange
+    Color(0xFF6B1A2A), // Burgundy
+    Color(0xFF8FA698), // Clay Neutral
+  ];
+
+  static const List<Color> _bellyPresets = [
+    Color(0xFFEFECE6), // Default Cream
+    Color(0xFFFFF8E7), // Warm Ivory
+    Color(0xFFFFE082), // Soft Gold
+    Color(0xFFD6E4FF), // Soft Sky
+    Color(0xFFB9F6CA), // Soft Mint
+    Color(0xFFFCE4EC), // Soft Pink
+    Color(0xFFEDE7F6), // Soft Lavender
+    Color(0xFFE2E8F0), // Cool Grey
+    Color(0xFFD9A9B2), // App Pink
+    Color(0xFFFFCCBC), // Soft Peach
+    Color(0xFFFFFFFF), // Pure White
+    Color(0xFFD7CCC8), // Warm Sand
+  ];
+
+  static const List<Color> _hatPresets = [
+    Color(0xFF001946), // Navy
+    Color(0xFF2C2C2E), // Charcoal
+    Color(0xFFFFB300), // Gold
+    Color(0xFF912740), // Crimson
+    Color(0xFF28542F), // Forest
+    Color(0xFF4A90B8), // Ocean
+    Color(0xFF6B1A2A), // Burgundy
+    Color(0xFF34A853), // Green
+    Color(0xFFFF9800), // Orange
+    Color(0xFF4A3728), // Brown
+    Color(0xFFD9A9B2), // Rose
+    Color(0xFFF8FAFC), // White
+  ];
+
   final _nameController = TextEditingController();
+  late final ValueNotifier<_CharacterDraft> _draft;
 
-  late Color _bodyColor;
-  late Color _bellyColor;
-  late Color _hatColor;
-  bool _customBelly = false;
-  bool _hasHat = false;
-  bool _hasGlasses = false;
-  bool _isSaving = false;
-
+  String? _editingId;
+  DateTime? _editingCreatedAt;
   _ColorTarget _selectedTarget = _ColorTarget.body;
+  _CreatorSection _activeSection = _CreatorSection.colors;
+  bool _isSaving = false;
+  List<CustomCharacterModel> _savedCharacters = const [];
 
   @override
   void initState() {
     super.initState();
     final edit = widget.characterToEdit;
     if (edit != null) {
+      _editingId = edit.id;
+      _editingCreatedAt = edit.createdAt;
       _nameController.text = edit.name;
-      _bodyColor = edit.bodyColor;
-      _bellyColor = edit.bellyColor;
-      _hatColor = edit.hatColor;
-      _customBelly = true;
-      _hasHat = edit.hasHat;
-      _hasGlasses = edit.hasGlasses;
+      _draft = ValueNotifier(
+        _CharacterDraft(
+          bodyColor: edit.bodyColor,
+          bellyColor: edit.bellyColor,
+          hatColor: edit.hatColor,
+          customBelly:
+              edit.bellyColorHex.toUpperCase() != '#EFECE6',
+          hasHat: edit.hasHat,
+          hasGlasses: edit.hasGlasses,
+        ),
+      );
     } else {
-      // Raw, neutral base character initially
-      _bodyColor = const Color(0xFF8FA698); // Clay / Raw sage neutral base
-      _bellyColor = const Color(0xFFEFECE6); // Default cream
-      _hatColor = const Color(0xFF2C2C2E);
-      _customBelly = false;
-      _hasHat = false;
-      _hasGlasses = false;
+      _draft = ValueNotifier(
+        const _CharacterDraft(
+          bodyColor: _defaultBodyColor,
+          bellyColor: _defaultBellyColor,
+          hatColor: _defaultHatColor,
+          customBelly: false,
+          hasHat: false,
+          hasGlasses: false,
+        ),
+      );
     }
+    _loadSavedCharacters();
+  }
+
+  void _loadSavedCharacters() {
+    try {
+      final repo = sl<CustomCharacterRepository>();
+      setState(() {
+        _savedCharacters = repo.getCachedCharacters();
+      });
+      repo.fetchCharacters().then((list) {
+        if (mounted) {
+          setState(() {
+            _savedCharacters = list;
+          });
+        }
+      });
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _draft.dispose();
     super.dispose();
   }
 
-  void _resetToRaw() {
+  void _resetToRaw({bool clearEditing = false}) {
+    if (clearEditing) {
+      _editingId = null;
+      _editingCreatedAt = null;
+      _nameController.clear();
+    }
+    _draft.value = const _CharacterDraft(
+      bodyColor: _defaultBodyColor,
+      bellyColor: _defaultBellyColor,
+      hatColor: _defaultHatColor,
+      customBelly: false,
+      hasHat: false,
+      hasGlasses: false,
+    );
     setState(() {
-      _bodyColor = const Color(0xFF8FA698);
-      _bellyColor = const Color(0xFFEFECE6);
-      _hatColor = const Color(0xFF2C2C2E);
-      _customBelly = false;
-      _hasHat = false;
-      _hasGlasses = false;
       _selectedTarget = _ColorTarget.body;
     });
   }
 
-  Color get _currentColorForTarget {
-    switch (_selectedTarget) {
-      case _ColorTarget.body:
-        return _bodyColor;
-      case _ColorTarget.belly:
-        return _bellyColor;
-      case _ColorTarget.hat:
-        return _hatColor;
-    }
-  }
-
-  void _onColorChanged(Color color) {
+  void _randomizeCharacter() {
+    final rng = math.Random();
+    final body = _bodyPresets[rng.nextInt(_bodyPresets.length)];
+    final belly = _bellyPresets[rng.nextInt(_bellyPresets.length)];
+    final hat = _hatPresets[rng.nextInt(_hatPresets.length)];
+    final hasHat = rng.nextBool();
+    final hasGlasses = rng.nextBool();
+    final motions = [
+      CharacterMotion.idle,
+      CharacterMotion.wave,
+      CharacterMotion.happy,
+      CharacterMotion.smile,
+      CharacterMotion.victory,
+    ];
+    _draft.value = _draft.value.copyWith(
+      bodyColor: body,
+      bellyColor: belly,
+      hatColor: hat,
+      customBelly: belly.toARGB32() != _defaultBellyColor.toARGB32(),
+      hasHat: hasHat,
+      hasGlasses: hasGlasses,
+      motion: motions[rng.nextInt(motions.length)],
+    );
     setState(() {
-      switch (_selectedTarget) {
-        case _ColorTarget.body:
-          _bodyColor = color;
-          break;
-        case _ColorTarget.belly:
-          _bellyColor = color;
-          _customBelly = true;
-          break;
-        case _ColorTarget.hat:
-          _hatColor = color;
-          break;
+      if (!hasHat && _selectedTarget == _ColorTarget.hat) {
+        _selectedTarget = _ColorTarget.body;
       }
     });
   }
 
-  Future<void> _saveAndApply() async {
+  void _loadCharacterForEdit(CustomCharacterModel character) {
+    _editingId = character.id;
+    _editingCreatedAt = character.createdAt;
+    _nameController.text = character.name;
+    _draft.value = _draft.value.copyWith(
+      bodyColor: character.bodyColor,
+      bellyColor: character.bellyColor,
+      hatColor: character.hatColor,
+      customBelly: character.bellyColorHex.toUpperCase() != '#EFECE6',
+      hasHat: character.hasHat,
+      hasGlasses: character.hasGlasses,
+    );
+    setState(() {
+      _selectedTarget = _ColorTarget.body;
+      _activeSection = _CreatorSection.colors;
+    });
+  }
+
+  Future<void> _deleteSavedCharacter(CustomCharacterModel character) async {
+    try {
+      await sl<CustomCharacterRepository>().deleteCharacter(character.id);
+      if (!mounted) return;
+      if (_editingId == character.id) {
+        _editingId = null;
+        _editingCreatedAt = null;
+      }
+      _loadSavedCharacters();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم حذف الشخصية «${character.name}»'),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر حذف الشخصية: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Color _colorForTarget(_CharacterDraft draft, _ColorTarget target) {
+    switch (target) {
+      case _ColorTarget.body:
+        return draft.bodyColor;
+      case _ColorTarget.belly:
+        return draft.bellyColor;
+      case _ColorTarget.hat:
+        return draft.hatColor;
+    }
+  }
+
+  List<Color> get _presetsForSelectedTarget {
+    switch (_selectedTarget) {
+      case _ColorTarget.body:
+        return _bodyPresets;
+      case _ColorTarget.belly:
+        return _bellyPresets;
+      case _ColorTarget.hat:
+        return _hatPresets;
+    }
+  }
+
+  String get _labelForSelectedTarget {
+    switch (_selectedTarget) {
+      case _ColorTarget.body:
+        return 'لون الجسم الأساسي';
+      case _ColorTarget.belly:
+        return 'لون البطن الكريمي';
+      case _ColorTarget.hat:
+        return 'لون الطاقية';
+    }
+  }
+
+  void _onColorChanged(Color color) {
+    final current = _draft.value;
+    switch (_selectedTarget) {
+      case _ColorTarget.body:
+        _draft.value = current.copyWith(bodyColor: color);
+        break;
+      case _ColorTarget.belly:
+        _draft.value = current.copyWith(
+          bellyColor: color,
+          customBelly: true,
+        );
+        break;
+      case _ColorTarget.hat:
+        _draft.value = current.copyWith(
+          hatColor: color,
+          hasHat: true,
+        );
+        break;
+    }
+  }
+
+  Future<void> _saveAndApply({bool saveAsNew = false}) async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -116,23 +352,30 @@ class _CustomCharacterCreatorScreenState extends State<CustomCharacterCreatorScr
 
     setState(() => _isSaving = true);
 
+    final d = _draft.value;
+    final isNew = saveAsNew || _editingId == null;
     final character = CustomCharacterModel(
-      id: widget.characterToEdit?.id ?? 'char_${DateTime.now().millisecondsSinceEpoch}',
+      id: isNew
+          ? 'char_${DateTime.now().millisecondsSinceEpoch}'
+          : _editingId!,
       name: name,
-      bodyColorHex: CustomCharacterModel.colorToHex(_bodyColor),
-      bellyColorHex: CustomCharacterModel.colorToHex(_bellyColor),
-      hasHat: _hasHat,
-      hatColorHex: CustomCharacterModel.colorToHex(_hatColor),
-      hasGlasses: _hasGlasses,
-      createdAt: widget.characterToEdit?.createdAt ?? DateTime.now(),
+      bodyColorHex: CustomCharacterModel.colorToHex(d.bodyColor),
+      bellyColorHex: CustomCharacterModel.colorToHex(
+        d.customBelly ? d.bellyColor : _defaultBellyColor,
+      ),
+      hasHat: d.hasHat,
+      hatColorHex: CustomCharacterModel.colorToHex(d.hatColor),
+      hasGlasses: d.hasGlasses,
+      createdAt: isNew ? DateTime.now() : (_editingCreatedAt ?? DateTime.now()),
     );
 
     try {
       await sl<CustomCharacterRepository>().saveCharacter(character);
       if (!mounted) return;
+      _loadSavedCharacters();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('تم حفظ الشخصية «$name» بنجاح! ستجدها في التايم لاين.'),
+          content: Text('تم حفظ الشخصية «$name» بنجاح!'),
           backgroundColor: AppColors.tertiary,
         ),
       );
@@ -152,321 +395,1100 @@ class _CustomCharacterCreatorScreenState extends State<CustomCharacterCreatorScr
 
   @override
   Widget build(BuildContext context) {
-    final hexBody = CustomCharacterModel.colorToHex(_bodyColor);
-    final characterString = 'custom|$hexBody|${_nameController.text.trim().isEmpty ? 'غلو' : _nameController.text.trim()}';
+    final radius = BorderRadius.circular(AppColors.border_radius);
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: const Text('اصنع شخصيتك بنفسك'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: 'إعادة ضبط الشخصية للوضع الخام',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _resetToRaw,
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.secondary,
+        title: Text(
+          _editingId != null ? 'تعديل الشخصية' : 'اصنع شخصيتك',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 17,
+            color: AppColors.secondary,
           ),
+        ),
+        centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: AppColors.inputBorder),
+        ),
+        actions: [
+          // Randomize button
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: OutlinedButton.icon(
+              onPressed: _randomizeCharacter,
+              icon: const Icon(Icons.auto_awesome_outlined, size: 16),
+              label: const Text(
+                'عشوائي',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.secondary,
+                backgroundColor: AppColors.surface,
+                side: const BorderSide(color: AppColors.inputBorder),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Reset button
+          IconButton(
+            tooltip: 'إعادة ضبط الشخصية',
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.secondary),
+            onPressed: () => _resetToRaw(clearEditing: false),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
-        child: Column(
-          children: [
-            // TOP HALF: 3D CHARACTER STAGE WITH DRAG TARGET
-            Expanded(
-              flex: 5,
-              child: DragTarget<String>(
-                onWillAcceptWithDetails: (details) =>
-                    details.data == 'glasses' || details.data == 'hat',
-                onAcceptWithDetails: (details) {
-                  if (details.data == 'glasses') {
-                    setState(() => _hasGlasses = true);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تمت إضافة النظارة!'), duration: Duration(milliseconds: 900)),
-                    );
-                  } else if (details.data == 'hat') {
-                    setState(() {
-                      _hasHat = true;
-                      _selectedTarget = _ColorTarget.hat;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تمت إضافة الطاقية!'), duration: Duration(milliseconds: 900)),
-                    );
-                  }
-                },
-                builder: (context, candidateData, rejectedData) {
-                  final isHovered = candidateData.isNotEmpty;
-                  return Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border(
-                              bottom: BorderSide(
-                                color: isHovered ? AppColors.primary : AppColors.inputBorder,
-                                width: isHovered ? 3 : 1,
-                              ),
-                            ),
-                          ),
-                          child: SmartCharacterViewer(
-                            key: ValueKey('creator_${_hasHat}_${_hasGlasses}_${_bodyColor.value}_${_bellyColor.value}_${_hatColor.value}'),
-                            characterName: characterString,
-                            showHat: _hasHat,
-                            hatColor: _hatColor,
-                            bellyColor: _customBelly ? _bellyColor : null,
-                            showGlasses: _hasGlasses,
-                            framing: 'body',
-                            cameraFit: 1.15,
-                            autoBlink: true,
-                            isPlaying: true,
-                            interactive: true,
-                          ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ============================================================
+              // 1. TOP HALF: INTERACTIVE 3D STAGE (ZERO-RELOAD)
+              // ============================================================
+              Expanded(
+                flex: 46,
+                child: DragTarget<String>(
+                  onWillAcceptWithDetails: (details) =>
+                      details.data == 'glasses' || details.data == 'hat',
+                  onAcceptWithDetails: (details) {
+                    if (details.data == 'glasses') {
+                      _draft.value = _draft.value.copyWith(hasGlasses: true);
+                    } else if (details.data == 'hat') {
+                      _draft.value = _draft.value.copyWith(hasHat: true);
+                      setState(() {
+                        _selectedTarget = _ColorTarget.hat;
+                      });
+                    }
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    final isHovered = candidateData.isNotEmpty;
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: radius,
+                        border: Border.all(
+                          color: isHovered
+                              ? AppColors.primary
+                              : AppColors.inputBorder,
+                          width: isHovered ? 2.5 : 1,
                         ),
                       ),
-
-                      // Hover drop highlight badge
-                      if (isHovered)
-                        Positioned.fill(
-                          child: Container(
-                            color: AppColors.primary.withOpacity(0.12),
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                  boxShadow: const [
-                                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
-                                  ],
+                      clipBehavior: Clip.antiAlias,
+                      child: ValueListenableBuilder<_CharacterDraft>(
+                        valueListenable: _draft,
+                        builder: (context, draft, _) {
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // 3D Character Viewer with constant Key — never reloads WebView/ThreeJS on state updates
+                              SmartCharacterViewer(
+                                key: const ValueKey(
+                                  'custom_character_creator_stage_viewer',
                                 ),
-                                child: const Row(
+                                characterName: 'port',
+                                bodyColor: draft.bodyColor,
+                                bellyColor:
+                                    draft.customBelly ? draft.bellyColor : null,
+                                showHat: draft.hasHat,
+                                hatColor: draft.hatColor,
+                                showGlasses: draft.hasGlasses,
+                                framing: draft.framing,
+                                cameraAngle: draft.cameraAngle,
+                                motion: draft.motion,
+                                cameraFit: 1.12,
+                                autoBlink: true,
+                                isPlaying: true,
+                                interactive: true,
+                              ),
+
+                              // Top-Right: Active Accessories & Rotate Hint
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.add_circle, color: AppColors.onPrimary),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'أفلت الإكسسوار لتطبيقه على الشخصية',
-                                      style: TextStyle(
-                                        color: AppColors.onPrimary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
                                       ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.background,
+                                        borderRadius: radius,
+                                        border: Border.all(
+                                          color: AppColors.inputBorder,
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.threesixty_rounded,
+                                            size: 14,
+                                            color: AppColors.secondary,
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'اسحب للتدوير',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.secondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (draft.hasHat) ...[
+                                      const SizedBox(width: 4),
+                                      _buildStageQuickBadge(
+                                        label: 'طاقية',
+                                        icon: Icons.face_retouching_natural,
+                                        onRemove: () {
+                                          _draft.value =
+                                              draft.copyWith(hasHat: false);
+                                          if (_selectedTarget ==
+                                              _ColorTarget.hat) {
+                                            setState(() {
+                                              _selectedTarget =
+                                                  _ColorTarget.body;
+                                            });
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                    if (draft.hasGlasses) ...[
+                                      const SizedBox(width: 4),
+                                      _buildStageQuickBadge(
+                                        label: 'نظارة',
+                                        icon: Icons.visibility_outlined,
+                                        onRemove: () {
+                                          _draft.value =
+                                              draft.copyWith(hasGlasses: false);
+                                        },
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+
+                              // Top-Left: Framing & Angle Quick Controls
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildStageActionBtn(
+                                      icon: draft.framing == 'face'
+                                          ? Icons.face_retouching_natural
+                                          : Icons.accessibility_new_rounded,
+                                      label: draft.framing == 'face'
+                                          ? 'الوجه'
+                                          : 'الجسم',
+                                      isActive: draft.framing == 'face',
+                                      onTap: () {
+                                        _draft.value = draft.copyWith(
+                                          framing: draft.framing == 'face'
+                                              ? 'body'
+                                              : 'face',
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 4),
+                                    _buildStageActionBtn(
+                                      icon: Icons.cameraswitch_outlined,
+                                      label: draft.cameraAngle == 0
+                                          ? 'أمامي'
+                                          : draft.cameraAngle == -45
+                                          ? 'مائل'
+                                          : 'جانبي',
+                                      isActive: draft.cameraAngle != 0,
+                                      onTap: () {
+                                        final nextAngle =
+                                            draft.cameraAngle == 0
+                                                ? -45.0
+                                                : draft.cameraAngle == -45
+                                                ? -90.0
+                                                : 0.0;
+                                        _draft.value = draft.copyWith(
+                                          cameraAngle: nextAngle,
+                                        );
+                                      },
                                     ),
                                   ],
                                 ),
                               ),
+
+                              // Bottom of Stage: Quick Motion Preview Strip
+                              Positioned(
+                                left: 8,
+                                right: 8,
+                                bottom: 8,
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      CharacterMotion.idle,
+                                      CharacterMotion.wave,
+                                      CharacterMotion.happy,
+                                      CharacterMotion.smile,
+                                      CharacterMotion.victory,
+                                      CharacterMotion.thinking,
+                                      CharacterMotion.walk,
+                                    ].map((motion) {
+                                      final selected = draft.motion == motion;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(left: 4),
+                                        child: InkWell(
+                                          onTap: () {
+                                            _draft.value =
+                                                draft.copyWith(motion: motion);
+                                          },
+                                          borderRadius: radius,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: selected
+                                                  ? AppColors.secondary
+                                                  : AppColors.surface.withValues(
+                                                      alpha: 0.92,
+                                                    ),
+                                              borderRadius: radius,
+                                              border: Border.all(
+                                                color: selected
+                                                    ? AppColors.secondary
+                                                    : AppColors.inputBorder,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              motion.arabicLabel,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: selected
+                                                    ? AppColors.onSecondary
+                                                    : AppColors.secondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+
+                              // Drag & Drop Highlight Overlay
+                              if (isHovered)
+                                Positioned.fill(
+                                  child: Container(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.14,
+                                    ),
+                                    child: Center(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: radius,
+                                          border: Border.all(
+                                            color: AppColors.secondary,
+                                          ),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.add_circle_outline,
+                                              color: AppColors.onPrimary,
+                                              size: 18,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'أفلت الإكسسوار هنا لتطبيقه على الشخصية',
+                                              style: TextStyle(
+                                                color: AppColors.onPrimary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // ============================================================
+              // 2. BOTTOM HALF: ORGANIZED WORKSPACE (NO SCROLL CONFLICTS)
+              // ============================================================
+              Expanded(
+                flex: 54,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // A. Character Name Input Bar + Section Switcher
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 42,
+                              child: TextField(
+                                controller: _nameController,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: AppColors.onSurface,
+                                ),
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(
+                                    Icons.badge_outlined,
+                                    color: AppColors.secondary,
+                                    size: 18,
+                                  ),
+                                  hintText: 'اسم الشخصية (مثال: بطل العلوم)...',
+                                  hintStyle: const TextStyle(fontSize: 12),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  filled: true,
+                                  fillColor: AppColors.surface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: radius,
+                                    borderSide: const BorderSide(
+                                      color: AppColors.inputBorder,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: radius,
+                                    borderSide: const BorderSide(
+                                      color: AppColors.inputBorder,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: radius,
+                                    borderSide: const BorderSide(
+                                      color: AppColors.secondary,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          if (_editingId != null) ...[
+                            const SizedBox(width: 6),
+                            SizedBox(
+                              height: 42,
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    _resetToRaw(clearEditing: true),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text(
+                                  'جديدة',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.secondary,
+                                  backgroundColor: AppColors.surface,
+                                  side: const BorderSide(
+                                    color: AppColors.inputBorder,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: radius,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
 
-                      // Rotate Hint Pill
-                      Positioned(
-                        top: 10,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(20),
+                      // B. Main Workspace Tabs (الألوان | الإكسسوارات | شخصياتي)
+                      Row(
+                        children: [
+                          _buildSectionTab(
+                            section: _CreatorSection.colors,
+                            icon: Icons.palette_outlined,
+                            label: 'الألوان',
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.touch_app_rounded, size: 14, color: Colors.black54),
-                              SizedBox(width: 4),
-                              Text(
-                                'اسحب لتدوير الشخصية',
-                                style: TextStyle(fontSize: 11, color: Colors.black54),
+                          const SizedBox(width: 6),
+                          _buildSectionTab(
+                            section: _CreatorSection.accessories,
+                            icon: Icons.checkroom_outlined,
+                            label: 'الإكسسوارات',
+                          ),
+                          const SizedBox(width: 6),
+                          _buildSectionTab(
+                            section: _CreatorSection.saved,
+                            icon: Icons.bookmarks_outlined,
+                            label: 'شخصياتي (${_savedCharacters.length})',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // C. Active Section Panel
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: radius,
+                            border: Border.all(color: AppColors.inputBorder),
+                          ),
+                          child: switch (_activeSection) {
+                            _CreatorSection.colors => _buildColorsSection(),
+                            _CreatorSection.accessories =>
+                              _buildAccessoriesSection(),
+                            _CreatorSection.saved =>
+                              _buildSavedCharactersSection(),
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // D. Pinned Save & Apply Action Bar
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 46,
+                                child: FilledButton(
+                                  onPressed: _isSaving
+                                      ? null
+                                      : () => _saveAndApply(saveAsNew: false),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: AppColors.onPrimary,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: radius,
+                                    ),
+                                  ),
+                                  child: _isSaving
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: AppColors.onPrimary,
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(
+                                              Icons.check_circle_rounded,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              _editingId != null
+                                                  ? 'حفظ تعديلات الشخصية'
+                                                  : 'حفظ وتطبيق الشخصية',
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ),
+                            if (_editingId != null) ...[
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                height: 46,
+                                child: OutlinedButton.icon(
+                                  onPressed: _isSaving
+                                      ? null
+                                      : () => _saveAndApply(saveAsNew: true),
+                                  icon: const Icon(
+                                    Icons.copy_outlined,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'حفظ كجديدة',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.secondary,
+                                    backgroundColor: AppColors.surface,
+                                    side: const BorderSide(
+                                      color: AppColors.secondary,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: radius,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
-                          ),
+                          ],
                         ),
                       ),
                     ],
-                  );
-                },
-              ),
-            ),
-
-            // BOTTOM HALF: CUSTOMIZATION TOOLS & COLOR WHEEL (Scrollable)
-            Expanded(
-              flex: 6,
-              child: Container(
-                color: AppColors.background,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  children: [
-                    // 1. Character Name Input
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
-                        border: Border.all(color: AppColors.inputBorder),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: TextField(
-                        controller: _nameController,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        decoration: const InputDecoration(
-                          icon: Icon(Icons.badge_outlined, color: AppColors.secondary),
-                          hintText: 'اكتب اسماً لشخصيتك (مثال: بطل العلوم، غلو المبتسم...)',
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // 2. Part Selector Tabs (جسم / بطن كريمي / طاقية)
-                    Row(
-                      children: [
-                        _buildTargetTab(
-                          label: 'الجسم الأساسي',
-                          icon: Icons.palette_outlined,
-                          target: _ColorTarget.body,
-                          activeColor: _bodyColor,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildTargetTab(
-                          label: 'الجزء الكريمي (البطن)',
-                          icon: Icons.cookie_outlined,
-                          target: _ColorTarget.belly,
-                          activeColor: _bellyColor,
-                        ),
-                        if (_hasHat) ...[
-                          const SizedBox(width: 8),
-                          _buildTargetTab(
-                            label: 'الطاقية',
-                            icon: Icons.face_retouching_natural,
-                            target: _ColorTarget.hat,
-                            activeColor: _hatColor,
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // 3. The Interactive Color Wheel
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
-                        border: Border.all(color: AppColors.inputBorder),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
-                        ],
-                      ),
-                      child: ColorWheelPicker(
-                        key: ValueKey('wheel_${_selectedTarget.name}_${_currentColorForTarget.value}'),
-                        initialColor: _currentColorForTarget,
-                        onColorChanged: _onColorChanged,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // 4. Draggable Accessories Shelf (رف الإكسسوارات)
-                    const Text(
-                      'الإكسسوارات (اسحب للإضافة أو انقر للتبديل):',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: AppColors.secondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        // Draggable Glasses
-                        Expanded(
-                          child: _buildDraggableAccessory(
-                            type: 'glasses',
-                            title: 'نظارة',
-                            icon: Icons.visibility_outlined,
-                            isActive: _hasGlasses,
-                            onToggle: () => setState(() => _hasGlasses = !_hasGlasses),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Draggable Hat
-                        Expanded(
-                          child: _buildDraggableAccessory(
-                            type: 'hat',
-                            title: 'طاقية',
-                            icon: Icons.face_retouching_natural,
-                            isActive: _hasHat,
-                            onToggle: () => setState(() {
-                              _hasHat = !_hasHat;
-                              if (_hasHat) _selectedTarget = _ColorTarget.hat;
-                              else if (_selectedTarget == _ColorTarget.hat) _selectedTarget = _ColorTarget.body;
-                            }),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 5. Save & Apply Button
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: _isSaving ? null : _saveAndApply,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppColors.border_radius),
-                          ),
-                          elevation: 2,
-                        ),
-                        child: _isSaving
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onPrimary),
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.check_circle_rounded, size: 22),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'تطبيق وحفظ الشخصية',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildSectionTab({
+    required _CreatorSection section,
+    required IconData icon,
+    required String label,
+  }) {
+    final isSelected = _activeSection == section;
+    final radius = BorderRadius.circular(AppColors.border_radius);
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _activeSection = section),
+        borderRadius: radius,
+        child: Container(
+          height: 36,
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.secondary : AppColors.surface,
+            borderRadius: radius,
+            border: Border.all(
+              color: isSelected ? AppColors.secondary : AppColors.inputBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: isSelected ? AppColors.onSecondary : AppColors.secondary,
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected
+                        ? AppColors.onSecondary
+                        : AppColors.secondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorsSection() {
+    return ValueListenableBuilder<_CharacterDraft>(
+      valueListenable: _draft,
+      builder: (context, draft, _) {
+        final activeColor = _colorForTarget(draft, _selectedTarget);
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Sub-target selector: Body | Belly | Hat
+              Row(
+                children: [
+                  _buildTargetTab(
+                    label: 'الجسم الأساسي',
+                    target: _ColorTarget.body,
+                    activeColor: draft.bodyColor,
+                  ),
+                  const SizedBox(width: 6),
+                  _buildTargetTab(
+                    label: 'البطن الكريمي',
+                    target: _ColorTarget.belly,
+                    activeColor: draft.bellyColor,
+                  ),
+                  const SizedBox(width: 6),
+                  _buildTargetTab(
+                    label: draft.hasHat ? 'الطاقية' : 'الطاقية (+)',
+                    target: _ColorTarget.hat,
+                    activeColor: draft.hatColor,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Color Wheel with stable key per target (NEVER keyed by color value!)
+              ColorWheelPicker(
+                key: ValueKey('wheel_target_${_selectedTarget.name}'),
+                initialColor: activeColor,
+                targetLabel: _labelForSelectedTarget,
+                presetColors: _presetsForSelectedTarget,
+                onColorChanged: _onColorChanged,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAccessoriesSection() {
+    final radius = BorderRadius.circular(AppColors.border_radius);
+    return ValueListenableBuilder<_CharacterDraft>(
+      valueListenable: _draft,
+      builder: (context, draft, _) {
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'انقر لتفعيل الإكسسوار أو اسحبه مباشرة إلى الشخصية في الأعلى:',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDraggableAccessory(
+                      type: 'glasses',
+                      title: 'نظارة ذكية',
+                      subtitle: draft.hasGlasses ? 'مُفعّلة' : 'اضغط أو اسحب',
+                      icon: Icons.visibility_outlined,
+                      isActive: draft.hasGlasses,
+                      onToggle: () {
+                        _draft.value = draft.copyWith(
+                          hasGlasses: !draft.hasGlasses,
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildDraggableAccessory(
+                      type: 'hat',
+                      title: 'طاقية الرأس',
+                      subtitle: draft.hasHat ? 'مُفعّلة' : 'اضغط أو اسحب',
+                      icon: Icons.face_retouching_natural,
+                      isActive: draft.hasHat,
+                      onToggle: () {
+                        final nextHat = !draft.hasHat;
+                        _draft.value = draft.copyWith(hasHat: nextHat);
+                        if (!nextHat && _selectedTarget == _ColorTarget.hat) {
+                          setState(() => _selectedTarget = _ColorTarget.body);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Quick Hat Color Swatches when Hat is active
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: radius,
+                  border: Border.all(color: AppColors.inputBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.color_lens_outlined,
+                          size: 16,
+                          color: AppColors.secondary,
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'ألوان الطاقية السريعة',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                        const Spacer(),
+                        InkWell(
+                          onTap: () {
+                            _draft.value = draft.copyWith(hasHat: true);
+                            setState(() {
+                              _selectedTarget = _ColorTarget.hat;
+                              _activeSection = _CreatorSection.colors;
+                            });
+                          },
+                          borderRadius: radius,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondaryContainer,
+                              borderRadius: radius,
+                              border: Border.all(color: AppColors.secondary),
+                            ),
+                            child: const Text(
+                              'عجلة ألوان الطاقية',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _hatPresets.map((color) {
+                        final isSelected = draft.hasHat &&
+                            (draft.hatColor.toARGB32() & 0xFFFFFF) ==
+                                (color.toARGB32() & 0xFFFFFF);
+                        return InkWell(
+                          onTap: () {
+                            _draft.value = draft.copyWith(
+                              hasHat: true,
+                              hatColor: color,
+                            );
+                          },
+                          borderRadius: radius,
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: radius,
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.secondary
+                                    : AppColors.inputBorder,
+                                width: isSelected ? 2.2 : 1,
+                              ),
+                            ),
+                            child: isSelected
+                                ? Icon(
+                                    Icons.check,
+                                    size: 15,
+                                    color: color.computeLuminance() > 0.55
+                                        ? AppColors.secondary
+                                        : AppColors.onSecondary,
+                                  )
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSavedCharactersSection() {
+    final radius = BorderRadius.circular(AppColors.border_radius);
+    if (_savedCharacters.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.person_add_alt_1_outlined,
+              size: 36,
+              color: AppColors.secondary,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'لا توجد شخصيات محفوظة حتى الآن',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: AppColors.secondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'صمّم شخصيتك بالألوان والإكسسوارات ثم اضغط حفظ لتظهر هنا.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: AppColors.onSurface),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  setState(() => _activeSection = _CreatorSection.colors),
+              icon: const Icon(Icons.palette_outlined, size: 16),
+              label: const Text('ابدأ التصميم الآن'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.secondary,
+                side: const BorderSide(color: AppColors.secondary),
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: _savedCharacters.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      itemBuilder: (context, index) {
+        final c = _savedCharacters[index];
+        final isEditingThis = _editingId == c.id;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: isEditingThis
+                ? AppColors.secondaryContainer.withValues(alpha: 0.45)
+                : AppColors.background,
+            borderRadius: radius,
+            border: Border.all(
+              color: isEditingThis
+                  ? AppColors.secondary
+                  : AppColors.inputBorder,
+              width: isEditingThis ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Color preview swatch (Body + Belly)
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: c.bodyColor,
+                  borderRadius: radius,
+                  border: Border.all(color: AppColors.inputBorder),
+                ),
+                alignment: Alignment.center,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: c.bellyColor,
+                    borderRadius: BorderRadius.circular(
+                      AppColors.border_radius,
+                    ),
+                    border: Border.all(color: AppColors.surface, width: 1),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      c.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Text(
+                          c.bodyColorHex,
+                          textDirection: TextDirection.ltr,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        if (c.hasHat) ...[
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.face_retouching_natural,
+                            size: 13,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(width: 2),
+                          const Text(
+                            'طاقية',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ],
+                        if (c.hasGlasses) ...[
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.visibility_outlined,
+                            size: 13,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(width: 2),
+                          const Text(
+                            'نظارة',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Edit button
+              InkWell(
+                onTap: () => _loadCharacterForEdit(c),
+                borderRadius: radius,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: radius,
+                    border: Border.all(color: AppColors.primary),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 14,
+                        color: AppColors.onPrimaryContainer,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'تعديل',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Delete button
+              InkWell(
+                onTap: () => _deleteSavedCharacter(c),
+                borderRadius: radius,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: radius,
+                    border: Border.all(color: AppColors.inputBorder),
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    size: 16,
+                    color: AppColors.error,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildTargetTab({
     required String label,
-    required IconData icon,
     required _ColorTarget target,
     required Color activeColor,
   }) {
     final isSelected = _selectedTarget == target;
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedTarget = target),
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        onTap: () {
+          if (target == _ColorTarget.hat && !_draft.value.hasHat) {
+            _draft.value = _draft.value.copyWith(hasHat: true);
+          }
+          setState(() => _selectedTarget = target);
+        },
+        borderRadius: radius,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 6),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.secondary : Colors.white,
-            borderRadius: BorderRadius.circular(AppColors.border_radius),
+            color: isSelected
+                ? AppColors.secondaryContainer
+                : AppColors.background,
+            borderRadius: radius,
             border: Border.all(
               color: isSelected ? AppColors.secondary : AppColors.inputBorder,
-              width: isSelected ? 2 : 1,
+              width: isSelected ? 1.5 : 1,
             ),
           ),
           child: Row(
@@ -477,8 +1499,8 @@ class _CustomCharacterCreatorScreenState extends State<CustomCharacterCreatorScr
                 height: 14,
                 decoration: BoxDecoration(
                   color: activeColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  border: Border.all(color: AppColors.secondary, width: 1),
                 ),
               ),
               const SizedBox(width: 6),
@@ -490,7 +1512,7 @@ class _CustomCharacterCreatorScreenState extends State<CustomCharacterCreatorScr
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                    color: isSelected ? Colors.white : AppColors.secondary,
+                    color: AppColors.secondary,
                   ),
                 ),
               ),
@@ -501,61 +1523,156 @@ class _CustomCharacterCreatorScreenState extends State<CustomCharacterCreatorScr
     );
   }
 
+  Widget _buildStageQuickBadge({
+    required String label,
+    required IconData icon,
+    required VoidCallback onRemove,
+  }) {
+    final radius = BorderRadius.circular(AppColors.border_radius);
+    return InkWell(
+      onTap: onRemove,
+      borderRadius: radius,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.secondaryContainer,
+          borderRadius: radius,
+          border: Border.all(color: AppColors.secondary),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: AppColors.onSecondaryContainer),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(width: 3),
+            const Icon(
+              Icons.close,
+              size: 11,
+              color: AppColors.onSecondaryContainer,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStageActionBtn({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    final radius = BorderRadius.circular(AppColors.border_radius);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: radius,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.secondary : AppColors.background,
+          borderRadius: radius,
+          border: Border.all(
+            color: isActive ? AppColors.secondary : AppColors.inputBorder,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isActive ? AppColors.onSecondary : AppColors.secondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: isActive ? AppColors.onSecondary : AppColors.secondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDraggableAccessory({
     required String type,
     required String title,
+    required String subtitle,
     required IconData icon,
     required bool isActive,
     required VoidCallback onToggle,
   }) {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     final content = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: isActive ? AppColors.secondaryContainer : Colors.white,
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        color: isActive ? AppColors.secondaryContainer : AppColors.background,
+        borderRadius: radius,
         border: Border.all(
           color: isActive ? AppColors.secondary : AppColors.inputBorder,
-          width: isActive ? 1.8 : 1,
+          width: isActive ? 1.5 : 1,
         ),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
-        ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: isActive ? AppColors.secondary : Colors.black54,
-            size: 20,
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: isActive ? AppColors.secondary : AppColors.surface,
+              borderRadius: radius,
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+            child: Icon(
+              icon,
+              color: isActive ? AppColors.onSecondary : AppColors.secondary,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: isActive ? AppColors.secondary : Colors.black87,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: AppColors.secondary,
+                  ),
                 ),
-              ),
-              Text(
-                isActive ? 'مُضافة (انقر للحذف)' : 'اسحب إلى الشخصية',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isActive ? AppColors.secondary : Colors.grey,
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.onSurface,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const Spacer(),
           Icon(
             isActive ? Icons.check_circle : Icons.drag_indicator,
             size: 18,
-            color: isActive ? AppColors.secondary : Colors.grey,
+            color: AppColors.secondary,
           ),
         ],
       ),
@@ -566,14 +1683,14 @@ class _CustomCharacterCreatorScreenState extends State<CustomCharacterCreatorScr
       feedback: Material(
         color: Colors.transparent,
         child: SizedBox(
-          width: 150,
-          child: Opacity(opacity: 0.85, child: content),
+          width: 155,
+          child: Opacity(opacity: 0.9, child: content),
         ),
       ),
       childWhenDragging: Opacity(opacity: 0.4, child: content),
       child: InkWell(
         onTap: onToggle,
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        borderRadius: radius,
         child: content,
       ),
     );

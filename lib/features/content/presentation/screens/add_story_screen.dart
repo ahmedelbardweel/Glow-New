@@ -400,6 +400,11 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
             await context.push('/custom-character-creator');
             _loadCustomCharacters();
           },
+          onEditCharacter: (character) async {
+            Navigator.pop(sheetContext);
+            await context.push('/custom-character-creator', extra: character);
+            _loadCustomCharacters();
+          },
         );
       },
     );
@@ -1293,18 +1298,23 @@ class _MontageAiVeilState extends State<_MontageAiVeil> with SingleTickerProvide
 class _CharacterPickerSheet extends StatelessWidget {
   final List<CustomCharacterModel> customCharacters;
   final VoidCallback onOpenCreator;
+  final ValueChanged<CustomCharacterModel>? onEditCharacter;
 
   const _CharacterPickerSheet({
     required this.customCharacters,
     required this.onOpenCreator,
+    this.onEditCharacter,
   });
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppColors.sheet_radius),
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       constraints: BoxConstraints(
@@ -1316,11 +1326,11 @@ class _CharacterPickerSheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 48,
-              height: 5,
+              width: 44,
+              height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(10),
+                color: AppColors.inputBorder,
+                borderRadius: radius,
               ),
             ),
           ),
@@ -1330,10 +1340,14 @@ class _CharacterPickerSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppColors.primaryContainer,
+                  borderRadius: radius,
                 ),
-                child: const Icon(Icons.alternate_email, color: AppColors.primary, size: 20),
+                child: const Icon(
+                  Icons.alternate_email,
+                  color: AppColors.onPrimaryContainer,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -1342,18 +1356,22 @@ class _CharacterPickerSheet extends StatelessWidget {
                   children: [
                     Text(
                       'ربط الجملة بشخصية (/)',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondary,
+                      ),
                     ),
                     Text(
                       'اختر الشخصية التي ستنطق وتمثل هذه الجملة',
-                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                      style: TextStyle(fontSize: 12, color: AppColors.onSurface),
                     ),
                   ],
                 ),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: Colors.black45),
+                icon: const Icon(Icons.close, color: AppColors.secondary),
               ),
             ],
           ),
@@ -1364,7 +1382,11 @@ class _CharacterPickerSheet extends StatelessWidget {
               children: [
                 const Text(
                   'شخصيات Glow الأساسية',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.secondary,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Wrap(
@@ -1374,13 +1396,16 @@ class _CharacterPickerSheet extends StatelessWidget {
                     final color = CharacterHelper.getColor(char.$1);
                     return InkWell(
                       onTap: () => Navigator.pop(context, char.$2),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: radius,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+                          color: AppColors.surface,
+                          borderRadius: radius,
+                          border: Border.all(color: AppColors.inputBorder),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1390,14 +1415,14 @@ class _CharacterPickerSheet extends StatelessWidget {
                               height: 18,
                               decoration: BoxDecoration(
                                 color: color,
-                                shape: BoxShape.circle,
+                                borderRadius: radius,
                               ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               char.$2,
-                              style: TextStyle(
-                                color: color,
+                              style: const TextStyle(
+                                color: AppColors.secondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
                               ),
@@ -1414,14 +1439,30 @@ class _CharacterPickerSheet extends StatelessWidget {
                   children: [
                     const Text(
                       'الشخصيات الجاهزة (المصممة)',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondary,
+                      ),
                     ),
-                    TextButton.icon(
+                    FilledButton.tonalIcon(
                       onPressed: onOpenCreator,
-                      icon: const Icon(Icons.add, size: 16, color: AppColors.secondary),
+                      icon: const Icon(Icons.add, size: 16),
                       label: const Text(
                         'اصنع شخصية +',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primaryContainer,
+                        foregroundColor: AppColors.onPrimaryContainer,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: radius),
                       ),
                     ),
                   ],
@@ -1431,23 +1472,34 @@ class _CharacterPickerSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                      color: AppColors.surface,
+                      borderRadius: radius,
+                      border: Border.all(color: AppColors.inputBorder),
                     ),
                     child: Center(
                       child: Column(
                         children: [
-                          Icon(Icons.palette_outlined, size: 32, color: Colors.grey.shade400),
+                          const Icon(
+                            Icons.palette_outlined,
+                            size: 32,
+                            color: AppColors.secondary,
+                          ),
                           const SizedBox(height: 6),
                           const Text(
                             'لم تصنع شخصيات خاصة بعد',
-                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           TextButton(
                             onPressed: onOpenCreator,
-                            child: const Text('اضغط هنا لتصميم شخصيتك الأولى ثلاثية الأبعاد'),
+                            child: const Text(
+                              'اضغط هنا لتصميم شخصيتك الأولى ثلاثية الأبعاد',
+                              style: TextStyle(color: AppColors.secondary),
+                            ),
                           ),
                         ],
                       ),
@@ -1460,54 +1512,83 @@ class _CharacterPickerSheet extends StatelessWidget {
                     children: customCharacters.map((c) {
                       return InkWell(
                         onTap: () => Navigator.pop(context, c.name),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: radius,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                            color: c.bodyColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: c.bodyColor.withValues(alpha: 0.35), width: 1.5),
+                            color: AppColors.surface,
+                            borderRadius: radius,
+                            border: Border.all(color: AppColors.inputBorder),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Stack(
+                              Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: c.bodyColor,
+                                  borderRadius: radius,
+                                  border: Border.all(
+                                    color: AppColors.inputBorder,
+                                  ),
+                                ),
                                 alignment: Alignment.center,
-                                children: [
-                                  Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      color: c.bodyColor,
-                                      shape: BoxShape.circle,
-                                    ),
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: c.bellyColor,
+                                    borderRadius: radius,
                                   ),
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: c.bellyColor,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 c.name,
-                                style: TextStyle(
-                                  color: c.bodyColor.computeLuminance() > 0.4 ? Colors.black87 : c.bodyColor,
+                                style: const TextStyle(
+                                  color: AppColors.secondary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
                               ),
                               if (c.hasHat) ...[
                                 const SizedBox(width: 4),
-                                const Icon(Icons.face_retouching_natural, size: 14, color: Colors.black54),
+                                const Icon(
+                                  Icons.face_retouching_natural,
+                                  size: 14,
+                                  color: AppColors.secondary,
+                                ),
                               ],
                               if (c.hasGlasses) ...[
                                 const SizedBox(width: 4),
-                                const Icon(Icons.visibility, size: 14, color: Colors.black54),
+                                const Icon(
+                                  Icons.visibility,
+                                  size: 14,
+                                  color: AppColors.secondary,
+                                ),
+                              ],
+                              if (onEditCharacter != null) ...[
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  onTap: () => onEditCharacter!(c),
+                                  borderRadius: radius,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.secondaryContainer,
+                                      borderRadius: radius,
+                                    ),
+                                    child: const Icon(
+                                      Icons.edit_outlined,
+                                      size: 13,
+                                      color: AppColors.onSecondaryContainer,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ],
                           ),

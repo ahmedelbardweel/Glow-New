@@ -67,24 +67,40 @@ class CharacterOfflinePack {
     final dir = Directory('${root.path}/character_runtime');
     await dir.create(recursive: true);
 
-    final planned = <String, int>{
-      htmlFileName: await _assetLength(htmlAsset),
-      jsFileName: await _assetLength(jsAsset),
-      modelFileName: await _assetLength(modelAsset),
-      'glow_rigged.glb': await _assetLength(CharacterRig.assetPath),
-      'inlineScript': 11,
-    };
     final stampFile = File('${dir.path}/$stampFileName');
-    if (await _stampMatches(stampFile, planned) &&
+    final riggedFile = File('${dir.path}/glow_rigged.glb');
+    final htmlLen = await _assetLength(htmlAsset);
+    final jsLen = await _assetLength(jsAsset);
+    const inlineVersion = 12;
+
+    if (await stampFile.exists() &&
         await htmlFile(dir).exists() &&
         await modelFile(dir).exists() &&
-        await File('${dir.path}/glow_rigged.glb').exists()) {
-      return dir;
+        await riggedFile.exists()) {
+      try {
+        final raw = jsonDecode(await stampFile.readAsString());
+        if (raw is Map &&
+            raw[htmlFileName] == htmlLen &&
+            raw[jsFileName] == jsLen &&
+            raw['inlineScript'] == inlineVersion &&
+            raw[modelFileName] == await modelFile(dir).length() &&
+            raw['glow_rigged.glb'] == await riggedFile.length()) {
+          return dir;
+        }
+      } catch (_) {}
     }
+
+    final planned = <String, int>{
+      htmlFileName: htmlLen,
+      jsFileName: jsLen,
+      modelFileName: await _assetLength(modelAsset),
+      'glow_rigged.glb': await _assetLength(CharacterRig.assetPath),
+      'inlineScript': inlineVersion,
+    };
 
     await _writeOfflineShell(htmlFile(dir));
     await _copyAsset(modelAsset, modelFile(dir));
-    await _copyAsset(CharacterRig.assetPath, File('${dir.path}/glow_rigged.glb'));
+    await _copyAsset(CharacterRig.assetPath, riggedFile);
     await stampFile.writeAsString(jsonEncode(planned), flush: true);
     return dir;
   }
@@ -92,20 +108,6 @@ class CharacterOfflinePack {
   Future<int> _assetLength(String assetPath) async {
     final data = await _bundle.load(assetPath);
     return data.lengthInBytes;
-  }
-
-  Future<bool> _stampMatches(File stampFile, Map<String, int> planned) async {
-    if (!await stampFile.exists()) return false;
-    try {
-      final raw = jsonDecode(await stampFile.readAsString());
-      if (raw is! Map) return false;
-      for (final entry in planned.entries) {
-        if (raw[entry.key] != entry.value) return false;
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
   }
 
   /// One HTML file with the viewer script inside it, so the WebView never

@@ -2,8 +2,12 @@ import 'dart:async';
 
 import 'package:Glow/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../features/content/data/models/custom_character_model.dart';
+import '../../features/content/data/repositories/custom_character_repository.dart';
 import '../animation/story_motion.dart';
+import '../di/injection_container.dart';
 import '../utils/character_helper.dart';
 import '../utils/character_poses.dart';
 import 'smart_character_viewer.dart';
@@ -19,9 +23,8 @@ class CharacterStudioScreen extends StatefulWidget {
 }
 
 class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
-  static const _ink = Color(0xFF18372F);
-  static const _muted = Color(0xFF688077);
-  static const _accent = Color(0xFF277A59);
+  static const _ink = AppColors.onPrimary;
+  static const _muted = AppColors.onSecondary;
   static const _sample =
       'مرحبا يا أصدقائي! مشى صديقنا إلى الحديقة. '
       'فكر كيف يساعد أصدقاءه؟ كان حزينا عندما خسر. '
@@ -50,6 +53,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   var _hatColor = const Color(0xFF2C2C2E);
   var _mode = _StudioMode.rigged;
   var _pose = CharacterPoses.all.first;
+  List<CustomCharacterModel> _customCharacters = const [];
 
   bool get _posesMode => _mode == _StudioMode.poses;
   bool get _rigged => _mode == _StudioMode.rigged;
@@ -68,6 +72,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   @override
   void initState() {
     super.initState();
+    _loadCustomCharacters();
     _clock.start();
     _timer = Timer.periodic(const Duration(milliseconds: 50), (_) {
       if (!_playing) return;
@@ -77,6 +82,15 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
         milliseconds: duration > 0 ? elapsed % duration : elapsed,
       );
     });
+  }
+
+  Future<void> _loadCustomCharacters() async {
+    if (!sl.isRegistered<CustomCharacterRepository>()) return;
+    final repo = sl<CustomCharacterRepository>();
+    setState(() => _customCharacters = repo.getCachedCharacters());
+    final chars = await repo.fetchCharacters();
+    if (!mounted) return;
+    setState(() => _customCharacters = chars);
   }
 
   @override
@@ -120,31 +134,41 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF3F7F3),
+        backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: const Color(0xFFF3F7F3),
+          backgroundColor: AppColors.surface,
           foregroundColor: _ink,
           surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(height: 1, color: AppColors.inputBorder),
+          ),
           title: const Text(
             'استوديو الشخصية',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 19),
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
           ),
           actions: [
             Padding(
-              padding: const EdgeInsetsDirectional.only(end: 20),
-              child: Center(
-                child: Text(
-                  'GLOW / 3D',
-                  textDirection: TextDirection.ltr,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
-                    color: _ink.withValues(alpha: 0.55),
-                  ),
+              padding: const EdgeInsetsDirectional.only(end: 12),
+              child: TextButton.icon(
+                onPressed: () async {
+                  await context.push('/custom-character-creator');
+                  _loadCustomCharacters();
+                },
+                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                label: const Text(
+                  'اصنع شخصية',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(borderRadius: radius),
                 ),
               ),
             ),
@@ -170,7 +194,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                           'شخصية واحدة، بحكايات كثيرة.',
                           style: TextStyle(
                             color: _ink,
-                            fontSize: 27,
+                            fontSize: 24,
                             height: 1.4,
                             fontWeight: FontWeight.w800,
                           ),
@@ -180,7 +204,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                           'جرّب الحركة والتعبير واللون، ثم دع قصتك تقود المشهد.',
                           style: TextStyle(color: _muted, height: 1.6),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         if (wide)
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,15 +234,16 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   }
 
   Widget _stage(double height) {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return Column(
       children: [
         Container(
           height: height,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFDCE6DC)),
+            borderRadius: radius,
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.inputBorder),
           ),
           child: Stack(
             fit: StackFit.expand,
@@ -294,8 +319,9 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                           : Icons.accessibility_new_rounded,
                       label: _framing == 'face' ? 'الوجه' : 'كامل الجسم',
                       active: _framing == 'face',
-                      onTap: () => setState(() =>
-                          _framing = _framing == 'face' ? 'body' : 'face'),
+                      onTap: () => setState(
+                        () => _framing = _framing == 'face' ? 'body' : 'face',
+                      ),
                     ),
                     _stageButton(
                       icon: _isSpeaking
@@ -303,8 +329,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                           : Icons.voice_over_off_rounded,
                       label: _isSpeaking ? 'يتحدث' : 'تحدث',
                       active: _isSpeaking,
-                      onTap: () =>
-                          setState(() => _isSpeaking = !_isSpeaking),
+                      onTap: () => setState(() => _isSpeaking = !_isSpeaking),
                     ),
                   ],
                 ),
@@ -320,15 +345,9 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      color: AppColors.surface.withValues(alpha: 0.94),
+                      borderRadius: radius,
+                      border: Border.all(color: AppColors.inputBorder),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -351,7 +370,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                     child: Text(
                       'اسحب للتدوير • قرّب للتفاصيل والدقة',
                       style: TextStyle(
-                        color: Color(0xFF52665B),
+                        color: _muted,
                         fontSize: 10,
                         shadows: [Shadow(color: Colors.white, blurRadius: 8)],
                       ),
@@ -368,6 +387,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   }
 
   Widget _modeSwitch() {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return SegmentedButton<_StudioMode>(
       segments: const [
         ButtonSegment(
@@ -390,17 +410,18 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
       showSelectedIcon: false,
       onSelectionChanged: (value) => setState(() => _mode = value.first),
       style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: _ink,
+        selectedBackgroundColor: AppColors.primary,
         selectedForegroundColor: Colors.white,
         foregroundColor: _ink,
-        side: const BorderSide(color: Color(0xFFDBE5DD)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        side: const BorderSide(color: AppColors.inputBorder),
+        shape: RoundedRectangleBorder(borderRadius: radius),
         padding: const EdgeInsets.symmetric(vertical: 14),
       ),
     );
   }
 
   Widget _poseGrid() {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return LayoutBuilder(
       builder: (context, constraints) => Wrap(
         spacing: 8,
@@ -410,10 +431,10 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
           return SizedBox(
             width: (constraints.maxWidth - 16) / 3,
             child: Material(
-              color: selected ? _ink : const Color(0xFFF3F6F3),
-              borderRadius: BorderRadius.circular(12),
+              color: selected ? AppColors.primary : AppColors.background,
+              borderRadius: radius,
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: radius,
                 onTap: () => setState(() => _pose = pose),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -441,6 +462,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   }
 
   Widget _playbackPanel() {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return _panel(
       child: ValueListenableBuilder<Duration>(
         valueListenable: _position,
@@ -454,12 +476,10 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 children: [
                   FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: _accent,
+                      backgroundColor: AppColors.primary,
                       minimumSize: const Size(54, 48),
                       padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: radius),
                     ),
                     onPressed: _togglePlayback,
                     child: Tooltip(
@@ -492,9 +512,9 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
               ),
               SliderTheme(
                 data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: _accent,
-                  thumbColor: _accent,
-                  inactiveTrackColor: const Color(0xFFE0E9E2),
+                  activeTrackColor: AppColors.primary,
+                  thumbColor: AppColors.primary,
+                  inactiveTrackColor: AppColors.inputBorder,
                   trackHeight: 3,
                   thumbShape: const RoundSliderThumbShape(
                     enabledThumbRadius: 6,
@@ -546,6 +566,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   }
 
   Widget _controls() {
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -558,21 +579,59 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
               _sectionTitle('الشخصية ولونها', Icons.palette_outlined),
               const SizedBox(height: 12),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: CharacterHelper.characters.keys.map((key) {
-                  final selected = _character == key;
-                  return ChoiceChip(
-                    label: Text(CharacterHelper.getCleanName(key)),
-                    avatar: CircleAvatar(
-                      backgroundColor: CharacterHelper.getColor(key),
-                      radius: 11,
-                    ),
-                    selected: selected,
-                    selectedColor: const Color(0xFFE0EDE4),
-                    onSelected: (_) => setState(() => _character = key),
-                  );
-                }).toList(),
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ...CharacterHelper.characters.keys.map((key) {
+                    final selected = _character == key;
+                    return ChoiceChip(
+                      label: Text(CharacterHelper.getCleanName(key)),
+                      avatar: CircleAvatar(
+                        backgroundColor: CharacterHelper.getColor(key),
+                        radius: 10,
+                      ),
+                      selected: selected,
+                      selectedColor: AppColors.secondaryContainer,
+                      backgroundColor: AppColors.background,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: radius,
+                        side: BorderSide(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.inputBorder,
+                        ),
+                      ),
+                      onSelected: (_) => setState(() => _character = key),
+                    );
+                  }),
+                  ..._customCharacters.map((custom) {
+                    final selected = _character == custom.name;
+                    return ChoiceChip(
+                      label: Text(custom.name),
+                      avatar: CircleAvatar(
+                        backgroundColor: custom.bodyColor,
+                        radius: 10,
+                      ),
+                      selected: selected,
+                      selectedColor: AppColors.secondaryContainer,
+                      backgroundColor: AppColors.background,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: radius,
+                        side: BorderSide(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.inputBorder,
+                        ),
+                      ),
+                      onSelected: (_) => setState(() {
+                        _character = custom.name;
+                        _showHat = custom.hasHat;
+                        _hatColor = custom.hatColor;
+                        _showGlasses = custom.hasGlasses;
+                      }),
+                    );
+                  }),
+                ],
               ),
               const SizedBox(height: 22),
               _sectionTitle('زاوية الكاميرا والعرض', Icons.camera_alt_outlined),
@@ -588,7 +647,10 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                     ),
                     ButtonSegment(
                       value: 'face',
-                      icon: Icon(Icons.face_retouching_natural_rounded, size: 16),
+                      icon: Icon(
+                        Icons.face_retouching_natural_rounded,
+                        size: 16,
+                      ),
                       label: Text('تركيز على الوجه'),
                     ),
                   ],
@@ -597,13 +659,11 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   onSelectionChanged: (val) =>
                       setState(() => _framing = val.first),
                   style: SegmentedButton.styleFrom(
-                    selectedBackgroundColor: _accent,
+                    selectedBackgroundColor: AppColors.primary,
                     selectedForegroundColor: Colors.white,
                     foregroundColor: _ink,
-                    side: const BorderSide(color: Color(0xFFDBE5DD)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    side: const BorderSide(color: AppColors.inputBorder),
+                    shape: RoundedRectangleBorder(borderRadius: radius),
                   ),
                 ),
               ),
@@ -643,18 +703,16 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                     ),
                     label: const Text('تلقائي حسب القصة'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: _accent,
+                      foregroundColor: AppColors.primary,
                       backgroundColor: _selectedMotion == null
-                          ? const Color(0xFFEAF3EC)
-                          : Colors.white,
+                          ? AppColors.primary.withValues(alpha: 0.1)
+                          : AppColors.surface,
                       side: BorderSide(
                         color: _selectedMotion == null
-                            ? _accent
-                            : const Color(0xFFDBE5DD),
+                            ? AppColors.primary
+                            : AppColors.inputBorder,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: radius),
                       padding: const EdgeInsets.all(13),
                     ),
                   ),
@@ -669,10 +727,12 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                       return SizedBox(
                         width: (constraints.maxWidth - 24) / 4,
                         child: Material(
-                          color: selected ? _ink : const Color(0xFFF3F6F3),
-                          borderRadius: BorderRadius.circular(12),
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.background,
+                          borderRadius: radius,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: radius,
                             onTap: () =>
                                 setState(() => _selectedMotion = motion),
                             child: Padding(
@@ -707,10 +767,14 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   value: _isSpeaking,
                   onChanged: (value) => setState(() => _isSpeaking = value),
                   contentPadding: EdgeInsets.zero,
-                  activeTrackColor: _accent,
+                  activeTrackColor: AppColors.primary,
                   title: const Text(
                     'حركة التحدث ونبضات الفم',
-                    style: TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: _ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   subtitle: const Text(
                     'تفعيل حركة الشفاه والفك بنبضات الكلام للمعاينة',
@@ -724,7 +788,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   value: _autoBlink,
                   onChanged: (value) => setState(() => _autoBlink = value),
                   contentPadding: EdgeInsets.zero,
-                  activeTrackColor: _accent,
+                  activeTrackColor: AppColors.primary,
                   title: const Text(
                     'رمش تلقائي للعيون',
                     style: TextStyle(color: _ink, fontSize: 13),
@@ -744,7 +808,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                     value: _blinkClosure,
                     min: 0.0,
                     max: 1.0,
-                    activeColor: _accent,
+                    activeColor: AppColors.primary,
                     onChanged: (val) => setState(() => _blinkClosure = val),
                   ),
                 ],
@@ -755,7 +819,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   value: _clay,
                   onChanged: (value) => setState(() => _clay = value),
                   contentPadding: EdgeInsets.zero,
-                  activeTrackColor: _accent,
+                  activeTrackColor: AppColors.primary,
                   title: const Text(
                     'وضع الطين (Clay Shading)',
                     style: TextStyle(color: _ink, fontSize: 13),
@@ -770,7 +834,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   value: _showGlasses,
                   onChanged: (value) => setState(() => _showGlasses = value),
                   contentPadding: EdgeInsets.zero,
-                  activeTrackColor: _accent,
+                  activeTrackColor: AppColors.primary,
                   title: const Text(
                     'إظهار النظارة',
                     style: TextStyle(color: _ink, fontSize: 13),
@@ -785,7 +849,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   value: _showHat,
                   onChanged: (value) => setState(() => _showHat = value),
                   contentPadding: EdgeInsets.zero,
-                  activeTrackColor: _accent,
+                  activeTrackColor: AppColors.primary,
                   title: const Text(
                     'إظهار الطاقية',
                     style: TextStyle(color: _ink, fontSize: 13),
@@ -800,7 +864,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   value: _skeleton,
                   onChanged: (value) => setState(() => _skeleton = value),
                   contentPadding: EdgeInsets.zero,
-                  activeTrackColor: _accent,
+                  activeTrackColor: AppColors.primary,
                   title: const Text(
                     'إظهار العظام',
                     style: TextStyle(color: _ink, fontSize: 13),
@@ -812,7 +876,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                     value: _showMuscles,
                     onChanged: (value) => setState(() => _showMuscles = value),
                     contentPadding: EdgeInsets.zero,
-                    activeTrackColor: _accent,
+                    activeTrackColor: AppColors.primary,
                     title: const Text(
                       'عضلات البطن',
                       style: TextStyle(color: _ink, fontSize: 13),
@@ -840,7 +904,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                         selected: selected,
                         label: 'لون الطاقية',
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: radius,
                           onTap: () => setState(() => _hatColor = color),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 160),
@@ -848,11 +912,9 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                             width: 36,
                             decoration: BoxDecoration(
                               color: color,
-                              shape: BoxShape.circle,
+                              borderRadius: radius,
                               border: Border.all(
-                                color: selected
-                                    ? _ink
-                                    : const Color(0xFFD0D8D0),
+                                color: selected ? _ink : AppColors.inputBorder,
                                 width: selected ? 2.2 : 1,
                               ),
                             ),
@@ -888,15 +950,23 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   decoration: InputDecoration(
                     hintText: 'مرحبا! مشى صديقنا إلى الحديقة…',
                     filled: true,
-                    fillColor: const Color(0xFFF5F7F3),
+                    fillColor: AppColors.background,
                     contentPadding: const EdgeInsets.all(14),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                      borderRadius: radius,
+                      borderSide: const BorderSide(
+                        color: AppColors.inputBorder,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: const BorderSide(
+                        color: AppColors.inputBorder,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: _accent),
+                      borderRadius: radius,
+                      borderSide: const BorderSide(color: AppColors.primary),
                     ),
                   ),
                 ),
@@ -906,11 +976,9 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   icon: const Icon(Icons.auto_stories_outlined, size: 18),
                   label: const Text('تطبيق القصة'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: _accent,
+                    backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: radius),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -932,16 +1000,16 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.all(Radius.circular(AppColors.border_radius)),
-      border: Border.all(color: const Color(0xFFE2E9E1)),
+      border: Border.all(color: AppColors.inputBorder),
     ),
     child: child,
   );
 
   Widget _sectionTitle(String title, IconData icon) => Row(
     children: [
-      Icon(icon, color: _accent, size: 20),
+      Icon(icon, color: AppColors.primary, size: 20),
       const SizedBox(width: 9),
       Text(
         title,
@@ -955,17 +1023,25 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   );
 
   Widget _badge({required IconData icon, required String label}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.92),
-      borderRadius: BorderRadius.circular(24),
+      color: AppColors.surface.withValues(alpha: 0.94),
+      borderRadius: BorderRadius.circular(AppColors.border_radius),
+      border: Border.all(color: AppColors.inputBorder),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: _accent),
+        Icon(icon, size: 15, color: AppColors.primary),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: _ink, fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: _ink,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     ),
   );
@@ -992,51 +1068,60 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
     required String label,
     required bool active,
     required VoidCallback onTap,
-  }) =>
-      Material(
-        color: active ? _ink : Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(20),
-        elevation: active ? 2 : 1,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 14,
-                  color: active ? Colors.white : _accent,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: active ? Colors.white : _ink,
-                  ),
-                ),
-              ],
+  }) {
+    final radius = BorderRadius.circular(AppColors.border_radius);
+    return Material(
+      color: active
+          ? AppColors.primary
+          : AppColors.surface.withValues(alpha: 0.94),
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: active ? AppColors.primary : AppColors.inputBorder,
             ),
           ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: active ? Colors.white : AppColors.primary,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: active ? Colors.white : _ink,
+                ),
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _angleChip(String label, double angle) {
     final active = _cameraAngle == angle;
+    final radius = BorderRadius.circular(AppColors.border_radius);
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: radius,
       onTap: () => setState(() => _cameraAngle = angle),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: active ? _ink : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          color: active ? AppColors.primary : Colors.transparent,
+          borderRadius: radius,
         ),
         child: Text(
           label,

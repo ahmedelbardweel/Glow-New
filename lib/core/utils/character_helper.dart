@@ -81,15 +81,10 @@ class CharacterHelper {
   }
 
   static Color getColor(String rawName) {
-    try {
-      final custom = sl<CustomCharacterRepository>().findCharacter(rawName);
-      if (custom != null) return custom.bodyColor;
-    } catch (_) {}
-
     if (rawName.startsWith('custom|')) {
       final parts = rawName.split('|');
       if (parts.length >= 2) {
-        final idOrHex = parts[1];
+        final idOrHex = parts[1].trim();
         if (idOrHex.startsWith('#')) {
           try {
             final clean = idOrHex.replaceAll('#', '').trim();
@@ -99,6 +94,11 @@ class CharacterHelper {
         }
       }
     }
+
+    try {
+      final custom = sl<CustomCharacterRepository>().findCharacter(rawName);
+      if (custom != null) return custom.bodyColor;
+    } catch (_) {}
 
     if (rawName.startsWith('http')) {
       try {
@@ -122,6 +122,9 @@ class CharacterHelper {
   }
 
   static String getColorKey(String rawName) {
+    if (rawName.startsWith('custom|')) {
+      return 'custom';
+    }
     if (rawName.startsWith('http')) {
       try {
         final uri = Uri.parse(rawName);

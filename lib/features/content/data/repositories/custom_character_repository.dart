@@ -10,35 +10,43 @@ class CustomCharacterRepository {
 
   static const _cacheKey = 'cached_custom_characters';
 
+  List<CustomCharacterModel>? _memoryCache;
+
   CustomCharacterRepository({
     required SupabaseClient supabase,
     required SharedPreferences prefs,
   })  : _supabase = supabase,
         _prefs = prefs;
 
-  /// Returns instantly from local storage (0ms latency, zero choking)
+  /// Returns instantly from in-memory cache or local storage (0ms latency, zero choking)
   List<CustomCharacterModel> getCachedCharacters() {
+    if (_memoryCache != null) return _memoryCache!;
     try {
       final raw = _prefs.getString(_cacheKey);
-      if (raw == null || raw.trim().isEmpty) return const [];
+      if (raw == null || raw.trim().isEmpty) {
+        _memoryCache = const [];
+        return const [];
+      }
       final decoded = jsonDecode(raw);
       if (decoded is List) {
-        return decoded
-            .map((item) => CustomCharacterModel.fromJson(item as Map<String, dynamic>))
-            .toList();
+        _memoryCache = List.unmodifiable(
+          decoded
+              .map((item) => CustomCharacterModel.fromJson(item as Map<String, dynamic>))
+              .toList(),
+        );
+        return _memoryCache!;
       }
     } catch (e) {
       debugPrint('Error reading cached custom characters: $e');
     }
+    _memoryCache = const [];
     return const [];
   }
 
   /// Syncs with Supabase in background and updates local cache
   Future<List<CustomCharacterModel>> fetchCharacters({bool forceRefresh = false}) async {
-    // 1. If not forcing refresh and we have cached data, return cached immediately
     final cached = getCachedCharacters();
     if (!forceRefresh && cached.isNotEmpty) {
-      // Background sync without blocking caller
       _syncFromSupabaseSilently();
       return cached;
     }
@@ -81,7 +89,6 @@ class CustomCharacterRepository {
 
   /// Saves character locally first (instant UI update), then syncs to Supabase
   Future<void> saveCharacter(CustomCharacterModel character) async {
-    // 1. Update local cache immediately
     final list = getCachedCharacters().toList();
     final index = list.indexWhere((c) => c.id == character.id);
     if (index >= 0) {
@@ -91,12 +98,10 @@ class CustomCharacterRepository {
     }
     await _saveToCache(list);
 
-    // 2. Upload to Supabase
     try {
       await _supabase.from('custom_characters').upsert(character.toJson());
     } catch (e) {
       debugPrint('Warning: Could not sync custom character to Supabase: $e');
-      // Character is safely stored locally and will be synced later
     }
   }
 
@@ -144,9 +149,15 @@ class CustomCharacterRepository {
     if (trimmed.startsWith('custom|')) {
       final parts = trimmed.split('|');
       if (parts.length > 1) {
-        final byId = getCharacterById(parts[1]);
+        final second = parts[1].trim();
+        // If parts[1] is a live hex color preview (e.g. custom|#FF0000|name),
+        // do not override live preview settings with a saved character by name.
+        if (second.startsWith('#')) {
+          return null;
+        }
+        final byId = getCharacterById(second);
         if (byId != null) return byId;
-        final byName = getCharacterByName(parts[1]);
+        final byName = getCharacterByName(second);
         if (byName != null) return byName;
       }
       if (parts.length > 2) {
@@ -155,6 +166,7 @@ class CustomCharacterRepository {
         final byName = getCharacterByName(parts[2]);
         if (byName != null) return byName;
       }
+      return null;
     }
     final byId = getCharacterById(trimmed);
     if (byId != null) return byId;
@@ -163,6 +175,7 @@ class CustomCharacterRepository {
   }
 
   Future<void> _saveToCache(List<CustomCharacterModel> list) async {
+    _memoryCache = List.unmodifiable(list);
     try {
       final raw = jsonEncode(list.map((c) => c.toJson()).toList());
       await _prefs.setString(_cacheKey, raw);

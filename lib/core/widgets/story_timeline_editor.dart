@@ -2418,6 +2418,8 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   }
 
   Widget _buildCustomCharacterPaletteItem(CustomCharacterModel c) {
+    final isLight = c.bodyColor.computeLuminance() > 0.55;
+    final fg = isLight ? AppColors.secondary : AppColors.onSecondary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       height: _paletteChipHeight,
@@ -2425,7 +2427,6 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
         color: c.bodyColor,
         borderRadius: BorderRadius.circular(AppColors.timeline_radius),
         border: Border.all(color: AppColors.inputBorder),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2435,26 +2436,26 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             height: 14,
             decoration: BoxDecoration(
               color: c.bellyColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 1.5),
+              borderRadius: BorderRadius.circular(AppColors.border_radius),
+              border: Border.all(color: AppColors.surface, width: 1.2),
             ),
           ),
           const SizedBox(width: 6),
           Text(
             c.name,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: fg,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
           ),
           if (c.hasHat) ...[
             const SizedBox(width: 4),
-            const Icon(Icons.face_retouching_natural, size: 14, color: Colors.white70),
+            Icon(Icons.face_retouching_natural, size: 14, color: fg),
           ],
           if (c.hasGlasses) ...[
             const SizedBox(width: 4),
-            const Icon(Icons.visibility, size: 14, color: Colors.white70),
+            Icon(Icons.visibility, size: 14, color: fg),
           ],
         ],
       ),

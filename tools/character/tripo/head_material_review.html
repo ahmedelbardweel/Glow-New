@@ -52,5 +52,9 @@ if(query.has('blink')){
  if(lids)lids.morphTargetInfluences.splice(0,4,Math.min(2*c,2-2*c),Math.max(0,2*c-1),Math.min(2*c,2-2*c),Math.max(0,2*c-1));
 }
 renderer.render(scene,camera);
+if(query.has('probe')){
+ const ray=new THREE.Raycaster();
+ window.probeMouth=(x,y)=>{ray.setFromCamera(new THREE.Vector2(2*x/innerWidth-1,1-2*y/innerHeight),camera);return ray.intersectObject(model,true).slice(0,3).map(hit=>({name:hit.object.name,face:hit.faceIndex,point:hit.point.toArray()}));};
+}
 document.title='Ready — Glow head material review';
 </script>

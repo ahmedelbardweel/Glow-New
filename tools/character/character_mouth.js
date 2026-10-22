@@ -1,104 +1,34 @@
-import * as THREE from 'three';
+import {MOUTH_TARGETS, sampleMouth} from './mouth_expression.js';
 
-/**
- * Real-time expressive mouth animation for the updated Glow mascot.
- * Controls the 4 morph targets on ExpressiveMouth:
- * - MouthOpen
- * - MouthSmile
- * - MouthSad
- * - MouthRound
- */
+/** One expression drives the jaw, lips, cavity, teeth and tongue together. */
 export class CharacterMouth {
   constructor(model) {
-    this.mouth = model.getObjectByName('ExpressiveMouth');
-    this.time = 0;
-    this.current = { open: 0, smile: 0.14, sad: 0, round: 0 };
-    this.dict = this.mouth?.morphTargetDictionary || {};
-    this.hasTargets = Boolean(
-      this.mouth &&
-      this.mouth.morphTargetInfluences &&
-      (this.dict.MouthOpen !== undefined || this.mouth.morphTargetInfluences.length >= 4)
-    );
+    this.meshes=[];
+    model.traverse(o=>{
+      if(o.morphTargetDictionary?.MouthOpen!==undefined) this.meshes.push(o);
+    });
+    this.mouth=model.getObjectByName('ExpressiveMouth');
+    this.hasTargets=this.meshes.length>0;
+    this.current=[0,.12,0,0];this.time=0;this.lastClock=null;
   }
-
-  update(dt, motion, speaking, clockTime) {
-    if (!this.hasTargets) return;
-    this.time += dt;
-
-    let targetOpen = 0.0;
-    let targetSmile = 0.0;
-    let targetSad = 0.0;
-    let targetRound = 0.0;
-
-    // Emotion expressions driven by the current animation motion
-    switch (motion) {
-      case 'Smile':
-        targetSmile = 0.85;
-        targetOpen = 0.04;
-        break;
-      case 'Happy':
-        targetSmile = 0.75;
-        targetOpen = 0.16;
-        break;
-      case 'Laugh':
-        targetSmile = 0.72;
-        targetOpen = 0.38 + 0.36 * Math.sin(this.time * 8.5);
-        break;
-      case 'Sad':
-        targetSad = 0.85;
-        targetOpen = 0.0;
-        break;
-      case 'Thinking':
-        targetRound = 0.35;
-        targetSmile = 0.05;
-        targetOpen = 0.06;
-        break;
-      case 'Victory':
-        targetSmile = 0.65;
-        targetOpen = 0.25;
-        break;
-      case 'Talk':
-        targetSmile = 0.22;
-        if (!speaking) {
-          const u = this.time * 3.5;
-          targetOpen = 0.12 + 0.32 * Math.pow(Math.sin(u), 2);
-        }
-        break;
-      case 'Idle':
-      case 'Wave':
-      case 'Walk':
-      default:
-        targetSmile = 0.14; // Friendly soft rest
-        targetOpen = 0.0;
-        break;
+  update(dt, motion, speaking=false, clockTime) {
+    if(!this.hasTargets) return;
+    const step=Number.isFinite(dt)?Math.max(0,Math.min(dt,.08)):0;
+    const clock=Number.isFinite(clockTime)?clockTime:this.time+step;
+    const seek=this.lastClock!==null&&Math.abs(clock-this.lastClock-step)>.20;
+    this.time=clock;this.lastClock=clock;
+    const target=sampleMouth(clock,motion,speaking);
+    for(let i=0;i<4;i++) {
+      // Quick closures preserve consonants; slower emotion changes stay gentle.
+      const rate=i===0?(target[i]<this.current[i]?38:28):(i===3?24:10);
+      const blend=seek||step===0?1:1-Math.exp(-step*rate);
+      this.current[i]+=(target[i]-this.current[i])*blend;
     }
-
-    // Dynamic speech cadence when speaking is active
-    if (speaking) {
-      const u = (clockTime !== undefined ? clockTime : this.time) * 4.4;
-      const syllable = Math.pow(Math.sin(u), 2) * 0.72 + Math.pow(Math.sin(u * 1.6), 2) * 0.28;
-      targetOpen = Math.max(targetOpen, 0.18 + 0.62 * syllable);
-      if (motion !== 'Sad') {
-        targetSmile = Math.max(targetSmile, 0.24 + 0.18 * Math.sin(u * 0.6));
+    for(const mesh of this.meshes) {
+      for(let i=0;i<4;i++) {
+        const index=mesh.morphTargetDictionary[MOUTH_TARGETS[i]];
+        if(index!==undefined)mesh.morphTargetInfluences[index]=this.current[i];
       }
     }
-
-    // Fluid exponential lerping for buttery 60fps transitions
-    const blendRate = 1 - Math.exp(-dt * 22);
-    this.current.open += (targetOpen - this.current.open) * blendRate;
-    this.current.smile += (targetSmile - this.current.smile) * blendRate;
-    this.current.sad += (targetSad - this.current.sad) * blendRate;
-    this.current.round += (targetRound - this.current.round) * blendRate;
-
-    const inf = this.mouth.morphTargetInfluences;
-    const openIdx = this.dict.MouthOpen ?? 0;
-    const smileIdx = this.dict.MouthSmile ?? 1;
-    const sadIdx = this.dict.MouthSad ?? 2;
-    const roundIdx = this.dict.MouthRound ?? 3;
-
-    if (inf.length > openIdx) inf[openIdx] = THREE.MathUtils.clamp(this.current.open, 0, 1);
-    if (inf.length > smileIdx) inf[smileIdx] = THREE.MathUtils.clamp(this.current.smile, 0, 1);
-    if (inf.length > sadIdx) inf[sadIdx] = THREE.MathUtils.clamp(this.current.sad, 0, 1);
-    if (inf.length > roundIdx) inf[roundIdx] = THREE.MathUtils.clamp(this.current.round, 0, 1);
   }
 }

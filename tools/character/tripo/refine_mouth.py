@@ -20,6 +20,11 @@ from smooth_head import TYPES, WIDTH, smooth
 TARGETS = ['MouthOpen', 'MouthSmile', 'MouthSad', 'MouthRound']
 
 
+def lip_height(x):
+    # Measured from the source atlas's green/cream boundary.
+    return .5119+1.52*x*x+45*x**4
+
+
 def normals(points, faces):
     _, first, inverse = np.unique(np.round(points, 7), axis=0,
                                   return_index=True, return_inverse=True)
@@ -64,17 +69,29 @@ def build(source, destination):
     attrs = p['attributes']
     old = get(attrs['POSITION'])
     surface = split_lips(old, get(attrs['NORMAL']), get(attrs['TEXCOORD_0']), get(p['indices']),
-                         f=old[:, 1]-(.5095+1.75*old[:, 0]**2), cut_x=.108,
-                         cut_z=.21, mouth_half=.101, max_path_points=3000)
+                         f=old[:, 1]-lip_height(old[:, 0]), cut_x=.108,
+                         cut_z=.21, mouth_half=.101, max_path_points=3000, join_contours=True)
+    assert len(surface['upper']) > 100, 'The lip contour must span the entire mouth'
     pos = surface['positions'].astype(float)
     faces = surface['indices'].astype(int)
     x = pos[:, 0]
-    field = pos[:, 1]-(.5095+1.75*x*x)
+    field = pos[:, 1]-lip_height(x)
+    # Classify interpolated polygon centers with the clipping field itself.
+    # Evaluating the curved contour again can put a tiny triangle on the wrong
+    # lip and stretch it across the opening.
+    original_field = old[:, 1]-lip_height(old[:, 0])
+    for i, record in enumerate(surface['surfaceVertexSources'], len(old)):
+        field[i] = np.array(record['weights'])@original_field[record['indices']]
     lower = field < 0
     lower[surface['upperCopies']] = False
     lower[surface['lowerCopies']] = True
     envelope = smooth(1-(x/.107)**2)
-    attenuation = envelope*smooth(1-abs(field)/np.where(lower, .065, .027))*smooth((pos[:, 2]-.19)/.04)
+    edge_samples = pos[surface['upper']]
+    edge_fit = np.linalg.lstsq(np.c_[np.ones(len(edge_samples)), edge_samples[:, 0]**2, edge_samples[:, 0]**4], edge_samples[:, 2], rcond=None)[0]
+    rounded_depth = np.c_[np.ones(len(pos)), x*x, x**4]@edge_fit + .12*field
+    collar = smooth(1-abs(field)/.014)*envelope*smooth((pos[:, 2]-.20)/.03)
+    pos[:, 2] += (rounded_depth-pos[:, 2])*collar
+    attenuation = envelope*smooth(1-abs(field)/np.where(lower, .085, .050))*smooth((pos[:, 2]-.19)/.04)
     # The lips are nearly closed at rest, with a narrow natural dark crease.
     base = pos.copy()
     base[:, 1] += np.where(lower, -.0006, .00015)*attenuation
@@ -95,7 +112,9 @@ def build(source, destination):
     body_normals = []
     for state in states:
         n = surface['normals'].copy()
-        n[affected] = normals(state, faces)[affected]
+        computed = normals(state, faces)
+        valid = affected & (np.linalg.norm(computed, axis=1) > .5)
+        n[valid] = computed[valid]
         body_normals.append(n)
 
     for name, index in list(attrs.items()):
@@ -132,6 +151,28 @@ def build(source, destination):
     order = np.argsort(pos[upper_ids, 0])
     upper_ids, lower_ids = upper_ids[order], lower_ids[order]
 
+    # Smooth interior borders avoid inheriting the reconstructed mesh's UV
+    # slits and tiny overlapping islands. The lips remain the original skin.
+    cx = np.linspace(-.107, .107, 241)
+    samples = pos[upper_ids]
+    fit = np.linalg.lstsq(np.c_[np.ones(len(samples)), samples[:, 0]**2, samples[:, 0]**4], samples[:, 2], rcond=None)[0]
+    curve = np.c_[cx, lip_height(cx), np.c_[np.ones(len(cx)), cx**2, cx**4]@fit-.0012]
+    ce = smooth(1-(cx/.107)**2)
+    borders = []
+    for is_lower in [False, True]:
+        rest = curve.copy(); rest[:, 1] += (-.0006 if is_lower else .00015)*ce
+        change = [np.zeros_like(curve) for _ in TARGETS]
+        change[0][:, 1] = (-.030 if is_lower else .0015)*ce
+        change[0][:, 2] = (-.009 if is_lower else 0)*ce
+        change[1][:, 0] = .04*cx*ce
+        change[1][:, 1] = (-.003+.008*(abs(cx)/.08)**2-(.0015 if is_lower else 0))*ce
+        change[2][:, 0] = -.06*cx*ce
+        change[2][:, 1] = .024*ce
+        change[3][:, 0] = -.30*cx*ce
+        change[3][:, 1] = (-.018 if is_lower else .006)*ce
+        change[3][:, 2] = (-.003 if is_lower else .0015)*ce
+        borders.append([rest]+[rest+d for d in change])
+
     def strip_faces(rows, columns):
         f = []
         for row in range(rows-1):
@@ -164,15 +205,14 @@ def build(source, destination):
         return ni
 
     # A recessed cavity follows the exact cut edges, rather than sitting on skin.
-    count = len(upper_ids)
+    count = len(cx)
     cavity = []
     rows = 9
-    for state in states:
-        upper, low = state[upper_ids], state[lower_ids]
+    for upper, low in zip(*borders):
         points = []
         for v in np.linspace(0, 1, rows):
             ring = upper*(1-v)+low*v
-            ring[:, 2] -= .0005+.020*np.sin(np.pi*v)*envelope[upper_ids]
+            ring[:, 2] -= .0005+.020*np.sin(np.pi*v)*ce
             points.extend(ring)
         cavity.append(np.array(points))
     colors = np.concatenate([np.tile(np.array([.022, .004, .008])*(.65+.35*abs(2*v-1)), (count, 1))
@@ -183,15 +223,14 @@ def build(source, destination):
     # Rounded upper tooth arch; hidden behind the lower lip when closed.
     xs = np.linspace(-.079, .079, 97)
     teeth = []
-    for state in states:
-        upper = state[upper_ids]
-        factor = np.ptp(upper[:, 0])/np.ptp(states[0][upper_ids, 0])
+    for upper in borders[0]:
+        factor = (upper[len(cx)//2+60, 0]-upper[len(cx)//2-60, 0])/(cx[len(cx)//2+60]-cx[len(cx)//2-60])
         xgrid = xs*factor
         path = np.c_[xgrid, np.interp(xgrid, upper[:, 0], upper[:, 1]), np.interp(xgrid, upper[:, 0], upper[:, 2])]
         points = []
         for v in np.linspace(0, 1, 5):
             ring = path.copy()
-            ring[:, 1] -= .0018+.007*v*(1-(xs/.081)**4)
+            ring[:, 1] -= -.001+.009*v*(1-(xs/.081)**4)
             ring[:, 2] -= .003-.0012*np.sin(np.pi*v)
             points.extend(ring)
         teeth.append(np.array(points))
@@ -208,11 +247,10 @@ def build(source, destination):
             a = 1+row*segments+i; b = 1+row*segments+(i+1) % segments
             tf.extend([[a, a+segments, b], [b, a+segments, b+segments]])
     tongue = []
-    for state in states:
-        low = state[lower_ids]
-        factor = np.ptp(low[:, 0])/np.ptp(states[0][lower_ids, 0])
+    for low in borders[1]:
+        factor = (low[len(cx)//2+60, 0]-low[len(cx)//2-60, 0])/(cx[len(cx)//2+60]-cx[len(cx)//2-60])
         tx = .052*radius*np.cos(angle)*factor
-        ty = np.interp(tx, low[:, 0], low[:, 1])+.005+.0045*radius*np.sin(angle)
+        ty = np.interp(0, low[:, 0], low[:, 1])+.007+.0045*radius*np.sin(angle)
         tz = np.interp(tx, low[:, 0], low[:, 2])-.009+.003*(1-radius**2)
         tongue.append(np.c_[tx, ty, tz])
     tc = np.tile([.30, .045, .065], (len(radius), 1))*(.86+.14*(1-radius**2))[:, None]
@@ -247,7 +285,7 @@ def build(source, destination):
         for node in [body_node, teeth_node, tongue_node]:
             animation['channels'].append(dict(sampler=channel['sampler'], target=dict(node=node, path='weights')))
     g.setdefault('extras', {})['mouthRefinement'] = dict(version=4, node=mouth_node, targets=TARGETS,
-        drivenNodes=[body_node, mouth_node, teeth_node, tongue_node], splitLipPoints=count,
+        drivenNodes=[body_node, mouth_node, teeth_node, tongue_node], splitLipPoints=len(upper_ids),
         speech='stylized syllables with closures and phrase rests')
     g['buffers'][0]['byteLength'] = len(blob)
     js = json.dumps(g, separators=(',', ':')).encode(); js += b' '*(-len(js) % 4)

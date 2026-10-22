@@ -8,7 +8,8 @@ import numpy as np
 
 
 def split_lips(p, n, uv, triangles, *, f=None, body_x=0., cut_x=.122, cut_z=.185,
-               cut_y_min=None, mouth_half=None, max_path_points=80):
+               cut_y_min=None, mouth_half=None, max_path_points=80,
+               join_contours=False):
     triangles=triangles.reshape(-1,3).astype(int)
     unique,inverse=np.unique(p,axis=0,return_inverse=True)
     # Trace the lip seam at the painted green-to-cream boundary, not lower on
@@ -49,7 +50,18 @@ def split_lips(p, n, uv, triangles, *, f=None, body_x=0., cut_x=.122, cut_z=.185
         adjacent.setdefault(a,set()).add(b);adjacent.setdefault(b,set()).add(a)
     if not edge_points:
         raise ValueError('No mouth contour crossings')
-    if front_smile:
+    if join_contours:
+        # Some reconstructed meshes contain disconnected but overlapping UV
+        # islands along the painted lip. Split every crossed front island and
+        # use its outermost samples for the cavity's continuous border.
+        component=set(edge_points)
+        columns={}
+        for key,point in edge_points.items():
+            column=round(float(point[0])/.0005)
+            if column not in columns or point[2]>edge_points[columns[column]][2]:
+                columns[column]=key
+        path=sorted(columns.values(),key=lambda key:edge_points[key][0])
+    elif front_smile:
         center=max(edge_points,key=lambda key: edge_points[key][2]-.4*abs(edge_points[key][0]-body_x))
 
         def walk(start, skip=None):

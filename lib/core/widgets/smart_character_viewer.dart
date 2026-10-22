@@ -81,7 +81,9 @@ class SmartCharacterViewer extends StatelessWidget {
     CustomCharacterModel? customChar;
     if (bodyColor == null) {
       try {
-        customChar = sl<CustomCharacterRepository>().findCharacter(characterName);
+        customChar = sl<CustomCharacterRepository>().findCharacter(
+          characterName,
+        );
       } catch (_) {}
     }
 
@@ -369,16 +371,19 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         if (material is three.MeshStandardMaterial) {
           final matName = material.name.toLowerCase();
           final isEye = meshName.contains('eye') || matName.contains('eye');
-          final isGlasses = meshName.contains('glasses') ||
+          final isGlasses =
+              meshName.contains('glasses') ||
               matName.contains('glasses') ||
               meshName.contains('spectacle') ||
               matName.contains('spectacle');
-          final isMouth = meshName.contains('mouth') ||
+          final isMouth =
+              meshName.contains('mouth') ||
               matName.contains('mouth') ||
               meshName.contains('jaw') ||
               matName.contains('teeth') ||
               matName.contains('tongue');
-          final isScalp = meshName.contains('scalp') || matName.contains('scalp');
+          final isScalp =
+              meshName.contains('scalp') || matName.contains('scalp');
           if (isEye) {
             material.roughness = 0.06;
             material.metalness = 0.0;
@@ -531,8 +536,8 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     final distance = isFace
         ? 1.65 * fit
         : math.max(3.5, _modelWidth / aspect) /
-            (2 * math.tan(38 * math.pi / 360)) *
-            fit;
+              (2 * math.tan(38 * math.pi / 360)) *
+              fit;
     final camY = isFace ? 2.45 : 2.06;
     final rad = (config.cameraAngle ?? 0) * math.pi / 180;
     final camX = distance * math.sin(rad) + (isFace ? 0 : 0.32);
@@ -579,7 +584,8 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     if (_paletteAttached) {
       _skinPalette.setColor(
         color,
-        originalGreen: config.bodyColor == null &&
+        originalGreen:
+            config.bodyColor == null &&
             CharacterHelper.getColorKey(config.characterName) == 'port',
       );
       _skinPalette.setBellyColor(config.bellyColor);
@@ -603,7 +609,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
 
   void _applyGlasses() {
     _model?.traverse((object) {
-      if (object.name != 'Glasses' && object.material?.name != 'Glasses') return;
+      if (object.name != 'Glasses' && object.material?.name != 'Glasses') {
+        return;
+      }
       object.visible = config.showGlasses;
     });
   }
@@ -741,7 +749,12 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       _sleeveMorph.update();
       final motion = config.motion ?? _plan.motionAt(_position);
       _eyeAnimation.update(dt, motion);
-      _mouthAnimation.update(dt, motion, isSpeaking: config.isSpeaking);
+      _mouthAnimation.update(
+        dt,
+        motion,
+        isSpeaking: config.isSpeaking,
+        clockTime: _elapsed,
+      );
       _applyTalkingMouth(motion);
       _breathe();
     }
@@ -941,9 +954,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
           if (!_ready && _error == null)
             ColoredBox(
               color: AppColors.surface,
-              child: _GlowingLoader(
-                color: _effectiveBodyColor,
-              ),
+              child: _GlowingLoader(color: _effectiveBodyColor),
             ),
           if (_error != null)
             Align(
@@ -956,7 +967,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
                     backgroundColor: AppColors.primaryContainer,
                     foregroundColor: AppColors.onPrimaryContainer,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                      borderRadius: BorderRadius.circular(
+                        AppColors.border_radius,
+                      ),
                     ),
                   ),
                   icon: const Icon(Icons.refresh, size: 18),

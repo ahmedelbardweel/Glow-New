@@ -35,6 +35,9 @@ try{
     await new Promise(resolve=>setTimeout(resolve,200));
   }
   if(!ready){const status=await call('Runtime.evaluate',{expression:'JSON.stringify({url:location.href,title:document.title})',returnByValue:true},sessionId);throw new Error('Three.js review did not finish loading: '+status.result?.value);}
+  if(process.argv.includes('--probe-mouth')){
+    const hits=await call('Runtime.evaluate',{expression:'[probeMouth(620,432),probeMouth(620,445),probeMouth(630,455)]',returnByValue:true},sessionId);console.log(JSON.stringify(hits.result.value));
+  }
   if(process.argv.includes('--verify-controls')){
     const checks=await call('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
       const p=window.glowReviewPanels.find(p=>p.id==='after'),model=p.model;

@@ -15,6 +15,7 @@ import '../../data/child_account_service.dart';
 import '../../data/datasources/auth_local_data_source.dart';
 import '../../data/parent_google_auth.dart';
 import '../../../content/data/services/sync_service.dart';
+import 'characters_intro_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -93,7 +94,17 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!isConnected) {
       if (cachedChild != null) {
-        if (mounted) _go('/child-dashboard');
+        if (mounted) {
+          await _holdForLogo();
+          if (!mounted) return;
+          await _sayAppName();
+          if (!mounted) return;
+          if (!CharactersIntroScreen.hasSeen()) {
+            context.go('/characters-intro', extra: '/child-dashboard');
+          } else {
+            context.go('/child-dashboard');
+          }
+        }
         return;
       }
       if (mounted) {
@@ -153,6 +164,10 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
     await _sayAppName();
     if (!mounted) return;
+    if (!CharactersIntroScreen.hasSeen()) {
+      context.go('/characters-intro', extra: route);
+      return;
+    }
     context.go(route);
   }
 
@@ -273,8 +288,11 @@ class _SplashScreenState extends State<SplashScreen> {
                     child: FilledButton(
                       onPressed: () {
                         HapticFeedback.lightImpact();
+                        final targetRoute = CharactersIntroScreen.hasSeen()
+                            ? '/role-selection'
+                            : '/characters-intro';
                         ChildButtonVoice.press('ابدأ الرحلة', () async {
-                          if (context.mounted) context.go('/role-selection');
+                          if (context.mounted) context.go(targetRoute);
                         });
                       },
                       style: FilledButton.styleFrom(

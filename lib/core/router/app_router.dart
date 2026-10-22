@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 // Import screens (to be created)
 import '../../features/auth/presentation/screens/splash_screen.dart';
+import '../../features/auth/presentation/screens/characters_intro_screen.dart';
 import '../../features/auth/presentation/screens/role_selection_screen.dart';
 import '../../features/auth/presentation/screens/child_onboarding_screen.dart';
 import '../../features/auth/presentation/screens/parent_auth_screen.dart';
@@ -51,6 +52,15 @@ class AppRouter {
       GoRoute(
         path: '/character-studio',
         builder: (context, state) => const CharacterStudioScreen(),
+      ),
+      GoRoute(
+        path: '/characters-intro',
+        builder: (context, state) {
+          final nextRoute = state.extra is String
+              ? state.extra as String
+              : '/role-selection';
+          return CharactersIntroScreen(nextRoute: nextRoute);
+        },
       ),
       GoRoute(
         path: '/role-selection',

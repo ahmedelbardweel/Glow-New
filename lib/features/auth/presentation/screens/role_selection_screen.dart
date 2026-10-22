@@ -20,6 +20,17 @@ class RoleSelectionScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'التعرف على الشخصيات',
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              context.go('/characters-intro');
+            },
+            icon: const Icon(
+              Icons.auto_awesome_rounded,
+              color: AppColors.primary,
+            ),
+          ),
+          IconButton(
             tooltip: 'استوديو الشخصية 3D',
             onPressed: () {
               HapticFeedback.lightImpact();

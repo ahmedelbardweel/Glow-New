@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -1445,26 +1446,27 @@ class _CharacterPickerSheet extends StatelessWidget {
                         color: AppColors.secondary,
                       ),
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: onOpenCreator,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text(
-                        'اصنع شخصية +',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                    if (kIsWeb)
+                      FilledButton.tonalIcon(
+                        onPressed: onOpenCreator,
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text(
+                          'اصنع شخصية +',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primaryContainer,
+                          foregroundColor: AppColors.onPrimaryContainer,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: radius),
                         ),
                       ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primaryContainer,
-                        foregroundColor: AppColors.onPrimaryContainer,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        shape: RoundedRectangleBorder(borderRadius: radius),
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -1493,14 +1495,16 @@ class _CharacterPickerSheet extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          TextButton(
-                            onPressed: onOpenCreator,
-                            child: const Text(
-                              'اضغط هنا لتصميم شخصيتك الأولى ثلاثية الأبعاد',
-                              style: TextStyle(color: AppColors.secondary),
+                          if (kIsWeb) ...[
+                            const SizedBox(height: 4),
+                            TextButton(
+                              onPressed: onOpenCreator,
+                              child: const Text(
+                                'اضغط هنا لتصميم شخصيتك الأولى ثلاثية الأبعاد',
+                                style: TextStyle(color: AppColors.secondary),
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

@@ -73,7 +73,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   context.push('/custom-character-creator');
                 },
                 icon: const Icon(Icons.palette_outlined, size: 18),
-                label: const Text('اصنع شخصية', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text('اصنع شخصيتك', style: TextStyle(fontWeight: FontWeight.bold)),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primaryContainer,
                   foregroundColor: AppColors.onPrimaryContainer,
@@ -112,16 +112,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Navigator.of(sheetContext).pop();
                         if (!context.mounted) return;
                         await showCreateOrganizationSheet(context);
-                      },
-                    ),
-                    StaffSetting(
-                      title: 'استوديو الشخصية 3D',
-                      subtitle: 'معاينة شخصيات Glow وحركاتها وألوانها بدقة عالية',
-                      onTap: (sheetContext) async {
-                        Navigator.of(sheetContext).pop();
-                        if (context.mounted) {
-                          context.push('/character-studio');
-                        }
                       },
                     ),
                   ],

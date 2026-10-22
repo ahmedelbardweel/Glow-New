@@ -8,7 +8,7 @@ import numpy as np
 
 
 def split_lips(p, n, uv, triangles, *, f=None, body_x=0., cut_x=.122, cut_z=.185,
-               cut_y_min=None, mouth_half=None):
+               cut_y_min=None, mouth_half=None, max_path_points=80):
     triangles=triangles.reshape(-1,3).astype(int)
     unique,inverse=np.unique(p,axis=0,return_inverse=True)
     # Trace the lip seam at the painted green-to-cream boundary, not lower on
@@ -65,7 +65,7 @@ def split_lips(p, n, uv, triangles, *, f=None, body_x=0., cut_x=.122, cut_z=.185
                         or (cut_y_min is not None and point[1]<cut_y_min+.008)):
                     break
                 path.append(nxt)
-                if len(path)>80:
+                if len(path)>max_path_points:
                     break
             return path
 

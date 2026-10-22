@@ -19,6 +19,9 @@ import '../../../dashboard/data/child_activity.dart';
 import '../../../../core/utils/character_helper.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
+import '../../../../core/audio/story_sentence_voice.dart';
+import '../../../../core/audio/admin_phrase_voice.dart';
 import '../../../../core/models/story_timeline.dart';
 import '../../../../core/widgets/story_transition_frame.dart';
 import '../../../../core/animation/story_motion.dart';
@@ -320,7 +323,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       _currentTimeline = null;
     }
 
-    // Pre-cache next scene's audio in the background for instant transition
+    // Pre-cache next scene's audio or voice in the background for instant transition
     if (_currentIndex + 1 < _stories.length) {
       final nextStory = _stories[_currentIndex + 1];
       final nextAudio = nextStory.audioUrl?.trim() ?? '';
@@ -329,24 +332,31 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
           nextAudio,
           folder: 'audio',
         );
+      } else if (nextStory.content.trim().isNotEmpty) {
+        unawaited(_preCacheStoryVoice(nextStory));
       }
     }
 
-    if (audioUrl.isEmpty) {
-      _startFallbackTimer(generation);
-      return;
-    }
-
-    // Each scene owns its player so a delayed load cannot replace new audio.
     final player = AudioPlayer();
     _audioPlayer = player;
     _listenToAudio(player, generation);
-    unawaited(_loadAudio(player, audioUrl, generation));
+
+    if (audioUrl.isEmpty) {
+      if (currentStory.content.trim().isNotEmpty) {
+        unawaited(_loadStoryVoice(player, currentStory, generation));
+      } else {
+        _startFallbackTimer(generation);
+      }
+      return;
+    }
+
+    unawaited(_loadAudio(player, audioUrl, currentStory, generation));
   }
 
   Future<void> _loadAudio(
     AudioPlayer player,
     String audioUrl,
+    StoryEntity currentStory,
     int generation,
   ) async {
     final resourceManager = sl<ResourceManager>();
@@ -380,7 +390,112 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       }
     }
     debugPrint('Story audio unavailable for $audioUrl');
-    if (_isCurrentScene(generation)) _startFallbackTimer(generation);
+    if (_isCurrentScene(generation)) {
+      if (currentStory.content.trim().isNotEmpty) {
+        await _loadStoryVoice(player, currentStory, generation);
+      } else {
+        _startFallbackTimer(generation);
+      }
+    }
+  }
+
+  Future<void> _loadStoryVoice(
+    AudioPlayer player,
+    StoryEntity story,
+    int generation,
+  ) async {
+    try {
+      final cachedFile = await _getCachedVoiceFile(story);
+      if (cachedFile != null &&
+          cachedFile.existsSync() &&
+          cachedFile.lengthSync() > 256) {
+        if (!_isCurrentScene(generation)) return;
+        if (await _playLocal(player, cachedFile.path, generation)) return;
+      }
+
+      String charId = 'qort';
+      final lower = story.characterName.toLowerCase();
+      for (final key in CharacterHelper.characters.keys) {
+        if (lower.contains(key)) {
+          charId = key;
+          break;
+        }
+      }
+
+      final clip = await StorySentenceVoice.speak(
+        characterId: charId,
+        text: story.content.trim(),
+      );
+
+      if (!_isCurrentScene(generation)) return;
+      if (cachedFile != null && await clip.file.exists()) {
+        try {
+          await clip.file.copy(cachedFile.path);
+        } catch (_) {}
+      }
+
+      final playPath =
+          cachedFile?.existsSync() == true ? cachedFile!.path : clip.file.path;
+      if (await _playLocal(player, playPath, generation)) return;
+    } catch (e) {
+      debugPrint('Story sentence voice error: $e');
+    }
+
+    // Fallback to narrator voice
+    try {
+      final narratorClip =
+          await StorySentenceVoice.speakNarrator(story.content.trim());
+      if (!_isCurrentScene(generation)) return;
+      if (await _playLocal(player, narratorClip.file.path, generation)) return;
+    } catch (e) {
+      debugPrint('Narrator voice fallback error: $e');
+    }
+
+    if (_isCurrentScene(generation)) {
+      _startFallbackTimer(generation);
+    }
+  }
+
+  Future<File?> _getCachedVoiceFile(StoryEntity story) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final cacheDir = Directory('${dir.path}/story_spoken_cache');
+      if (!cacheDir.existsSync()) {
+        cacheDir.createSync(recursive: true);
+      }
+      final fileKey = story.id.isNotEmpty
+          ? story.id
+          : AdminPhraseVoice.fileId(story.content.trim());
+      return File('${cacheDir.path}/$fileKey.wav');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _preCacheStoryVoice(StoryEntity story) async {
+    try {
+      final cachedFile = await _getCachedVoiceFile(story);
+      if (cachedFile != null &&
+          cachedFile.existsSync() &&
+          cachedFile.lengthSync() > 256) {
+        return;
+      }
+      String charId = 'qort';
+      final lower = story.characterName.toLowerCase();
+      for (final key in CharacterHelper.characters.keys) {
+        if (lower.contains(key)) {
+          charId = key;
+          break;
+        }
+      }
+      final clip = await StorySentenceVoice.speak(
+        characterId: charId,
+        text: story.content.trim(),
+      );
+      if (cachedFile != null && await clip.file.exists()) {
+        await clip.file.copy(cachedFile.path);
+      }
+    } catch (_) {}
   }
 
   Future<bool> _playLocal(
@@ -571,7 +686,6 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     setState(() {
       _currentIndex = 0;
     });
-    _speakScene();
     _startStory();
   }
 
@@ -584,18 +698,6 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     );
   }
 
-  void _speakScene() {
-    if (_stories.isEmpty) return;
-    final story = _stories[_currentIndex];
-    unawaited(
-      ChildButtonVoice.speakLines([
-        widget.mission.title,
-        'مشهد ${_currentIndex + 1} من ${_stories.length}',
-        if (story.title.trim().isNotEmpty) story.title.trim(),
-      ]),
-    );
-  }
-
   void _nextStory() {
     if (!mounted || _leaving) return;
     if (_currentIndex < _stories.length - 1) {
@@ -603,23 +705,11 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
         _currentIndex++;
       });
       _logStory(_stories[_currentIndex]);
-      _speakScene();
       _startStory();
     } else {
       // Finished all stories
       _stopPlayback();
       context.pushReplacement('/child/quiz-intro', extra: widget.mission);
-    }
-  }
-
-  void _previousStory() {
-    if (!mounted || _leaving) return;
-    if (_currentIndex > 0) {
-      setState(() {
-        _currentIndex--;
-      });
-      _speakScene();
-      _startStory();
     }
   }
 
@@ -685,7 +775,6 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                         _currentIndex = 0;
                       });
                       _logStory(stories.first);
-                      _speakScene();
                       _startStory();
                     }
                   },
@@ -957,48 +1046,6 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
                                                         ),
                                                       ),
                                                     ),
-                                                    if (story.content.trim().isNotEmpty)
-                                                      Positioned(
-                                                        left: 10,
-                                                        right: 10,
-                                                        bottom: 10,
-                                                        child: _SpeechCaption(
-                                                          text: story.content,
-                                                          position: _positionNotifier,
-                                                          duration: _totalDuration,
-                                                        ),
-                                                      ),
-                                                    Positioned(
-                                                      top: 16,
-                                                      left: 0,
-                                                      right: 0,
-                                                      child: Center(
-                                                        child: Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                            horizontal: 16,
-                                                            vertical: 8,
-                                                          ),
-                                                          decoration: BoxDecoration(
-                                                            color: Colors.transparent,
-                                                            border: Border.all(
-                                                              color: AppColors.inputBorder,
-                                                              width: 1.5,
-                                                            ),
-                                                            borderRadius: BorderRadius.circular(
-                                                              AppColors.border_radius,
-                                                            ),
-                                                          ),
-                                                          child: Text(
-                                                            CharacterHelper.getCleanName(activeChar),
-                                                            style: const TextStyle(
-                                                              color: AppColors.secondary,
-                                                              fontSize: 16,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
                                                   ],
                                                 ),
                                               ),
@@ -1246,118 +1293,6 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
           ),
         );
       },
-    );
-  }
-}
-
-/// Caption as wide as the player. Height follows the text up to the
-/// previous fixed size, then the words scroll with the speech.
-class _SpeechCaption extends StatefulWidget {
-  const _SpeechCaption({
-    required this.text,
-    required this.position,
-    required this.duration,
-  });
-
-  final String text;
-  final ValueNotifier<Duration> position;
-  final Duration duration;
-
-  @override
-  State<_SpeechCaption> createState() => _SpeechCaptionState();
-}
-
-class _SpeechCaptionState extends State<_SpeechCaption> {
-  final ScrollController _scroll = ScrollController();
-  var _followAt = 0;
-
-  static const _maxHeight = 88.0;
-
-  static const _style = TextStyle(
-    color: AppColors.secondary,
-    fontSize: 16,
-    height: 1.5,
-    fontWeight: FontWeight.bold,
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    widget.position.addListener(_followSpeech);
-  }
-
-  @override
-  void didUpdateWidget(covariant _SpeechCaption oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.position != widget.position) {
-      oldWidget.position.removeListener(_followSpeech);
-      widget.position.addListener(_followSpeech);
-    }
-    if (oldWidget.text != widget.text) {
-      if (_scroll.hasClients) _scroll.jumpTo(0);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.position.removeListener(_followSpeech);
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  void _followSpeech() {
-    if (!_scroll.hasClients) return;
-    final total = widget.duration.inMilliseconds;
-    final max = _scroll.position.maxScrollExtent;
-    if (total <= 0 || max <= 0) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now < _followAt) return;
-    final progress = (widget.position.value.inMilliseconds / total).clamp(0.0, 1.0);
-    _followAt = now + 80;
-    final target = max * progress;
-    if ((_scroll.offset - target).abs() < 1) return;
-    _scroll.jumpTo(target);
-  }
-
-  double _heightFor(double width) {
-    const horizontalPad = 24.0;
-    const verticalPad = 16.0;
-    final painter = TextPainter(
-      text: TextSpan(text: widget.text, style: _style),
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.rtl,
-    )..layout(maxWidth: (width - horizontalPad).clamp(0, double.infinity));
-    final wanted = painter.height + verticalPad;
-    if (wanted < _maxHeight) return wanted;
-    return _maxHeight;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Container(
-            height: _heightFor(constraints.maxWidth),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: Border.all(color: AppColors.inputBorder, width: 1.5),
-              borderRadius: BorderRadius.circular(AppColors.border_radius),
-            ),
-            child: SingleChildScrollView(
-              controller: _scroll,
-              physics: const ClampingScrollPhysics(),
-              child: Text(
-                widget.text,
-                style: _style,
-                textAlign: TextAlign.center,
-                textDirection: TextDirection.rtl,
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

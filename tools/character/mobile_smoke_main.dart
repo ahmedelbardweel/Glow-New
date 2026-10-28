@@ -33,7 +33,7 @@ class _CheckState extends State<_Check> {
   int step = 0;
   bool testing = false;
   final position = ValueNotifier(Duration.zero);
-  static const colors = ['port', 'fort', 'lort', 'mort', 'qort'];
+  static const colors = ['port', 'fort', 'lort', 'mort', 'qort', 'sort'];
 
   @override
   void initState() {
@@ -49,9 +49,9 @@ class _CheckState extends State<_Check> {
       setState(() => step++);
       position.value = Duration(seconds: step * 2);
       debugPrint(
-        'MOBILE_CHECK step=$step motion=${CharacterMotion.values[step % 10].clipName}',
+        'MOBILE_CHECK step=$step motion=${CharacterMotion.values[step % CharacterMotion.values.length].clipName}',
       );
-      if (step == 12) {
+      if (step == CharacterMotion.values.length + 2) {
         timer.cancel();
         final navigator = Navigator.of(context);
         this.timer = Timer(const Duration(seconds: 10), () {
@@ -68,7 +68,11 @@ class _CheckState extends State<_Check> {
             ),
           ),
         );
-        if (mounted) setState(() { testing = false; step = 0; });
+        if (mounted)
+          setState(() {
+            testing = false;
+            step = 0;
+          });
         debugPrint('MOBILE_CHECK returned to original route');
       }
     });
@@ -80,17 +84,20 @@ class _CheckState extends State<_Check> {
     body: Column(
       children: [
         Text(
-          'Step $step • ${colors[step % 5]} • ${CharacterMotion.values[step % 10].clipName}',
+          'Step $step • ${colors[step % colors.length]} • ${CharacterMotion.values[step % CharacterMotion.values.length].clipName}',
         ),
         SizedBox(
           height: step.isEven ? 400 : 300,
           child: SmartCharacterViewer(
-            characterName: colors[step % 5],
-            motion: CharacterMotion.values[step % 10],
+            characterName: colors[step % colors.length],
+            motion:
+                CharacterMotion.values[step % CharacterMotion.values.length],
             isPlaying: true,
             isSpeaking: step % 3 == 1,
             playbackPosition: position,
             showSkeleton: step == 10,
+            showHat: step.isEven,
+            showGlasses: step % 3 != 0,
           ),
         ),
         FilledButton(

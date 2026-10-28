@@ -41,7 +41,13 @@ model.traverse(o=>{
   if(o.isMesh){o.frustumCulled=false;if(query.has('clay'))o.material=new THREE.MeshStandardMaterial({color:0x84a996,roughness:.78,side:THREE.DoubleSide});}
 });
 const mixer=new THREE.AnimationMixer(model);
-mixer.clipAction(gltf.animations.find(c=>c.name===(query.get('clip')||'Idle'))).play();mixer.update(Number(query.get('time')||0));
+const clip=gltf.animations.find(c=>c.name===(query.get('clip')||'Idle'));
+if(clip)mixer.clipAction(clip).play();mixer.update(Number(query.get('time')||0));
+if(query.get('framing')==='hand'){
+ model.updateMatrixWorld(true);
+ const hand=model.getObjectByName('RightHand'),center=hand.localToWorld(new THREE.Vector3(-.035,0,0));
+ camera.position.copy(center).add(new THREE.Vector3(.32*Math.sin(angle),.035,.32*Math.cos(angle)));camera.lookAt(center);
+}
 if(query.has('mouth')){
  const poses={closed:[0,0,0,0],open:[1,0,0,0],smile:[.12,.95,0,0],sad:[0,0,.95,0],round:[0,0,0,1],laugh:[.7,.8,0,0]};
  model.traverse(o=>{if(o.morphTargetDictionary?.MouthOpen!==undefined&&poses[query.get('mouth')])o.morphTargetInfluences.splice(0,4,...poses[query.get('mouth')]);});

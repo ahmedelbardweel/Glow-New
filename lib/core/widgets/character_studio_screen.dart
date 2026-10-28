@@ -39,6 +39,10 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
   var _basePosition = Duration.zero;
   var _character = 'port';
   CharacterMotion? _selectedMotion;
+  var _referenceSequence = false;
+  Duration get _playbackDuration => _referenceSequence
+      ? Duration(seconds: referenceMotionSequence.length * 4)
+      : _plan.duration;
   var _playing = true;
   var _isSpeaking = false;
   var _framing = 'body';
@@ -76,11 +80,12 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
     _clock.start();
     _timer = Timer.periodic(const Duration(milliseconds: 50), (_) {
       if (!_playing) return;
-      final duration = _plan.duration.inMilliseconds;
+      final duration = _playbackDuration.inMilliseconds;
       final elapsed = (_basePosition + _clock.elapsed).inMilliseconds;
       _position.value = Duration(
         milliseconds: duration > 0 ? elapsed % duration : elapsed,
       );
+      _syncSequence(_position.value);
     });
   }
 
@@ -120,6 +125,15 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
     _basePosition = position;
     _position.value = position;
     _clock.reset();
+    _syncSequence(position);
+  }
+
+  void _syncSequence(Duration position) {
+    if (!_referenceSequence) return;
+    final motion =
+        referenceMotionSequence[(position.inMilliseconds ~/ 4000) %
+            referenceMotionSequence.length];
+    if (_selectedMotion != motion) setState(() => _selectedMotion = motion);
   }
 
   void _applyStory() {
@@ -128,6 +142,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
       _storyText = _storyController.text;
       _plan = StoryMotionPlan.fromText(_storyText);
       _selectedMotion = null;
+      _referenceSequence = false;
       _seek(Duration.zero);
     });
   }
@@ -253,7 +268,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 storyText: _storyText,
                 isPlaying: _playing,
                 isSpeaking: _isSpeaking,
-                playbackPosition: _position,
+                playbackPosition: _referenceSequence ? null : _position,
                 motion: _selectedMotion,
                 interactive: true,
                 showSkeleton: _skeleton,
@@ -468,7 +483,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
         valueListenable: _position,
         builder: (context, position, child) {
           final cue = _plan.cueAt(position);
-          final duration = _plan.duration.inMilliseconds;
+          final duration = _playbackDuration.inMilliseconds;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -500,7 +515,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   const Icon(Icons.repeat_rounded, size: 16, color: _muted),
                   const SizedBox(width: 8),
                   Text(
-                    '${_time(position)} / ${_time(_plan.duration)}',
+                    '${_time(position)} / ${_time(_playbackDuration)}',
                     textDirection: TextDirection.ltr,
                     style: const TextStyle(
                       fontSize: 12,
@@ -687,14 +702,18 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
               ] else ...[
                 const SizedBox(height: 22),
                 _sectionTitle(
-                  'الحركة والتعبير (10 حركات)',
+                  'الحركة والتعبير (${CharacterMotion.values.length} حركة)',
                   Icons.accessibility_new_rounded,
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => setState(() => _selectedMotion = null),
+                    onPressed: () => setState(() {
+                      _referenceSequence = false;
+                      _selectedMotion = null;
+                      _seek(Duration.zero);
+                    }),
                     icon: Icon(
                       _selectedMotion == null
                           ? Icons.check_circle_rounded
@@ -719,6 +738,32 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 ),
                 const SizedBox(height: 10),
                 LayoutBuilder(
+                  builder: (context, constraints) => Column(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() {
+                          _referenceSequence = !_referenceSequence;
+                          if (_referenceSequence) {
+                            _selectedMotion = referenceMotionSequence.first;
+                            _seek(Duration.zero);
+                          }
+                        }),
+                        icon: Icon(
+                          _referenceSequence
+                              ? Icons.stop_circle_outlined
+                              : Icons.play_circle_outline,
+                        ),
+                        label: Text(
+                          _referenceSequence
+                              ? 'إيقاف العرض المتتابع'
+                              : 'تشغيل حركات الصورة بالتتابع',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+                LayoutBuilder(
                   builder: (context, constraints) => Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -733,8 +778,10 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                           borderRadius: radius,
                           child: InkWell(
                             borderRadius: radius,
-                            onTap: () =>
-                                setState(() => _selectedMotion = motion),
+                            onTap: () => setState(() {
+                              _referenceSequence = false;
+                              _selectedMotion = motion;
+                            }),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               child: Column(
@@ -747,6 +794,8 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                                   const SizedBox(height: 7),
                                   Text(
                                     motion.arabicLabel,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: selected ? Colors.white : _ink,
@@ -1061,6 +1110,16 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
     CharacterMotion.walk => Icons.directions_walk_rounded,
     CharacterMotion.smile => Icons.sentiment_satisfied_alt_rounded,
     CharacterMotion.laugh => Icons.sentiment_very_satisfied_rounded,
+    CharacterMotion.powerPose => Icons.fitness_center_rounded,
+    CharacterMotion.neutral => Icons.accessibility_new_rounded,
+    CharacterMotion.excited => Icons.auto_awesome_rounded,
+    CharacterMotion.curious => Icons.psychology_alt_outlined,
+    CharacterMotion.encourage => Icons.thumb_up_alt_outlined,
+    CharacterMotion.winCelebration => Icons.star_rounded,
+    CharacterMotion.frustrated => Icons.sentiment_very_dissatisfied_rounded,
+    CharacterMotion.nervous => Icons.sentiment_dissatisfied_rounded,
+    CharacterMotion.confused => Icons.help_outline_rounded,
+    CharacterMotion.ultimateWin => Icons.emoji_events_rounded,
   };
 
   Widget _stageButton({

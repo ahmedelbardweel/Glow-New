@@ -97,7 +97,35 @@ class CharacterEyeAnimation {
       case CharacterMotion.idle:
       case CharacterMotion.talk:
       case CharacterMotion.walk:
+      case CharacterMotion.neutral:
         break;
+      case CharacterMotion.curious:
+        x += .05;
+        y -= .045;
+        squint = .07;
+      case CharacterMotion.confused:
+        x += .07 * math.sin(_motionTime * 2);
+        squint = .10;
+      case CharacterMotion.nervous:
+        x += .065 * math.sin(_motionTime * 4);
+        y += .02;
+        squint = .06;
+      case CharacterMotion.frustrated:
+        x *= .2;
+        y += .07;
+        squint = .40;
+      case CharacterMotion.excited:
+        squint = .18 + .06 * math.sin(_motionTime * 5);
+        y -= .02;
+      case CharacterMotion.winCelebration:
+      case CharacterMotion.ultimateWin:
+        squint = .25;
+        y -= .03;
+      case CharacterMotion.encourage:
+        squint = .08;
+      case CharacterMotion.powerPose:
+        squint = .06;
+        y -= .02;
     }
     final gazeEase = 1 - math.exp(-dt * 16);
     _gazeX += (x.clamp(-.10, .10) - _gazeX) * gazeEase;

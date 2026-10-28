@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import '../lib/core/animation/story_motion.dart';
 
@@ -77,18 +80,26 @@ void main() {
     });
 
     test('GLB clip names remain unique and complete', () {
-      expect(CharacterMotion.values.map((motion) => motion.clipName).toSet(), {
-        'Idle',
-        'Talk',
-        'Wave',
-        'Happy',
-        'Sad',
-        'Thinking',
-        'Victory',
-        'Walk',
-        'Smile',
-        'Laugh',
-      });
+      final bytes = File('assets/3d/glow_rigged.glb').readAsBytesSync();
+      final length = ByteData.sublistView(bytes).getUint32(12, Endian.little);
+      final gltf = jsonDecode(utf8.decode(bytes.sublist(20, 20 + length)));
+      final clips = (gltf['animations'] as List).map((a) => a['name']).toSet();
+      final names = CharacterMotion.values.map((motion) => motion.clipName).toSet();
+      expect(names.length, CharacterMotion.values.length);
+      expect(names, clips);
+    });
+
+    test('new emotion cues and explicit overrides select the reference states', () {
+      final plan = StoryMotionPlan.fromText(
+        'أنا متحمس! كان فضوليا. أنا فضولي. إنه مرتبك. شعر بالتوتر. متوتر. '
+        'أحسنت! احتفل بالفوز. رفع الكأس.',
+        overrides: {1: CharacterMotion.curious, 4: CharacterMotion.nervous},
+      );
+      expect(plan.cues.map((cue) => cue.motion), [
+        CharacterMotion.excited, CharacterMotion.curious, CharacterMotion.curious,
+        CharacterMotion.confused, CharacterMotion.nervous, CharacterMotion.nervous,
+        CharacterMotion.encourage, CharacterMotion.winCelebration, CharacterMotion.ultimateWin,
+      ]);
     });
   });
 }

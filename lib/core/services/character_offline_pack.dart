@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../utils/character_helper.dart';
 import '../utils/character_poses.dart';
+import 'character_pack_version.dart';
 
 /// Stages the mobile Three.js shell and shared GLB under app support so the
 /// WebView loads them as local files — no base64 bridge, fully offline.
@@ -71,7 +72,7 @@ class CharacterOfflinePack {
     final riggedFile = File('${dir.path}/glow_rigged.glb');
     final htmlLen = await _assetLength(htmlAsset);
     final jsLen = await _assetLength(jsAsset);
-    const inlineVersion = 12;
+    const inlineVersion = 13;
 
     if (await stampFile.exists() &&
         await htmlFile(dir).exists() &&
@@ -80,6 +81,7 @@ class CharacterOfflinePack {
       try {
         final raw = jsonDecode(await stampFile.readAsString());
         if (raw is Map &&
+            raw['contentVersion'] == characterPackVersion &&
             raw[htmlFileName] == htmlLen &&
             raw[jsFileName] == jsLen &&
             raw['inlineScript'] == inlineVersion &&
@@ -90,7 +92,8 @@ class CharacterOfflinePack {
       } catch (_) {}
     }
 
-    final planned = <String, int>{
+    final planned = <String, Object>{
+      'contentVersion': characterPackVersion,
       htmlFileName: htmlLen,
       jsFileName: jsLen,
       modelFileName: await _assetLength(modelAsset),
@@ -114,10 +117,9 @@ class CharacterOfflinePack {
   /// requests a second file or the network.
   Future<void> _writeOfflineShell(File destination) async {
     final html = await _assetText(htmlAsset);
-    final script = (await _assetText(jsAsset)).replaceAll(
-      '</script',
-      '<\\/script',
-    );
+    final script = (await _assetText(
+      jsAsset,
+    )).replaceAll('</script', '<\\/script');
     final shell = html
         .replaceFirst("script-src 'self'", "script-src 'unsafe-inline'")
         .replaceFirst(
@@ -132,10 +134,9 @@ class CharacterOfflinePack {
 
   Future<String> _assetText(String assetPath) async {
     final data = await _bundle.load(assetPath);
-    return utf8.decode(data.buffer.asUint8List(
-      data.offsetInBytes,
-      data.lengthInBytes,
-    ));
+    return utf8.decode(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+    );
   }
 
   Future<void> _copyAsset(String assetPath, File destination) async {

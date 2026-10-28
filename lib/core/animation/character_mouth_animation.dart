@@ -25,6 +25,7 @@ class CharacterMouthAnimation {
     CharacterMotion motion, {
     bool isSpeaking = false,
     double? clockTime,
+    double? clipTime,
   }) {
     if (_meshes.isEmpty) return;
     final step = dt.isFinite ? dt.clamp(0.0, .08) : 0.0;
@@ -34,7 +35,12 @@ class CharacterMouthAnimation {
     final seek = _lastClock != null && (clock - _lastClock! - step).abs() > .20;
     _time = clock;
     _lastClock = clock;
-    final target = sampleMouthExpression(clock, motion, speaking: isSpeaking);
+    final target = sampleMouthExpression(
+      clock,
+      motion,
+      speaking: isSpeaking,
+      motionTime: clipTime,
+    );
     for (var i = 0; i < 4; i++) {
       final rate = i == 0
           ? (target[i] < _current[i] ? 38 : 28)

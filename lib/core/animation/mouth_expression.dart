@@ -7,7 +7,9 @@ List<double> sampleMouthExpression(
   double time,
   CharacterMotion motion, {
   bool speaking = false,
+  double? motionTime,
 }) {
+  final phase = motionTime ?? time;
   var open = 0.0, smile = .12, sad = 0.0, round = 0.0;
   switch (motion) {
     case CharacterMotion.smile:
@@ -15,11 +17,10 @@ List<double> sampleMouthExpression(
       open = .12;
     case CharacterMotion.happy:
       smile = .80;
-      open = .22;
+      open = .18 + .06 * (1 - math.cos(phase * math.pi * 2 / 3.2));
     case CharacterMotion.laugh:
-      smile = .80;
-      open =
-          .12 + .65 * math.pow(math.max(0, math.sin(time * math.pi * 6)), 1.2);
+      smile = .90;
+      open = .50 + .25 * math.sin(phase * math.pi * 6 / 3.2);
     case CharacterMotion.sad:
       smile = 0;
       sad = .95;
@@ -37,6 +38,35 @@ List<double> sampleMouthExpression(
     case CharacterMotion.idle:
     case CharacterMotion.walk:
       break;
+    case CharacterMotion.powerPose:
+      smile = .40;
+    case CharacterMotion.neutral:
+      smile = .12;
+    case CharacterMotion.excited:
+      smile = .90;
+      open = .40 + .08 * (1 - math.cos(phase * math.pi * 4 / 3.2));
+    case CharacterMotion.curious:
+      smile = .04;
+      round = .18;
+    case CharacterMotion.encourage:
+      smile = .75;
+      open = .08;
+    case CharacterMotion.winCelebration:
+    case CharacterMotion.ultimateWin:
+      smile = .90;
+      open = .48;
+    case CharacterMotion.frustrated:
+      smile = 0;
+      sad = 1;
+    case CharacterMotion.nervous:
+      smile = 0;
+      open = .055;
+      sad = .65;
+      round = .10;
+    case CharacterMotion.confused:
+      smile = 0;
+      sad = .25;
+      round = .25;
   }
   if (speaking || motion == CharacterMotion.talk) {
     const syllables = [

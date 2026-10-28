@@ -1,49 +1,82 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Glow — Expressive mouth review</title>
-<style>body{margin:0;height:100vh;display:flex;flex-direction:column;background:#eef2ef;font:15px Arial;color:#18372f}header{padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}button,select,input{padding:7px}main{display:flex;flex:1;min-height:0}section{width:50%;min-width:0;position:relative}h3{position:absolute;top:0;left:20px;pointer-events:none}canvas{display:block;width:100%;height:100%}#status{font-size:12px}</style>
-<script type="importmap">{"imports":{"three":"/tools/character/node_modules/three/build/three.module.js","three/addons/":"/tools/character/node_modules/three/examples/jsm/"}}</script></head>
-<body><header><b>Glow · الفم والتعبيرات</b><label>لون الشخصية <select id="character"><option value="port">Port — أخضر</option><option value="fort">Fort — أحمر</option><option value="lort">Lort — زيتوني</option><option value="mort">Mort — وردي</option><option value="qort">Qort — أزرق</option><option value="sort">Sort — ذهبي</option></select></label><select id="clip"><option>Idle</option><option>Wave</option><option>Talk</option><option>Victory</option><option>Happy</option><option>Thinking</option><option>Walk</option><option>Sad</option><option>Smile</option><option>Laugh</option></select><button id="play">Pause</button><input id="time" type="range" min="0" max="4" step="0.01" value="0"><select id="angle"><option value="0">Front</option><option value="-50">Right three-quarter</option><option value="-90">Right side</option><option value="50">Left three-quarter</option><option value="90">Left side</option><option value="180">Back</option></select><button id="reload">Reload result</button><label><input id="clay" type="checkbox">Clay</label><label dir="rtl" style="white-space:nowrap"><input id="hat" type="checkbox" autocomplete="off">إظهار الطاقية</label><label dir="rtl"><input id="glasses" type="checkbox" checked autocomplete="off">إظهار النظارة</label><label dir="rtl"><input id="autoBlink" type="checkbox" checked autocomplete="off">رمش تلقائي</label><label dir="rtl">الجفن <input id="blink" type="range" min="0" max="1" step="0.01" value="0"></label><select id="framing"><option value="face">الوجه</option><option value="body">الجسم كاملًا</option></select><label dir="rtl"><input id="speaking" type="checkbox">تحدث</label><span id="status">Loading…</span></header><main><section id="before"><h3>الفم السابق</h3></section><section id="after"><h3>الفم المطوّر</h3></section></main>
+<!doctype html><html lang="ar"><head><meta charset="utf-8"><title>Glow · استوديو الحركات</title>
+<style>
+body{margin:0;height:100vh;display:flex;flex-direction:column;background:#eef2ef;font:14px Arial;color:#18372f}header{padding:12px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;border-bottom:1px solid #d9e3dc}button,select{padding:8px 11px;border:1px solid #c5d7cb;border-radius:8px;background:#fff;color:#18372f}button{cursor:pointer}#sequence{background:#245b43;color:white}label{display:flex;align-items:center;gap:4px}main{display:flex;flex:1;min-height:0}section{flex:1;min-width:0;position:relative}#before{display:none}body.compare #before{display:block}h3{position:absolute;top:4px;right:20px;pointer-events:none;font-size:14px}canvas{display:block;width:100%;height:100%}#status{font-size:12px;color:#648071}#time{width:150px}footer{padding:8px 18px;text-align:center;color:#648071;font-size:12px}
+</style><script type="importmap">{"imports":{"three":"/tools/character/node_modules/three/build/three.module.js","three/addons/":"/tools/character/node_modules/three/examples/jsm/"}}</script></head>
+<body><header dir="rtl"><b>Glow · الحركات والتعبيرات</b>
+<select id="clip" aria-label="الحركة"></select><button id="sequence">تشغيل حركات الصورة بالتتابع</button><button id="play">Pause</button>
+<input id="time" aria-label="موضع الحركة" type="range" min="0" max="4" step="0.01" value="0">
+<select id="angle" aria-label="زاوية العرض"><option value="0">الأمام</option><option value="-50">يمين مائل</option><option value="-90">الجنب الأيمن</option><option value="50">يسار مائل</option><option value="90">الجنب الأيسر</option><option value="180">الخلف</option></select>
+<select id="framing" aria-label="التقريب"><option value="body">الجسم كاملًا</option><option value="face">الوجه</option></select>
+<select id="character" aria-label="لون الشخصية"><option value="port">Port — أخضر</option><option value="fort">Fort — أحمر</option><option value="lort">Lort — زيتوني</option><option value="mort">Mort — وردي</option><option value="qort">Qort — أزرق</option><option value="sort">Sort — ذهبي</option></select>
+<label><input id="hat" type="checkbox" autocomplete="off">الطاقية</label><label><input id="glasses" type="checkbox" checked autocomplete="off">النظارة</label><label><input id="speaking" type="checkbox">تحدث</label>
+<label><input id="autoBlink" type="checkbox" checked>رمش تلقائي</label><label>الجفن <input id="blink" type="range" min="0" max="1" step="0.01" value="0" style="width:70px"></label>
+<label><input id="clay" type="checkbox">المجسم</label><label><input id="compare" type="checkbox">قبل / بعد</label><button id="reload">تحديث</button><span id="status">جارٍ التحميل…</span></header>
+<main><section id="before"><h3>النسخة السابقة</h3></section><section id="after"><h3 id="poseName"></h3></section></main>
+<footer dir="rtl">اسحب لتدوير الشخصية · عجلة الفأرة للتقريب · الحركات تتصل بسلاسة، ويمكن اختيار أي حركة أثناء العرض</footer>
 <script type="module">
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {applyCharacterSurface} from '/tools/character/character_surface.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {CharacterSkinPalette} from '/tools/character/character_palette.js';
 import {CharacterEyes} from '/tools/character/character_eyes.js';
 import {CharacterMouth} from '/tools/character/character_mouth.js';
-const characterColors={port:'#36593c',fort:'#a63352',lort:'#8fa685',mort:'#d9a9b2',qort:'#aad7e9',sort:'#e2b15a'};
-document.querySelector('#character').value=new URLSearchParams(location.search).get('character')||'port';
-const panels=[]; let playing=true, t=0, current=new URLSearchParams(location.search).get('clip')||'Idle'; document.querySelector('#clip').value=current; const loader=new GLTFLoader();
+import {CharacterProps} from '/tools/character/character_props.js';
+import {MotionBlend} from '/tools/character/motion_blend.js';
+import {motionLabels,referenceSequence} from '/tools/character/motion_catalog.js';
+const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
+const colors={port:'#36593c',fort:'#a63352',lort:'#8fa685',mort:'#d9a9b2',qort:'#aad7e9',sort:'#e2b15a'};
+for(const [name,label] of Object.entries(motionLabels))$('clip').add(new Option(label,name));
+let playing=true,t=0,sequence=query.get('sequence')==='1',sequenceTime=0;
+let current=query.get('clip')||(sequence?referenceSequence[0]:'Idle');
+$('clip').value=current;$('character').value=query.get('character')||'port';$('framing').value=query.get('framing')||'body';
+const panels=[],loader=new GLTFLoader();
 for(const id of ['before','after']){
- const host=document.getElementById(id),scene=new THREE.Scene();scene.background=new THREE.Color('#eef2ef');
+ const host=$(id),scene=new THREE.Scene();scene.background=new THREE.Color('#eef2ef');
  const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;host.append(renderer.domElement);
- const camera=new THREE.PerspectiveCamera(32,1,.01,20);camera.position.set(0,.69,1.45);
- const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,.64,0);controls.enablePan=false;controls.update();
+ const camera=new THREE.PerspectiveCamera(32,1,.01,20),controls=new OrbitControls(camera,renderer.domElement);controls.enablePan=false;
  scene.add(new THREE.HemisphereLight(0xffffff,0x677b6d,2));const key=new THREE.DirectionalLight(0xffffff,2.4);key.position.set(-2,4,5);scene.add(key);const fill=new THREE.DirectionalLight(0xd5e6ff,1);fill.position.set(3,2,-2);scene.add(fill);
  const p={id,host,scene,renderer,camera,controls};panels.push(p);
- new ResizeObserver(()=>{renderer.setSize(host.clientWidth,host.clientHeight);camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix()}).observe(host);
+ new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;renderer.setPixelRatio(Math.min(2,Math.max(devicePixelRatio,1.5),2048/Math.max(host.clientWidth,host.clientHeight)));renderer.setSize(host.clientWidth,host.clientHeight);camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();frameCamera()}).observe(host);
  await load(p);
 }
 async function load(p){
- const url=p.id==='before'?'/build/tripo/mouth_pro_review/before.glb':'/build/tripo/side_review/candidate.glb';
- const gltf=await loader.loadAsync(url+'?v='+Date.now());if(p.model)p.scene.remove(p.model);p.model=gltf.scene;p.scene.add(p.model);p.mixer=new THREE.AnimationMixer(p.model);p.clips=gltf.animations;p.eyes=new CharacterEyes(p.model);p.mouth=new CharacterMouth(p.model);p.palette=new CharacterSkinPalette();const seen=new Set();p.model.traverse(o=>p.palette.attach(o,seen));applyCharacter(p);
- p.model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.userData.original=o.material;o.userData.clay=new THREE.MeshStandardMaterial({color:['Body','Scalp','EyeLids','EyeSocketSkin'].includes(o.name)?0x84a996:0x686b70,roughness:.85,side:THREE.DoubleSide});if(document.querySelector('#clay').checked)o.material=o.userData.clay}});applyHat(p);applyGlasses(p);select(p);
+ const url=p.id==='before'?'/build/tripo/motion_quality_review/before.glb':'/build/tripo/side_review/candidate.glb';
+ const gltf=await loader.loadAsync(url+'?v='+Date.now());
+ if(p.model){p.blend.clear();p.mixer.uncacheRoot(p.model);p.scene.remove(p.model);const disposed=new Set();p.model.traverse(o=>{if(o.geometry)o.geometry.dispose();for(const m of [o.material,o.userData.original,o.userData.clay].flat().filter(Boolean)){if(disposed.has(m))continue;disposed.add(m);for(const value of Object.values(m))if(value?.isTexture&&!disposed.has(value)){value.dispose();disposed.add(value);}m.dispose();}});}
+ p.model=gltf.scene;p.scene.add(p.model);if(p.id==='after')p.model.traverse(applyCharacterSurface);p.mixer=new THREE.AnimationMixer(p.model);p.clips=gltf.animations;
+ p.actions=new Map(p.clips.map(c=>[c.name,p.mixer.clipAction(c)]));p.blend=new MotionBlend(p.actions);
+ p.eyes=new CharacterEyes(p.model);p.mouth=new CharacterMouth(p.model);p.props=new CharacterProps(p.model);p.palette=new CharacterSkinPalette();
+ const seen=new Set();p.model.traverse(o=>p.palette.attach(o,seen));applyCharacter(p);
+ p.model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.userData.original=o.material;o.userData.clay=new THREE.MeshStandardMaterial({color:['Body','Scalp','EyeLids','EyeSocketSkin'].includes(o.name)?0x84a996:0x686b70,roughness:.85,side:THREE.DoubleSide});if($('clay').checked)o.material=o.userData.clay;}});
+ applyHat(p);applyGlasses(p);select(p,true);
 }
-function applyCharacter(p){const key=document.querySelector('#character').value;p.palette.setColor(characterColors[key],key==='port')}
-document.querySelector('#character').onchange=()=>panels.forEach(applyCharacter);
-function applyHat(p){p.model.traverse(o=>{if(o.name==='Hat')o.visible=document.querySelector('#hat').checked})}
-function applyGlasses(p){const frame=p.model.getObjectByName('Glasses');if(frame)frame.visible=document.querySelector('#glasses').checked}
-function select(p){p.mixer.stopAllAction();const clip=p.clips.find(c=>c.name===current);p.action=p.mixer.clipAction(clip).play();document.querySelector('#time').max=clip.duration;p.action.time=t%clip.duration;p.mixer.update(0);}
-document.querySelector('#clip').onchange=e=>{current=e.target.value;t=0;panels.forEach(select)};
-document.querySelector('#play').onclick=e=>{playing=!playing;e.target.textContent=playing?'Pause':'Play'};
-document.querySelector('#time').oninput=e=>{t=+e.target.value;playing=false;document.querySelector('#play').textContent='Play'};
-function frameCamera(){const a=+document.querySelector('#angle').value*Math.PI/180,face=document.querySelector('#framing').value==='face',distance=face?1.45:3.0;panels.forEach(p=>{p.camera.position.set(distance*Math.sin(a),face?.69:.48,distance*Math.cos(a));p.controls.target.set(0,face?.64:.48,0);p.controls.update()})}
-document.querySelector('#angle').onchange=frameCamera;
-document.querySelector('#framing').onchange=frameCamera;
-if(new URLSearchParams(location.search).get('framing')==='body'){document.querySelector('#framing').value='body';frameCamera()}
-document.querySelector('#glasses').onchange=()=>panels.forEach(applyGlasses);
-document.querySelector('#blink').oninput=()=>{document.querySelector('#autoBlink').checked=false;panels.forEach(p=>p.eyes.setClosure(+document.querySelector('#blink').value))};
-document.querySelector('#reload').onclick=async()=>{await load(panels[1]);document.querySelector('#status').textContent='Result reloaded'};
-document.querySelector('#clay').onchange=e=>panels.forEach(p=>p.model.traverse(o=>{if(o.isMesh)o.material=e.target.checked?o.userData.clay:o.userData.original}));
-document.querySelector('#hat').onchange=()=>panels.forEach(applyHat);
-let last=performance.now();function frame(now){const dt=Math.min((now-last)/1000,.06);last=now;if(playing)t+=dt;panels.forEach(p=>{if(p.action){p.action.time=t%p.action.getClip().duration;p.mixer.update(0)}if(document.querySelector('#autoBlink').checked){if(playing)p.eyes.update(dt,current)}else p.eyes.setClosure(+document.querySelector('#blink').value);p.mouth.update(playing?dt:0,current,document.querySelector("#speaking").checked,t);p.controls.update();p.renderer.render(p.scene,p.camera)});document.querySelector('#time').value=t%(panels[0].action?.getClip().duration||4);requestAnimationFrame(frame)}requestAnimationFrame(frame);document.querySelector('#status').textContent='Ready';document.title='Ready — Glow expressive mouth review';
-if(new URLSearchParams(location.search).has('test'))window.glowReviewPanels=panels;
+function select(p,immediate=false){p.action=p.blend.select(current,immediate||!playing);p.mixer.update(0);p.props.update();$('time').max=p.action.getClip().duration;}
+function selectCurrent(name){current=name;$('clip').value=name;panels.forEach(p=>select(p));$('poseName').textContent=motionLabels[current];}
+function applyCharacter(p){const key=$('character').value;p.palette.setColor(colors[key],key==='port');}
+function applyHat(p){p.model.getObjectByName('Hat').visible=$('hat').checked;}
+function applyGlasses(p){p.model.getObjectByName('Glasses').visible=$('glasses').checked;}
+function sequenceLabel(){$('sequence').textContent=sequence?'إيقاف العرض المتتابع':'تشغيل حركات الصورة بالتتابع';}
+$('clip').onchange=e=>{sequence=false;sequenceLabel();selectCurrent(e.target.value);};
+$('sequence').onclick=()=>{sequence=!sequence;sequenceTime=0;if(sequence){playing=true;$('play').textContent='Pause';selectCurrent(referenceSequence[0]);}sequenceLabel();};
+$('play').onclick=e=>{playing=!playing;e.target.textContent=playing?'Pause':'Play';};
+$('time').oninput=e=>{t=+e.target.value;playing=false;sequence=false;sequenceLabel();$('play').textContent='Play';panels.forEach(p=>{p.blend.clear();select(p,true);p.action.time=t%p.action.getClip().duration;p.mixer.update(0);p.mouth.update(0,current,$('speaking').checked,t,p.action.time);});};
+function frameCamera(){const angle=+$('angle').value*Math.PI/180,face=$('framing').value==='face';panels.forEach(p=>{const distance=(face?1.45:2.35)*Math.max(1,1/Math.max(.5,p.camera.aspect));p.camera.position.set(distance*Math.sin(angle),face?.69:.62,distance*Math.cos(angle));p.controls.target.set(0,face?.64:.50,0);p.controls.update();});}
+$('angle').onchange=frameCamera;$('framing').onchange=frameCamera;
+$('character').onchange=()=>panels.forEach(applyCharacter);$('hat').onchange=()=>panels.forEach(applyHat);$('glasses').onchange=()=>panels.forEach(applyGlasses);
+$('blink').oninput=()=>{$('autoBlink').checked=false;panels.forEach(p=>p.eyes.setClosure(+$('blink').value));};
+$('speaking').onchange=()=>{if(!playing)panels.forEach(p=>p.mouth.update(0,current,$('speaking').checked,t,p.action.time));};
+$('reload').onclick=async()=>{await load(panels[1]);$('status').textContent='تم التحديث';};
+$('clay').onchange=e=>panels.forEach(p=>p.model.traverse(o=>{if(o.isMesh)o.material=e.target.checked?o.userData.clay:o.userData.original;}));
+$('compare').onchange=e=>document.body.classList.toggle('compare',e.target.checked);
+let last=performance.now();
+function frame(now){
+ const elapsed=Math.min((now-last)/1000,.25),dt=Math.min(elapsed,.06);last=now;
+ if(playing){t+=dt;if(sequence){sequenceTime+=elapsed;const next=referenceSequence[Math.floor(sequenceTime/4)%referenceSequence.length];if(next!==current)selectCurrent(next);}}
+ panels.forEach(p=>{if(playing){p.blend.update(dt);p.mixer.update(dt);p.props.update();if($('autoBlink').checked)p.eyes.update(dt,current);p.mouth.update(dt,current,$('speaking').checked,t,p.action.time);}if(!$('autoBlink').checked)p.eyes.setClosure(+$('blink').value);p.controls.update();if(p.host.clientWidth)p.renderer.render(p.scene,p.camera);});
+ $('time').value=panels[1].action.time;requestAnimationFrame(frame);
+}
+frameCamera();sequenceLabel();$('poseName').textContent=motionLabels[current];requestAnimationFrame(frame);
+$('status').textContent=Object.keys(motionLabels).length+' حركة';document.title='Ready — Glow reference motions';
+if(query.has('test'))window.glowReviewPanels=panels;
 </script></body></html>

@@ -5,6 +5,12 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CharacterSkinPalette } from './character_palette.js';
 import { CharacterEyes } from './character_eyes.js';
 import { CharacterMouth } from './character_mouth.js';
+import { MotionBlend } from './motion_blend.js';
+import { applyCharacterSurface } from './character_surface.js';
+import { CharacterProps } from './character_props.js';
+import { MobileQuality } from './mobile_quality.js';
+const quality = new MobileQuality();
+let motionProps;
 
 // Bundled as one local classic script: no CDN, network import or model URL.
 const send = (type, detail = {}) => window.GlowCharacter?.postMessage(JSON.stringify({ type, ...detail }));
@@ -20,6 +26,7 @@ let state = {
   framing: 'body', angle: 0, autoBlink: true, blink: 0, clay: false,
 };
 const actions = new Map();
+const motionBlend = new MotionBlend(actions);
 const HAT_MATERIALS = new Set(['Hat', 'HatBand', 'HatTrim', 'HatSkin']);
 const skinPalette = new CharacterSkinPalette();
 let jawRestPos = null;
@@ -30,7 +37,7 @@ const jawAxis = new THREE.Vector3(1, 0, 0);
 
 function applyTalkingMouth(dt) {
   if (mouthAnimation) {
-    mouthAnimation.update(dt, state.motion, state.speaking, time);
+    mouthAnimation.update(dt, state.motion, state.speaking, time, active?.time);
   }
   if (jaw && jawRest && jawRestPos) {
     const sad = state.motion === 'Sad';
@@ -83,11 +90,7 @@ function updateCameraPosition() {
 }
 
 function selectMotion() {
-  const next = actions.get(state.motion) ?? actions.get('Idle') ?? actions.values().next().value;
-  if (!next || next === active) return;
-  next.reset().setEffectiveWeight(1).play();
-  if (active) next.crossFadeFrom(active, .3, false);
-  active = next;
+  active = motionBlend.select(state.motion, !state.playing);
 }
 function applyGlasses() {
   if (!model) return;
@@ -135,10 +138,7 @@ function applyHat() {
 function resize() {
   if (!renderer || !camera) return;
   const w = Math.max(1, innerWidth), h = Math.max(1, innerHeight);
-  // Supersampled buffer plus MSAA. The long side stays at 3072 so the
-  // silhouette stays sharp without an 8K framebuffer that stalls the GPU.
-  const longSide = Math.max(w, h);
-  renderer.setPixelRatio(Math.max(1, Math.min(devicePixelRatio || 1, 3, 3072 / longSide)));
+  renderer.setPixelRatio(quality.pixelRatio(w, h, devicePixelRatio || 1));
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
   updateCameraPosition();
@@ -153,13 +153,20 @@ function schedule() {
 function tick(now) {
   frame = 0;
   if (disposed || !state.visible || document.hidden) { last = 0; return; }
-  const dt = last ? Math.min((now - last) / 1000, .08) : 0; last = now;
+  const elapsed = last ? (now - last) / 1000 : 0;
+  const dt = Math.min(elapsed, .08); last = now;
+  if (state.playing && quality.sample(elapsed)) {
+    renderer.setPixelRatio(quality.pixelRatio(innerWidth, innerHeight, devicePixelRatio || 1));
+    renderer.setSize(innerWidth, innerHeight, false);
+  }
   const orbitChanged = controls.update();
-  if (state.playing || !state.autoBlink) {
+  if (state.playing) {
     time += dt; state.position += dt;
     if (state.playing) {
       selectMotion();
+      motionBlend.update(dt);
       mixer?.update(dt);
+      motionProps?.update();
     }
     if (state.autoBlink === false && state.blink !== undefined) {
       eyeAnimation?.setClosure(Number(state.blink) || 0);
@@ -175,7 +182,7 @@ function tick(now) {
     if (!sampleStart) sampleStart = now;
     sampledFrames++;
     if (now - sampleStart >= 5000) {
-      send('sample', { fps: +(sampledFrames * 1000 / (now - sampleStart)).toFixed(1), triangles: renderer.info.render.triangles, motion: state.motion, actionTime: active?.time, textures: renderer.info.memory.textures });
+      send('sample', { fps: +(sampledFrames * 1000 / (now - sampleStart)).toFixed(1), triangles: renderer.info.render.triangles, motion: state.motion, actionTime: active?.time, textures: renderer.info.memory.textures, drawCalls: renderer.info.render.calls, pixelRatio: renderer.getPixelRatio(), qualityScale: quality.scale });
       sampledFrames = 0; sampleStart = now;
     }
   }
@@ -204,49 +211,19 @@ async function _mountGltf(data) {
   model.traverse(object => {
     if (object.isMesh) {
       object.frustumCulled = false;
-      const meshName = (object.name || '').toLowerCase();
+      applyCharacterSurface(object);
       for (const material of [object.material].flat().filter(Boolean)) {
-        const matName = (material.name || '').toLowerCase();
-        const isEye = meshName.includes('eye') || matName.includes('eye');
-        const isGlasses = meshName.includes('glasses') || matName.includes('glasses') || meshName.includes('spectacle') || matName.includes('spectacle');
-        const isMouth = meshName.includes('mouth') || matName.includes('mouth') || meshName.includes('jaw') || matName.includes('teeth') || matName.includes('tongue');
-        const isScalp = meshName.includes('scalp') || matName.includes('scalp');
-
-        if (isEye) {
-          material.roughness = 0.06;
-          material.metalness = 0.0;
-          material.envMapIntensity = 1.5;
-        } else if (isGlasses) {
-          material.roughness = 0.16;
-          material.metalness = 0.15;
-          material.envMapIntensity = 1.3;
-        } else if (isMouth) {
-          material.roughness = 0.25;
-          material.metalness = 0.0;
-          material.envMapIntensity = 0.8;
-        } else if (isScalp) {
-          // Remove roughness map and match Body properties identically
-          material.roughnessMap = null;
-          material.roughness = 0.38;
-          material.metalness = 0.02;
-          material.envMapIntensity = 0.95;
-        } else {
-          material.roughness = 0.38;
-          material.metalness = 0.02;
-          material.envMapIntensity = 0.95;
-        }
-
         if (material.map) {
           material.map.colorSpace = THREE.SRGBColorSpace;
-          material.map.anisotropy = Math.min(16, maxAniso);
+          material.map.anisotropy = Math.min(4, maxAniso);
           material.map.needsUpdate = true;
         }
         if (material.normalMap) {
-          material.normalMap.anisotropy = Math.min(16, maxAniso);
+          material.normalMap.anisotropy = Math.min(4, maxAniso);
           material.normalMap.needsUpdate = true;
         }
         if (material.roughnessMap) {
-          material.roughnessMap.anisotropy = Math.min(16, maxAniso);
+          material.roughnessMap.anisotropy = Math.min(4, maxAniso);
           material.roughnessMap.needsUpdate = true;
         }
         material.needsUpdate = true;
@@ -256,6 +233,7 @@ async function _mountGltf(data) {
   });
   eyeAnimation = new CharacterEyes(model);
   mouthAnimation = new CharacterMouth(model);
+  motionProps = new CharacterProps(model);
   jaw = model.getObjectByName('Jaw'); jawRest = jaw?.quaternion.clone(); jawRestPos = jaw?.position.clone();
 
   const bounds = new THREE.Box3().setFromObject(model), size = bounds.getSize(new THREE.Vector3()), center = bounds.getCenter(new THREE.Vector3());
@@ -321,14 +299,16 @@ async function loadFromBase64(encoded) {
   } catch (error) { fail(error); }
 }
 function update(next) {
+  const changed = key => next[key] !== undefined && next[key] !== state[key];
   const wasSpeaking = state.speaking;
   const seek = next.seek === true;
   const fitChanged = next.cameraFit !== undefined && next.cameraFit !== state.cameraFit;
-  const cameraChanged = fitChanged || next.framing !== undefined || next.angle !== undefined;
-  const hatChanged = next.hat !== undefined || next.hatColor !== undefined || next.color !== undefined;
-  const glassesChanged = next.glasses !== undefined;
-  const clayChanged = next.clay !== undefined;
-  const blinkChanged = next.autoBlink !== undefined || next.blink !== undefined;
+  const cameraChanged = fitChanged || changed('framing') || changed('angle');
+  const hatChanged = changed('hat') || changed('hatColor') || changed('color');
+  const glassesChanged = changed('glasses');
+  const clayChanged = changed('clay');
+  const blinkChanged = changed('autoBlink') || changed('blink');
+  if (changed('visible') || changed('playing')) { last = 0; quality.reset(); }
   state = { ...state, ...next };
   skinPalette.setColor(state.color, state.originalGreen);
   skinPalette.setBellyColor(state.bellyColor, state.customBelly);
@@ -345,13 +325,15 @@ function update(next) {
   }
   if (mixer) {
     selectMotion();
-    if (seek) { mixer.stopAllAction(); active = null; selectMotion(); if (active) active.time = state.position % active.getClip().duration; mixer.update(0); }
+    if (seek) { motionBlend.clear(); mixer.stopAllAction(); active = null; time = state.position; selectMotion(); if (active) active.time = state.position % active.getClip().duration; mixer.update(0); }
+    if (seek || !state.playing) { mixer.update(0); applyTalkingMouth(0); }
     if (wasSpeaking && !state.speaking && jaw && jawRest && jawRestPos) {
       jaw.quaternion.copy(jawRest);
       jaw.position.copy(jawRestPos);
       mixer.update(0);
     }
   }
+  motionProps?.update();
   if (cameraChanged) updateCameraPosition();
   if (fitChanged) resize();
   if (!state.visible) { cancelAnimationFrame(frame); frame = 0; last = 0; }
@@ -362,10 +344,11 @@ function dispose() {
   if (disposed) return;
   disposed = true; ready = false;
   cancelAnimationFrame(frame); controls?.dispose(); mixer?.stopAllAction();
+  buffer = null; motionBlend.clear(); actions.clear();
   const textures = new Set(), materials = new Set(), geometries = new Set();
   scene?.traverse(object => {
     if (object.geometry) geometries.add(object.geometry);
-    for (const material of [object.material].flat().filter(Boolean)) {
+    for (const material of [object.material, object.userData.original, object.userData.clay].flat().filter(Boolean)) {
       materials.add(material); for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
     }
   });
@@ -390,7 +373,11 @@ try {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
   if ('physicallyCorrectLights' in renderer) renderer.physicallyCorrectLights = false;
-  renderer.debug.onShaderError = () => fail(new Error('Character shader compilation failed'));
+  renderer.debug.onShaderError = (gl, program, vertex, fragment) => {
+    const detail = [gl.getProgramInfoLog(program), gl.getShaderInfoLog(vertex), gl.getShaderInfoLog(fragment)].filter(Boolean).join('\n');
+    console.error(detail);
+    fail(new Error('Character shader compilation failed: ' + detail));
+  };
   document.body.appendChild(renderer.domElement);
   renderer.domElement.addEventListener('webglcontextlost', event => { event.preventDefault(); fail(new Error('Graphics context lost')); });
   scene = new THREE.Scene();

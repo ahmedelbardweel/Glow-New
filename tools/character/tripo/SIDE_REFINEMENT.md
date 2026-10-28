@@ -232,3 +232,76 @@ through 90 animated poses. The side review compares before/after smoothing
 with synchronized colors and accessory controls. Inspect front, both sides
 and back, then verify palette/accessory controls before installing the GLB
 into both shipped paths and rebuilding the studio.
+
+## Articulated mouth and connected reference motions
+
+`refine_mouth.py` runs on the completed head model and replaces the painted
+opening with split Body lips, a localized moving jaw, a recessed cavity,
+separate upper teeth and a tongue. Four shared morph names drive all four
+parts. `port_lip_surface.py` joins the source's disconnected UV islands along
+the lip. Skinning, UVs and head/accessory geometry outside this collar remain
+unchanged. `check_mouth_refinement.py` checks these preservation boundaries.
+
+`build_reference_motions.py` then adds the reference sheet's thirteen acting
+states (twenty clips including the previous motions). Analytical arm IK places
+hands at the hips, across the chest, under the chin, near the mouth/head and
+around the trophy. Happy, Laugh and Victory are refined; the approved Wave
+and remaining established tracks and durations are preserved. Star/cup trophies,
+books, question marks, sweat, sparkles and confetti are ordinary local GLB
+geometry, with explicit visibility tracks in every clip. The original image's
+front/side/back views use the studio camera controls.
+
+```powershell
+python tools/character/tripo/refine_mouth.py build/tripo/mouth_pro_review/before.glb build/tripo/mouth_pro_review/candidate.glb
+python tools/character/tripo/build_reference_motions.py build/tripo/mouth_pro_review/candidate.glb build/tripo/reference_motion_review/candidate.glb
+python tools/character/tripo/check_reference_motions.py build/tripo/mouth_pro_review/candidate.glb build/tripo/reference_motion_review/candidate.glb build/tripo/reference_motion_review/validation.json
+node tools/character/check_motion_blend.mjs
+node tools/character/check_mouth_runtime.mjs build/tripo/reference_motion_review/runtime_samples.json
+dart tools/character/check_mouth_parity.dart build/tripo/reference_motion_review/runtime_samples.json
+node tools/character/build_mobile_viewer.mjs
+```
+
+The reference validator checks 377 poses/transitions, preserved skin and Wave,
+loop boundaries, and isolation of the eight prop groups. The browser check
+uses `--verify-mouth --verify-motions --verify-controls --verify-palette` on
+`side_review/index.html?test=1`. `reference_motion_sheet.html` renders all
+reference poses, or a comma-separated `clips` subset with an `angle` parameter.
+
+`MotionBlend` and `CharacterMotionBlend` interpolate the current mixture over
+0.7 seconds with a smooth easing curve, including interrupted transitions.
+Weights stay normalized and outgoing actions stop when settled. The studio
+and review have a four-second-per-state reference sequence, independent of
+the story cues. Pause freezes it; selecting a pose exits sequence mode.
+Mouth and eye expression profiles cover all twenty states. The mouth's
+speech cadence is a stylized preview, not audio phoneme recognition.
+
+Install the validated candidate to `assets/3d/glow_rigged.glb`,
+`web/character_rig/glow_rigged.glb` and `build/tripo/side_review/candidate.glb`,
+copy the maintained review HTML, rebuild the mobile bundle and Flutter studio.
+Do not regenerate from an older pre-head or pre-mouth asset.
+
+### Motion quality revision 2
+
+Generate from the same completed-mouth input into
+`build/tripo/motion_quality_review/candidate.glb`. Preserve revision 1 as
+`build/tripo/motion_quality_review/before.glb` for the comparison view.
+The cup and star are now children of LeftHand with one fixed local grip
+offset; rotation tracks keep them upright. The validator checks the grip
+attachment through all 377 sampled poses and transitions, not just endpoints.
+
+Palm orientation is authored for encouragement and the hand at the temple.
+Axial twist is shared 65/35 between forearm and wrist to avoid pinching.
+Curious brings the hand to the chin; celebration adds coordinated foot/hip
+motion. Happy/Laugh/Excited mouth shapes now use the selected clip's local
+phase, while speech keeps its independent continuous cadence.
+
+`character_surface.js` and the Dart viewer use matching skin roughness (.64),
+including EyeSocketSkin and EyeLids. Only actual eyeballs receive eye shading;
+authored gold/felt/prop materials are preserved. This fixes the previous
+studio-wide glossy override. The review also uses the shared surface profile.
+
+`CharacterProps` and the Dart viewer hide zero-scale effect groups after each
+mixer update. The browser test measured 10 idle draw calls versus 77 when all
+hidden groups were still submitted. Preview/mobile supersampling improves
+edges with capped drawing-buffer dimensions. The existing browser checks
+also verify skin consistency, retained gold, hand parenting and effect culling.

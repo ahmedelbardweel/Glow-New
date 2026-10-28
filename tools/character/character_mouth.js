@@ -11,13 +11,13 @@ export class CharacterMouth {
     this.hasTargets=this.meshes.length>0;
     this.current=[0,.12,0,0];this.time=0;this.lastClock=null;
   }
-  update(dt, motion, speaking=false, clockTime) {
+  update(dt, motion, speaking=false, clockTime, clipTime) {
     if(!this.hasTargets) return;
     const step=Number.isFinite(dt)?Math.max(0,Math.min(dt,.08)):0;
     const clock=Number.isFinite(clockTime)?clockTime:this.time+step;
     const seek=this.lastClock!==null&&Math.abs(clock-this.lastClock-step)>.20;
     this.time=clock;this.lastClock=clock;
-    const target=sampleMouth(clock,motion,speaking);
+    const target=sampleMouth(clock,motion,speaking,Number.isFinite(clipTime)?clipTime:clock);
     for(let i=0;i<4;i++) {
       // Quick closures preserve consonants; slower emotion changes stay gentle.
       const rate=i===0?(target[i]<this.current[i]?38:28):(i===3?24:10);

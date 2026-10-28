@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loading mobile engine</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#edf2ef}canvas{display:block;width:100%;height:100%}</style></head><body>
+<script>
+window.mobileMessages=[];
+window.GlowCharacter={postMessage(raw){
+ const message=JSON.parse(raw);mobileMessages.push(message);
+ if(message.type==='boot') {
+  GlowViewer.update({motion:'UltimateWin',hat:true,glasses:true,diagnostics:true});
+  GlowViewer.loadLocal('../../assets/3d/glow_rigged.glb');
+ }
+ if(message.type==='ready') {
+  if(message.clips.length!==20) throw Error('Expected all 20 mobile clips');
+  document.title='Ready mobile engine';
+ }
+ if(message.type==='error'||message.type==='localLoadFailed') document.title='Failed '+message.message;
+}};
+</script><script src="../../assets/3d/character_mobile.js"></script></body></html>

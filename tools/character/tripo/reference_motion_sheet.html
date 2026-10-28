@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><title>Reference motions</title>
+<style>body{margin:0;background:#eef2ef;font:20px Arial}canvas{display:block}.label{position:absolute;text-align:center;pointer-events:none;color:#18372f}</style>
+<script type="importmap">{"imports":{"three":"/tools/character/node_modules/three/build/three.module.js","three/addons/":"/tools/character/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {applyCharacterSurface} from '/tools/character/character_surface.js';
+import {CharacterEyes} from '/tools/character/character_eyes.js';
+import {CharacterMouth} from '/tools/character/character_mouth.js';
+import {motionLabels,referenceSequence} from '/tools/character/motion_catalog.js';
+const query=new URLSearchParams(location.search),renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#eef2ef');
+scene.add(new THREE.HemisphereLight(0xffffff,0x677b6d,2));
+const key=new THREE.DirectionalLight(0xffffff,2.4);key.position.set(-2,4,5);scene.add(key);
+const fill=new THREE.DirectionalLight(0xd5e6ff,1);fill.position.set(3,2,-2);scene.add(fill);
+const gltf=await new GLTFLoader().loadAsync(query.get('model')||'/build/tripo/motion_quality_review/candidate.glb');scene.add(gltf.scene);gltf.scene.traverse(applyCharacterSurface);
+gltf.scene.traverse(o=>{if(o.isMesh)o.frustumCulled=false;if(o.name==='Hat')o.visible=query.get('hat')==='1';});
+const mixer=new THREE.AnimationMixer(gltf.scene),eyes=new CharacterEyes(gltf.scene),mouth=new CharacterMouth(gltf.scene);
+const names=query.has('clips')?query.get('clips').split(','):referenceSequence;
+const columns=names.length<=4?2:4,rows=Math.ceil(names.length/columns),w=innerWidth/columns,h=innerHeight/rows;
+const camera=new THREE.PerspectiveCamera(28,w/h,.01,20),angle=Number(query.get('angle')||0)*Math.PI/180;
+const distance=2.5*Math.max(1,h/w);
+camera.position.set(distance*Math.sin(angle),.62,distance*Math.cos(angle));camera.lookAt(0,.49,0);
+renderer.setScissorTest(true);
+for(let i=0;i<names.length;i++){
+ const name=names[i];mixer.stopAllAction();mixer.clipAction(gltf.animations.find(c=>c.name===name)).play();mixer.update(Number(query.get('time')||.8));
+ eyes.update(.7,name);mouth.update(0,name,false,.8);
+ const x=(i%columns)*w,y=Math.floor(i/columns)*h;
+ renderer.setViewport(x,innerHeight-y-h,w,h);renderer.setScissor(x,innerHeight-y-h,w,h);renderer.render(scene,camera);
+ const label=document.createElement('div');label.className='label';label.textContent=motionLabels[name];
+ Object.assign(label.style,{left:x+'px',top:(y+h-30)+'px',width:w+'px'});document.body.append(label);
+}
+document.title='Ready — Reference motion sheet';
+</script>

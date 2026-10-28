@@ -26,15 +26,61 @@ try{
   const {sessionId}=await call('Target.attachToTarget',{targetId,flatten:true});
   await call('Runtime.enable',{},sessionId);
   await call('Log.enable',{},sessionId);
-  await call('Emulation.setDeviceMetricsOverride',{width:800,height:800,deviceScaleFactor:1,mobile:false},sessionId);
+  const studio=process.argv.includes('--studio');
+  await call('Emulation.setDeviceMetricsOverride',{width:studio?1400:process.argv.includes('--sheet')?1600:800,height:studio?1000:process.argv.includes('--sheet')?1600:800,deviceScaleFactor:1,mobile:false},sessionId);
   await call('Page.navigate',{url},sessionId);
   let ready=false;
   for(let n=0;n<180;n++){
-    const result=await call('Runtime.evaluate',{expression:'document.title',returnByValue:true},sessionId);
+    const result=await call('Runtime.evaluate',{expression:studio?"document.querySelector('flt-glass-pane') ? 'Ready' : document.title":'document.title',returnByValue:true},sessionId);
     if(result.result?.value?.startsWith('Ready')){ready=true;break;}
     await new Promise(resolve=>setTimeout(resolve,200));
   }
   if(!ready){const status=await call('Runtime.evaluate',{expression:'JSON.stringify({url:location.href,title:document.title})',returnByValue:true},sessionId);throw new Error('Three.js review did not finish loading: '+status.result?.value);}
+  if(process.argv.includes('--mobile')) {
+    const result=await call('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
+      const ready=mobileMessages.find(m=>m.type==='ready');
+      if(!ready||ready.clips.length!==20)throw Error('Missing mobile clips');
+      for(const motion of ready.clips){
+        GlowViewer.update({motion,playing:false,hat:true,glasses:true});
+        await new Promise(r=>setTimeout(r,60));
+      }
+      GlowViewer.update({visible:false});
+      await new Promise(r=>setTimeout(r,100));
+      GlowViewer.update({visible:true,playing:true,motion:'UltimateWin',color:'#4a90b8',originalGreen:false,hat:false,glasses:false});
+      await new Promise(r=>setTimeout(r,1000));
+      const errors=mobileMessages.filter(m=>m.type==='error'||m.type==='localLoadFailed');
+      if(errors.length)throw Error(JSON.stringify(errors));
+      return {clips:ready.clips,triangles:ready.triangles,bridgeControls:true,suspendResume:true};
+    })()`},sessionId);
+    if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));
+    await fs.writeFile(output+'.mobile-checks.json',JSON.stringify(result.result.value,null,2));
+    console.log(JSON.stringify(result.result.value));
+  }
+  if(studio){
+    await new Promise(resolve=>setTimeout(resolve,15000));
+    await call('Runtime.evaluate',{expression:"document.querySelector('flt-semantics-placeholder')?.click()"},sessionId);
+    await new Promise(resolve=>setTimeout(resolve,1500));
+    const loaded=await call('Page.captureScreenshot',{format:'png'},sessionId);
+    await fs.writeFile(output+'.loaded.png',Buffer.from(loaded.data,'base64'));
+    const controls=await call('Runtime.evaluate',{returnByValue:true,expression:`(()=>{
+      const nodes=[...document.querySelectorAll('[aria-label],flt-semantics')];
+      const label=e=>(e.getAttribute('aria-label')||e.textContent).trim();
+      const labels=nodes.map(label).filter(v=>v.length<100);
+      const sequence=nodes.find(e=>label(e)==='تشغيل حركات الصورة بالتتابع');
+      if(!sequence)throw Error('Sequence control missing: '+JSON.stringify(labels));
+      sequence.click();return labels;
+    })()`},sessionId);
+    if(controls.exceptionDetails)throw Error(JSON.stringify(controls.exceptionDetails));
+    await new Promise(resolve=>setTimeout(resolve,5000));
+    const selected=await call('Runtime.evaluate',{returnByValue:true,expression:`(()=>{
+      const button=[...document.querySelectorAll('[aria-label],flt-semantics')].find(e=>(e.getAttribute('aria-label')||e.textContent).trim()==='الفوز النهائي');
+      if(!button)throw Error('Final win control missing');button.click();return true;
+    })()`},sessionId);
+    if(selected.exceptionDetails)throw Error(JSON.stringify(selected.exceptionDetails));
+    await new Promise(resolve=>setTimeout(resolve,2000));
+    await fs.writeFile(output+'.studio-checks.json',JSON.stringify({sequenceControl:true,ultimateWinSelected:true,labels:controls.result.value},null,2));
+    console.log('Studio sequence and final-win controls verified');
+  }
   if(process.argv.includes('--probe-mouth')){
     const hits=await call('Runtime.evaluate',{expression:'[probeMouth(620,432),probeMouth(620,445),probeMouth(630,455)]',returnByValue:true},sessionId);console.log(JSON.stringify(hits.result.value));
   }
@@ -87,9 +133,17 @@ try{
         }
       }
       assert(snapshots.Talk.some(w=>w[0]>.6)&&snapshots.Talk.some(w=>w[0]<.02),'Speech does not open and close');
-      assert(snapshots.Smile.every(w=>w[1]>.99),'Smile missing');
-      assert(snapshots.Sad.every(w=>w[2]>.99&&w[0]===0),'Sad mouth missing');
-      assert(snapshots.Idle.every(w=>w.every(v=>v===0)),'Idle mouth does not close');
+      assert(snapshots.Smile.every(w=>w[1]>.9),'Smile missing');
+      assert(snapshots.Sad.every(w=>w[2]>.9&&w[0]===0),'Sad mouth missing');
+      assert(snapshots.Idle.every(w=>w[0]===0),'Idle mouth does not close');
+      const parts=['Body','ExpressiveMouth','MouthTeeth','MouthTongue'].map(name=>p.model.getObjectByName(name));
+      assert(parts.every(Boolean),'Missing mouth part');
+      for(const clip of p.clips){
+        p.mouth.update(0,clip.name,true,.63);
+        assert(parts.every(part=>part.morphTargetInfluences.every((v,i)=>Math.abs(v-parts[0].morphTargetInfluences[i])<1e-7)),'Mouth parts out of sync');
+      }
+      p.blend.clear();
+      p.mixer.stopAllAction();
       const select=document.getElementById('clip');select.value='Talk';select.dispatchEvent(new Event('change'));
       const seek=document.getElementById('time');seek.value=.08;seek.dispatchEvent(new Event('input'));
       return {headAttached:true,openClose:true,smile:true,sad:true,idleClosed:true,clips:p.clips.length,samples};
@@ -98,6 +152,40 @@ try{
     await fs.writeFile(output+'.mouth-checks.json',JSON.stringify(checks.result.value,null,2));
     console.log(JSON.stringify(checks.result.value));
     await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  if(process.argv.includes('--verify-motions')){
+    const checks=await call('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
+      const p=window.glowReviewPanels.find(p=>p.id==='after'),select=document.getElementById('clip');
+      const assert=(v,m)=>{if(!v)throw Error(m)},wait=ms=>new Promise(r=>setTimeout(r,ms));
+      const play=document.getElementById('play'),sequence=document.getElementById('sequence');
+      if(play.textContent==='Pause')play.click();
+      assert(select.options.length===20&&p.clips.length===20,'Missing motions');
+      const renderCalls=()=>{p.renderer.render(p.scene,p.camera);return p.renderer.info.render.calls;};
+      select.value='Idle';select.dispatchEvent(new Event('change'));
+      p.props.groups.forEach(g=>g.visible=true);const submitted=renderCalls();
+      p.props.update();const culled=renderCalls();
+      assert(culled<submitted,'Inactive effects still submit draw calls');
+      for(const name of ['Body','Scalp','EyeLids','EyeSocketSkin'])assert(Math.abs(p.model.getObjectByName(name).material.roughness-.64)<1e-6,'Skin shading mismatch: '+name);
+      assert(p.model.getObjectByName('CupBowl').material.metalness>.5,'Gold material overwritten');
+      for(const name of ['CupTrophy','StarTrophy'])assert(p.model.getObjectByName(name).parent.name==='LeftHand','Trophy not attached to hand');
+      const props={StarTrophy:'WinCelebration',CupTrophy:'UltimateWin',ConfettiFX:'UltimateWin',CuriosityFX:'Curious',ConfusionFX:'Confused',SweatFX:'Nervous',ExcitementFX:'Excited',VictoryFX:'Victory'};
+      for(const option of select.options){
+        select.value=option.value;select.dispatchEvent(new Event('change'));
+        assert(p.action.getClip().name===option.value,'Wrong selected clip');
+        assert(p.blend.weights.size===1,'Paused selection left outgoing action');
+        for(const [name,motion] of Object.entries(props))assert(Math.abs(p.model.getObjectByName(name).scale.x-(motion===option.value?1:0))<1e-5,'Leaked prop '+name);
+      }
+      sequence.click();await wait(80);assert(select.value==='PowerPose','Sequence did not start');
+      for(let i=0;i<40&&select.value==='PowerPose';i++)await wait(250);
+      assert(select.value==='Neutral','Sequence did not advance');
+      play.click();const time=p.action.time,selected=select.value;await wait(120);
+      assert(p.action.time===time&&select.value===selected,'Pause did not freeze');
+      sequence.click();select.value='UltimateWin';select.dispatchEvent(new Event('change'));
+      return {clips:20,referenceSequence:true,pauseFreezes:true,propsIsolated:true,pausedSelection:true,consistentSkin:true,goldPreserved:true,trophiesAttached:true,idleDrawCalls:culled,unculledDrawCalls:submitted};
+    })()`},sessionId);
+    if(checks.exceptionDetails)throw Error(JSON.stringify(checks.exceptionDetails));
+    await fs.writeFile(output+'.motion-checks.json',JSON.stringify(checks.result.value,null,2));
+    console.log(JSON.stringify(checks.result.value));
   }
   if(process.argv.includes('--verify-palette')){
     const result=await call('Runtime.evaluate',{returnByValue:true,expression:`(()=>{

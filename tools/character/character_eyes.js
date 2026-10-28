@@ -54,6 +54,14 @@ export class CharacterEyes {
       case 'Smile':close=.07;break;
       case 'Victory':y-=.04;close=.08;break;
       case 'Wave':x+=.025*Math.sin(this.motionTime*1.4);break;
+      case 'Curious':x+=.05;y-=.045;close=.07;break;
+      case 'Confused':x+=.07*Math.sin(this.motionTime*2);close=.10;break;
+      case 'Nervous':x+=.065*Math.sin(this.motionTime*4);y+=.02;close=.06;break;
+      case 'Frustrated':x*=.2;y+=.07;close=.40;break;
+      case 'Excited':close=.18+.06*Math.sin(this.motionTime*5);y-=.02;break;
+      case 'WinCelebration':case 'UltimateWin':close=.25;y-=.03;break;
+      case 'Encourage':close=.08;break;
+      case 'PowerPose':close=.06;y-=.02;break;
     }
     const ease=1-Math.exp(-dt*16);
     this.gazeX+=(THREE.MathUtils.clamp(x,-.1,.1)-this.gazeX)*ease;

@@ -7,6 +7,7 @@ import '../animation/story_motion.dart';
 import '../animation/character_skin_palette.dart';
 import '../animation/character_eye_animation.dart';
 import '../animation/character_mouth_animation.dart';
+import '../animation/character_motion_blend.dart';
 import '../animation/character_sleeve_morph.dart';
 import '../services/character_asset_cache.dart';
 import '../theme/app_colors.dart';
@@ -221,6 +222,14 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   three.Object3D? _model;
   three.AnimationMixer? _mixer;
   three.AnimationAction? _activeAction;
+  final _motionBlend = CharacterMotionBlend();
+  final _motionProps = <three.Object3D>[];
+  void _updateMotionProps() {
+    for (final group in _motionProps) {
+      group.visible = group.scale.x.abs() > .0001;
+    }
+  }
+
   three.OrbitControls? _orbit;
   three.Object3D? _jaw;
   three.Object3D? _mouth;
@@ -280,10 +289,11 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         if (!mounted || generation != _loadGeneration || _error != null) return;
         _loadTimeout?.cancel();
         _startup.stop();
-        if (kDebugMode)
+        if (kDebugMode) {
           debugPrint(
             'Character first frame: ${_startup.elapsedMilliseconds} ms (compatibility=$_compatibilityMode)',
           );
+        }
         setState(() => _ready = true);
         widget.configuration.onReady?.call();
       },
@@ -361,45 +371,51 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       return;
     }
     _model = data.scene;
+    for (final name in [
+      'StarTrophy',
+      'CupTrophy',
+      'ExcitementFX',
+      'CuriosityFX',
+      'ConfusionFX',
+      'SweatFX',
+      'VictoryFX',
+      'ConfettiFX',
+    ]) {
+      final node = _model!.getObjectByName(name);
+      if (node != null) _motionProps.add(node);
+    }
+    _updateMotionProps();
     view.scene.add(_model!);
     _model!.traverse((object) {
       if (object is three.Bone) _bones.add(object);
       if (object is three.Mesh) {
         object.frustumCulled = false;
-        final meshName = object.name.toLowerCase();
         final material = object.material;
         if (material is three.MeshStandardMaterial) {
-          final matName = material.name.toLowerCase();
-          final isEye = meshName.contains('eye') || matName.contains('eye');
-          final isGlasses =
-              meshName.contains('glasses') ||
-              matName.contains('glasses') ||
-              meshName.contains('spectacle') ||
-              matName.contains('spectacle');
-          final isMouth =
-              meshName.contains('mouth') ||
-              matName.contains('mouth') ||
-              meshName.contains('jaw') ||
-              matName.contains('teeth') ||
-              matName.contains('tongue');
-          final isScalp =
-              meshName.contains('scalp') || matName.contains('scalp');
-          if (isEye) {
-            material.roughness = 0.06;
-            material.metalness = 0.0;
-          } else if (isGlasses) {
-            material.roughness = 0.16;
-            material.metalness = 0.15;
-          } else if (isMouth) {
-            material.roughness = 0.25;
-            material.metalness = 0.0;
-          } else if (isScalp) {
+          final skin = const [
+            'Body',
+            'Scalp',
+            'EyeSocketSkin',
+            'EyeLids',
+          ].contains(object.name);
+          final eye = object.name == 'EyeLeft' || object.name == 'EyeRight';
+          if (skin) {
+            material.roughness = .64;
+            material.metalness = 0;
             material.roughnessMap = null;
-            material.roughness = 0.38;
-            material.metalness = 0.02;
-          } else {
-            material.roughness = 0.38;
-            material.metalness = 0.02;
+            material.envMapIntensity = .8;
+          } else if (eye) {
+            material.roughness = .17;
+            material.metalness = 0;
+            material.envMapIntensity = 1;
+          } else if (object.name == 'Glasses') {
+            material.roughness = .30;
+            material.metalness = .06;
+            material.envMapIntensity = 1;
+          } else if (object.name == 'ExpressiveMouth') {
+            material.roughness = .56;
+            material.metalness = 0;
+            material.envMapIntensity = .6;
           }
           material.needsUpdate = true;
         }
@@ -711,9 +727,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         _actions['Idle'] ??
         (_actions.isEmpty ? null : _actions.values.first);
     if (next == null || identical(next, _activeAction)) return;
-    final previous = _activeAction;
-    next.reset().setEffectiveWeight(1).play();
-    if (previous != null) next.crossFadeFrom(previous, 0.3);
+    _motionBlend.select(next, immediate: !config.isPlaying);
     _activeAction = next;
   }
 
@@ -721,6 +735,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     final position = _position;
     if (position < _lastPosition ||
         (position - _lastPosition).inMilliseconds > 1200) {
+      _motionBlend.clear();
       _mixer?.stopAllAction();
       _activeAction = null;
       _elapsed = position.inMicroseconds / 1000000;
@@ -730,7 +745,15 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         action.time = _elapsed % action.clip.duration;
       }
       _mixer?.update(0);
+      _updateMotionProps();
       _sleeveMorph.update();
+      _mouthAnimation.update(
+        0,
+        config.motion ?? _plan.motionAt(position),
+        isSpeaking: config.isSpeaking,
+        clockTime: _elapsed,
+        clipTime: _activeAction?.time,
+      );
     }
     _lastPosition = position;
   }
@@ -742,10 +765,12 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       final dt = delta.clamp(0.0, 0.08);
       _elapsed += dt;
       _selectMotion();
+      _motionBlend.update(dt);
       if (_jaw != null && _jawRest != null) {
         _jaw!.quaternion.setFrom(_jawRest!);
       }
       _mixer?.update(dt);
+      _updateMotionProps();
       _sleeveMorph.update();
       final motion = config.motion ?? _plan.motionAt(_position);
       _eyeAnimation.update(dt, motion);
@@ -754,6 +779,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
         motion,
         isSpeaking: config.isSpeaking,
         clockTime: _elapsed,
+        clipTime: _activeAction?.time,
       );
       _applyTalkingMouth(motion);
       _breathe();
@@ -781,8 +807,9 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
   }
 
   bool _canRender() {
-    if (!mounted || !_foreground || !_tickerEnabled || _error != null)
+    if (!mounted || !_foreground || !_tickerEnabled || _error != null) {
       return false;
+    }
     final box = context.findRenderObject();
     if (box is! RenderBox || !box.hasSize || !box.attached) return false;
     final bounds = box.localToGlobal(Offset.zero) & box.size;
@@ -825,6 +852,7 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
       _fitCamera();
     }
     if (old.storyText != config.storyText) {
+      _motionBlend.clear();
       _plan = StoryMotionPlan.fromText(config.storyText);
       _elapsed = 0;
       _lastPosition = Duration.zero;
@@ -846,7 +874,17 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _selectMotion();
     if (old.motion != config.motion || old.storyText != config.storyText) {
       _mixer?.update(0);
+      _updateMotionProps();
       _sleeveMorph.update();
+      if (!config.isPlaying) {
+        _mouthAnimation.update(
+          0,
+          config.motion ?? _plan.motionAt(_position),
+          isSpeaking: config.isSpeaking,
+          clockTime: _elapsed,
+          clipTime: _activeAction?.time,
+        );
+      }
     }
     _updateSkeleton();
   }
@@ -883,6 +921,8 @@ class _CharacterSurfaceState extends State<_CharacterSurface>
     _sleeveMorph.dispose();
     _orbit?.dispose();
     _orbit = null;
+    _motionBlend.clear();
+    _motionProps.clear();
     _mixer?.stopAllAction();
     for (final action in _actions.values.toList()) {
       _mixer?.uncacheAction(action.clip, _model);

@@ -8,7 +8,8 @@ void main(List<String> args) {
   var error = 0.0;
   for (final sample in samples) {
     final motion = CharacterMotion.values.firstWhere((m) => m.clipName == sample['motion']);
-    final actual = sampleMouthExpression((sample['time'] as num).toDouble(), motion, speaking: sample['speaking']);
+    final actual = sampleMouthExpression((sample['time'] as num).toDouble(), motion,
+        speaking: sample['speaking'], motionTime: (sample['clipTime'] as num?)?.toDouble());
     for (var i = 0; i < 4; i++) {
       final difference = (actual[i] - (sample['pose'][i] as num)).abs();
       if (difference > error) error = difference;

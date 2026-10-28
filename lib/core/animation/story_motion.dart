@@ -9,13 +9,40 @@ enum CharacterMotion {
   victory('Victory', 'انتصار'),
   walk('Walk', 'مشي'),
   smile('Smile', 'ابتسامة'),
-  laugh('Laugh', 'ضحك');
+  laugh('Laugh', 'ضحك'),
+  powerPose('PowerPose', 'وقفة القوة'),
+  neutral('Neutral', 'محايد'),
+  excited('Excited', 'متحمس جدًا'),
+  curious('Curious', 'فضولي'),
+  encourage('Encourage', 'تشجيع قوي'),
+  winCelebration('WinCelebration', 'احتفال بالفوز'),
+  frustrated('Frustrated', 'محبط'),
+  nervous('Nervous', 'متوتر'),
+  confused('Confused', 'مرتبك'),
+  ultimateWin('UltimateWin', 'الفوز النهائي');
 
   const CharacterMotion(this.clipName, this.arabicLabel);
 
   final String clipName;
   final String arabicLabel;
 }
+
+/// The reference sheet as one connected acting sequence, four seconds per pose.
+const referenceMotionSequence = [
+  CharacterMotion.powerPose,
+  CharacterMotion.neutral,
+  CharacterMotion.curious,
+  CharacterMotion.confused,
+  CharacterMotion.nervous,
+  CharacterMotion.frustrated,
+  CharacterMotion.encourage,
+  CharacterMotion.happy,
+  CharacterMotion.laugh,
+  CharacterMotion.excited,
+  CharacterMotion.victory,
+  CharacterMotion.winCelebration,
+  CharacterMotion.ultimateWin,
+];
 
 /// A sentence-sized movement cue. [start] is inclusive, [end] exclusive.
 class StoryMotionCue {
@@ -138,6 +165,28 @@ class StoryMotionPlan {
   // Fixed priority is intentional and testable. A sentence containing several
   // emotions needs an editor override when these simple rules are insufficient.
   static const _rules = <(CharacterMotion, List<String>)>[
+    (
+      CharacterMotion.ultimateWin,
+      ['الكاس', 'كاس', 'البطوله', 'بطوله', 'trophy', 'championship'],
+    ),
+    (
+      CharacterMotion.winCelebration,
+      ['احتفال', 'احتفل', 'يحتفل', 'celebrate', 'celebration'],
+    ),
+    (
+      CharacterMotion.encourage,
+      ['تشجيع', 'شجع', 'احسنت', 'encourage', 'bravo'],
+    ),
+    (CharacterMotion.excited, ['متحمس', 'حماس', 'excited', 'thrilled']),
+    (CharacterMotion.nervous, ['متوتر', 'توتر', 'قلق', 'nervous', 'anxious']),
+    (CharacterMotion.confused, ['مرتبك', 'حيره', 'محتار', 'confused']),
+    (
+      CharacterMotion.frustrated,
+      ['محبط', 'احباط', 'frustrated', 'disappointed'],
+    ),
+    (CharacterMotion.curious, ['فضولي', 'فضول', 'يتساءل', 'curious']),
+    (CharacterMotion.powerPose, ['قوه', 'قوي', 'power', 'strong']),
+    (CharacterMotion.neutral, ['محايد', 'neutral']),
     (
       CharacterMotion.victory,
       [

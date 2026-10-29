@@ -45,9 +45,10 @@ class SyncService {
   static const _packageReadyPrefix = 'glow_content_package_ready_';
   static const syncFreshFor = Duration(hours: 6);
 
-  final ValueNotifier<SyncStatusState> syncState = ValueNotifier<SyncStatusState>(
-    const SyncStatusState(status: SyncStatus.idle, message: 'جاهز'),
-  );
+  final ValueNotifier<SyncStatusState> syncState =
+      ValueNotifier<SyncStatusState>(
+        const SyncStatusState(status: SyncStatus.idle, message: 'جاهز'),
+      );
 
   StreamSubscription<InternetConnectionStatus>? _networkSubscription;
   bool _isSyncRunning = false;
@@ -161,7 +162,9 @@ class SyncService {
     if (_isSyncRunning) return;
 
     // Throttle silent background syncs if synced recently (within 30 seconds)
-    if (silent && _lastSyncTime != null && DateTime.now().difference(_lastSyncTime!).inSeconds < 30) {
+    if (silent &&
+        _lastSyncTime != null &&
+        DateTime.now().difference(_lastSyncTime!).inSeconds < 30) {
       return;
     }
 
@@ -204,7 +207,10 @@ class SyncService {
         } catch (e) {
           syncState.value = SyncStatusState(
             status: SyncStatus.error,
-            message: userMessage(e, fallback: 'تعذر حفظ الإنجاز. حاول مرة أخرى.'),
+            message: userMessage(
+              e,
+              fallback: 'تعذر حفظ الإنجاز. حاول مرة أخرى.',
+            ),
           );
           _isSyncRunning = false;
           return;
@@ -220,32 +226,38 @@ class SyncService {
       final packages = <_MissionPackage>[];
       final worldMissions = <String, List<MissionModel>>{};
 
-      await Future.wait(remoteWorlds.map((world) async {
-        final remoteMissions = await remoteDataSource.getMissions(world.id);
-        worldMissions[world.id] = remoteMissions;
+      await Future.wait(
+        remoteWorlds.map((world) async {
+          final remoteMissions = await remoteDataSource.getMissions(world.id);
+          worldMissions[world.id] = remoteMissions;
 
-        final fetched = await Future.wait(remoteMissions.map((mission) async {
-          final results = await Future.wait([
-            remoteDataSource.getStories(mission.id),
-            remoteDataSource.getQuestions(mission.id),
-          ]);
-          return _MissionPackage(
-            mission: mission,
-            stories: results[0] as List<StoryModel>,
-            questions: results[1] as List<QuestionModel>,
+          final fetched = await Future.wait(
+            remoteMissions.map((mission) async {
+              final results = await Future.wait([
+                remoteDataSource.getStories(mission.id),
+                remoteDataSource.getQuestions(mission.id),
+              ]);
+              return _MissionPackage(
+                mission: mission,
+                stories: results[0] as List<StoryModel>,
+                questions: results[1] as List<QuestionModel>,
+              );
+            }),
           );
-        }));
-        packages.addAll(fetched);
-      }));
+          packages.addAll(fetched);
+        }),
+      );
 
-      final worldMediaReady = await Future.wait(remoteWorlds.map((world) async {
-        if (world.imageUrl.trim().isEmpty) return true;
-        return (await resourceManager.downloadAndCacheFile(
-              world.imageUrl,
-              folder: 'images',
-            )) !=
-            null;
-      }));
+      final worldMediaReady = await Future.wait(
+        remoteWorlds.map((world) async {
+          if (world.imageUrl.trim().isEmpty) return true;
+          return (await resourceManager.downloadAndCacheFile(
+                world.imageUrl,
+                folder: 'images',
+              )) !=
+              null;
+        }),
+      );
       if (worldMediaReady.any((ready) => !ready)) {
         throw StateError('تعذر تنزيل صور العالم كاملة');
       }
@@ -259,16 +271,53 @@ class SyncService {
 
       // Commit only after *all* packages are complete. Readers either get the
       // previous offline package or the new complete one, never a half-sync.
-      await localDataSource.cacheWorlds(remoteWorlds);
+      // Keep the bundled launch world even when Supabase is empty, and append
+      // any worlds added remotely. Remote rows with matching IDs update the
+      // local copy; absence from Supabase never removes offline launch content.
+      final cachedWorlds = await localDataSource.getCachedWorlds();
+      final worldsById = <String, dynamic>{
+        for (final world in cachedWorlds) world.id: world,
+        for (final world in remoteWorlds) world.id: world,
+      };
+      await localDataSource.cacheWorlds(worldsById.values.toList());
       for (final world in remoteWorlds) {
+        final cachedMissions = await localDataSource.getCachedMissions(
+          world.id,
+        );
+        final missionsById = <String, MissionModel>{
+          for (final mission in cachedMissions) mission.id: mission,
+          for (final mission
+              in worldMissions[world.id] ?? const <MissionModel>[])
+            mission.id: mission,
+        };
         await localDataSource.cacheMissions(
           world.id,
-          worldMissions[world.id] ?? const <MissionModel>[],
+          missionsById.values.toList(),
         );
       }
       for (final package in packages) {
-        await localDataSource.cacheStories(package.mission.id, package.stories);
-        await localDataSource.cacheQuestions(package.mission.id, package.questions);
+        final cachedStories = await localDataSource.getCachedStories(
+          package.mission.id,
+        );
+        final storiesById = <String, StoryModel>{
+          for (final story in cachedStories) story.id: story,
+          for (final story in package.stories) story.id: story,
+        };
+        final cachedQuestions = await localDataSource.getCachedQuestions(
+          package.mission.id,
+        );
+        final questionsById = <String, QuestionModel>{
+          for (final question in cachedQuestions) question.id: question,
+          for (final question in package.questions) question.id: question,
+        };
+        await localDataSource.cacheStories(
+          package.mission.id,
+          storiesById.values.toList(),
+        );
+        await localDataSource.cacheQuestions(
+          package.mission.id,
+          questionsById.values.toList(),
+        );
         await preferences.setInt(
           '$_packageReadyPrefix${package.mission.id}',
           DateTime.now().millisecondsSinceEpoch,
@@ -277,10 +326,14 @@ class SyncService {
 
       // 5. Sync Child Progress
       if (childId != null && childId.isNotEmpty) {
-        final ready = await GetIt.instance<ChildAccountService>().ensureSession(childId);
+        final ready = await GetIt.instance<ChildAccountService>().ensureSession(
+          childId,
+        );
         if (ready) {
           try {
-            final remoteProgress = await remoteDataSource.getCompletedMissions(childId);
+            final remoteProgress = await remoteDataSource.getCompletedMissions(
+              childId,
+            );
             await localDataSource.cacheChildProgress(childId, remoteProgress);
           } catch (_) {}
         }

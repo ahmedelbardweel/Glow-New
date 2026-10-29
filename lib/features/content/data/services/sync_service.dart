@@ -15,6 +15,7 @@ import '../built_in_habit_audio.dart';
 import '../models/mission_model.dart';
 import '../models/question_model.dart';
 import '../models/story_model.dart';
+import '../models/world_model.dart';
 
 enum SyncStatus { idle, syncing, success, offline, error }
 
@@ -275,7 +276,7 @@ class SyncService {
       // any worlds added remotely. Remote rows with matching IDs update the
       // local copy; absence from Supabase never removes offline launch content.
       final cachedWorlds = await localDataSource.getCachedWorlds();
-      final worldsById = <String, dynamic>{
+      final worldsById = <String, WorldModel>{
         for (final world in cachedWorlds) world.id: world,
         for (final world in remoteWorlds) world.id: world,
       };

@@ -311,6 +311,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
     final currentStory = _stories[_currentIndex];
     final audioUrl = currentStory.audioUrl?.trim() ?? '';
+    final bundledAsset = BuiltInHabitAudio.assetFor(currentStory.id);
     if (currentStory.timelineData != null) {
       try {
         _currentTimeline = StoryTimeline.fromJson(
@@ -342,6 +343,11 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     _audioPlayer = player;
     _listenToAudio(player, generation);
 
+    if (bundledAsset != null) {
+      unawaited(_playBundledAudio(player, bundledAsset, generation));
+      return;
+    }
+
     if (audioUrl.isEmpty) {
       if (currentStory.content.trim().isNotEmpty) {
         unawaited(_loadStoryVoice(player, currentStory, generation));
@@ -360,10 +366,6 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     StoryEntity currentStory,
     int generation,
   ) async {
-    final bundledAsset = BuiltInHabitAudio.assetFor(currentStory.id);
-    if (bundledAsset != null) {
-      if (await _playBundledAudio(player, bundledAsset, generation)) return;
-    }
     final resourceManager = sl<ResourceManager>();
     var localPath = resourceManager.getLocalFilePath(audioUrl);
     if ((localPath == null || !File(localPath).existsSync()) &&

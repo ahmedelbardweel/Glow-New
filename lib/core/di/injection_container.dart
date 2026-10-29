@@ -28,6 +28,7 @@ import '../../features/content/data/datasources/content_local_data_source.dart';
 import '../../features/content/data/repositories/content_repository_impl.dart';
 import '../../features/content/data/repositories/custom_character_repository.dart';
 import '../../features/content/data/services/sync_service.dart';
+import '../../features/content/data/services/launch_habit_bootstrapper.dart';
 import '../../features/dashboard/data/child_activity.dart';
 import '../../features/dashboard/data/parent_children_repository_impl.dart';
 import '../../features/dashboard/domain/repositories/parent_children_repository.dart';
@@ -149,7 +150,6 @@ Future<void> init() async {
       remoteDataSource: sl(),
       localDataSource: sl(),
       networkInfo: sl(),
-      resourceManager: sl(),
     ),
   );
 
@@ -188,6 +188,9 @@ Future<void> init() async {
       connectionChecker: sl(),
       preferences: sl(),
     ),
+  );
+  sl.registerLazySingleton<LaunchHabitBootstrapper>(
+    () => LaunchHabitBootstrapper(sl()),
   );
 
   // Use Cases

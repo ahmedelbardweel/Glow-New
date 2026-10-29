@@ -27,6 +27,7 @@ import '../../../../core/widgets/story_transition_frame.dart';
 import '../../../../core/animation/story_motion.dart';
 import '../../data/models/custom_character_model.dart';
 import '../../data/repositories/custom_character_repository.dart';
+import '../../data/built_in_habit_audio.dart';
 
 class ChildStoryViewerScreen extends StatefulWidget {
   final MissionEntity mission;
@@ -359,6 +360,10 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
     StoryEntity currentStory,
     int generation,
   ) async {
+    final bundledAsset = BuiltInHabitAudio.assetFor(currentStory.id);
+    if (bundledAsset != null) {
+      if (await _playBundledAudio(player, bundledAsset, generation)) return;
+    }
     final resourceManager = sl<ResourceManager>();
     var localPath = resourceManager.getLocalFilePath(audioUrl);
     if ((localPath == null || !File(localPath).existsSync()) &&
@@ -396,6 +401,24 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
       } else {
         _startFallbackTimer(generation);
       }
+    }
+  }
+
+  Future<bool> _playBundledAudio(
+    AudioPlayer player,
+    String assetPath,
+    int generation,
+  ) async {
+    try {
+      await player.setSource(AssetSource(assetPath));
+      if (!_isCurrentScene(generation)) return false;
+      await player.setVolume(_isMuted ? 0 : 1);
+      _hasAudio = true;
+      if (_playRequested && _isAppActive) await player.resume();
+      return true;
+    } catch (error) {
+      debugPrint('Bundled story audio unavailable: $error');
+      return false;
     }
   }
 

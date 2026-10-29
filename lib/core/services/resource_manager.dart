@@ -134,7 +134,8 @@ class ResourceManager {
       final response = await http
           .get(Uri.parse(cleanUrl))
           .timeout(const Duration(seconds: 30));
-      if (response.statusCode == 200 && _looksLikeAudio(response.bodyBytes)) {
+      if (response.statusCode == 200 &&
+          _looksLikeExpectedFile(response.bodyBytes, folder)) {
         await file.writeAsBytes(response.bodyBytes);
         await cacheBox.put(cleanUrl, file.path);
         _verifiedLocalPaths.add(file.path);
@@ -156,8 +157,22 @@ class ResourceManager {
     if (await file.exists()) await file.delete();
   }
 
-  bool _looksLikeAudio(List<int> bytes) {
+  /// Reject error pages and truncated responses without treating every
+  /// resource as audio. Stories use WAV/MP3, while their cover art and
+  /// character files are valid image/model binaries too.
+  bool _looksLikeExpectedFile(List<int> bytes, String folder) {
     if (bytes.length < 12) return false;
+    if (folder == 'audio') return _looksLikeAudio(bytes);
+
+    // HTML error pages are the common false-positive returned by storage.
+    final opening = String.fromCharCodes(bytes.take(32)).trimLeft().toLowerCase();
+    if (opening.startsWith('<!doctype') || opening.startsWith('<html')) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _looksLikeAudio(List<int> bytes) {
     final riff = bytes[0] == 0x52 &&
         bytes[1] == 0x49 &&
         bytes[2] == 0x46 &&

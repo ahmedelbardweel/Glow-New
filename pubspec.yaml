@@ -89,6 +89,8 @@ flutter:
     - assets/3d/
     - assets/voice/child/
     - assets/voice/onboarding/
+    - assets/voice/habits/
+    - assets/content/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

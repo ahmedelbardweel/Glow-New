@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'core/di/injection_container.dart' as di;
+import 'features/content/data/services/launch_habit_bootstrapper.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
@@ -45,6 +46,7 @@ void main() async {
   await Hive.openBox('resource_cache_meta');
 
   await di.init();
+  await di.sl<LaunchHabitBootstrapper>().seedIfNeeded();
 
   runApp(const GlowApp());
 }

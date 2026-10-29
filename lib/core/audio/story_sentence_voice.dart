@@ -12,10 +12,9 @@ import '../config/admin_api_keys.dart';
 class StorySentenceVoice {
   StorySentenceVoice._();
 
-  static const _builtInKey =
-      'sk_70ad200afdaeee4ef1fb1a42d9a9af9ca69ec2d01c8e617f';
-
-  static String get _apiKey => AdminApiKeys.eleven ?? _builtInKey;
+  /// Keys must be supplied by the administrator at runtime. Shipping a TTS
+  /// secret inside the APK makes it recoverable by anyone who installs it.
+  static String get _apiKey => AdminApiKeys.eleven ?? '';
 
   static String get activeApiKey => _apiKey;
 
@@ -54,6 +53,11 @@ class StorySentenceVoice {
   }
 
   static Future<({File file, double seconds})> _render(_Voice voice, String text) async {
+    if (_apiKey.isEmpty) {
+      throw const StoryVoiceException(
+        'أضف مفتاح ElevenLabs من إعدادات الأدمن لتوليد صوت جديد.',
+      );
+    }
     final http.Response response;
     try {
       response = await http

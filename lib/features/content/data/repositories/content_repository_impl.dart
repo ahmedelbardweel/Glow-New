@@ -4,7 +4,6 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/errors/user_message.dart';
 import '../../../../core/network/network_info.dart';
-import '../../../../core/services/resource_manager.dart';
 import '../../domain/entities/world_entity.dart';
 import '../../domain/entities/mission_entity.dart';
 import '../../domain/entities/story_entity.dart';
@@ -22,13 +21,11 @@ class ContentRepositoryImpl implements ContentRepository {
   final ContentRemoteDataSource remoteDataSource;
   final ContentLocalDataSource localDataSource;
   final NetworkInfo networkInfo;
-  final ResourceManager resourceManager;
 
   ContentRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     required this.networkInfo,
-    required this.resourceManager,
   });
 
   @override
@@ -53,16 +50,9 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   Future<void> _refreshWorlds() async {
-    if (!await networkInfo.isConnected) return;
-    try {
-      final worlds = await remoteDataSource.getWorlds().timeout(const Duration(seconds: 6));
-      await localDataSource.cacheWorlds(worlds);
-      for (final world in worlds) {
-        if (world.imageUrl.isNotEmpty) {
-          resourceManager.downloadAndCacheInBackground(world.imageUrl, folder: 'images');
-        }
-      }
-    } catch (_) {}
+    // SyncService owns staged downloads and commits content atomically.
+    // A direct background write here could expose a mission before its audio
+    // package finishes downloading.
   }
 
   @override
@@ -111,11 +101,7 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   Future<void> _refreshMissions(String worldId) async {
-    if (!await networkInfo.isConnected) return;
-    try {
-      final missions = await remoteDataSource.getMissions(worldId).timeout(const Duration(seconds: 6));
-      await localDataSource.cacheMissions(worldId, missions);
-    } catch (_) {}
+    // See _refreshWorlds: content updates are coordinated by SyncService.
   }
 
   @override
@@ -165,20 +151,7 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   Future<void> _refreshStories(String missionId) async {
-    if (!await networkInfo.isConnected) return;
-    try {
-      final stories = await remoteDataSource.getStories(missionId).timeout(const Duration(seconds: 6));
-      await localDataSource.cacheStories(missionId, stories);
-      for (final story in stories) {
-        resourceManager.cacheCharacterModels(story.characterName, story.timelineData);
-        if (story.audioUrl != null && story.audioUrl!.isNotEmpty) {
-          resourceManager.downloadAndCacheInBackground(story.audioUrl!, folder: 'audio');
-        }
-        if (story.imageUrl.isNotEmpty) {
-          resourceManager.downloadAndCacheInBackground(story.imageUrl, folder: 'images');
-        }
-      }
-    } catch (_) {}
+    // See _refreshWorlds: content updates are coordinated by SyncService.
   }
 
   @override
@@ -221,11 +194,7 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   Future<void> _refreshQuestions(String missionId) async {
-    if (!await networkInfo.isConnected) return;
-    try {
-      final questions = await remoteDataSource.getQuestions(missionId).timeout(const Duration(seconds: 6));
-      await localDataSource.cacheQuestions(missionId, questions);
-    } catch (_) {}
+    // See _refreshWorlds: content updates are coordinated by SyncService.
   }
 
   @override

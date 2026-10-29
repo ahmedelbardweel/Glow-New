@@ -11,6 +11,10 @@ import '../../../../core/network/network_info.dart';
 import '../../../../core/services/resource_manager.dart';
 import '../datasources/content_local_data_source.dart';
 import '../datasources/content_remote_data_source.dart';
+import '../built_in_habit_audio.dart';
+import '../models/mission_model.dart';
+import '../models/question_model.dart';
+import '../models/story_model.dart';
 
 enum SyncStatus { idle, syncing, success, offline, error }
 
@@ -38,6 +42,7 @@ class SyncService {
   final SharedPreferences preferences;
 
   static const _lastSyncKey = 'glow_last_content_sync_ms';
+  static const _packageReadyPrefix = 'glow_content_package_ready_';
   static const syncFreshFor = Duration(hours: 6);
 
   final ValueNotifier<SyncStatusState> syncState = ValueNotifier<SyncStatusState>(
@@ -206,49 +211,69 @@ class SyncService {
         }
       }
 
-      // 2. Sync Worlds and collect media tasks
+      // 2. Download each remote mission as an atomic offline package.
+      //
+      // Never replace the local cache while a story is still missing audio,
+      // an image, or a custom character file. This keeps the last known good
+      // version playable when the connection drops halfway through an update.
       final remoteWorlds = await remoteDataSource.getWorlds();
-      await localDataSource.cacheWorlds(remoteWorlds);
-      
-      final List<Future> mediaTasks = [];
-      for (var world in remoteWorlds) {
-        if (world.imageUrl.isNotEmpty) {
-          mediaTasks.add(resourceManager.downloadAndCacheFile(world.imageUrl, folder: 'images'));
-        }
-      }
+      final packages = <_MissionPackage>[];
+      final worldMissions = <String, List<MissionModel>>{};
 
-      // 3. Parallel Sync for Worlds, Missions, Stories, Questions
       await Future.wait(remoteWorlds.map((world) async {
         final remoteMissions = await remoteDataSource.getMissions(world.id);
-        await localDataSource.cacheMissions(world.id, remoteMissions);
+        worldMissions[world.id] = remoteMissions;
 
-        await Future.wait(remoteMissions.map((mission) async {
-          try {
-            final storiesFuture = remoteDataSource.getStories(mission.id);
-            final questionsFuture = remoteDataSource.getQuestions(mission.id);
-            final remoteStories = await storiesFuture;
-            final remoteQuestions = await questionsFuture;
-
-            await localDataSource.cacheStories(mission.id, remoteStories);
-            await localDataSource.cacheQuestions(mission.id, remoteQuestions);
-
-            for (var story in remoteStories) {
-              resourceManager.cacheCharacterModels(story.characterName, story.timelineData);
-              if (story.audioUrl != null && story.audioUrl!.isNotEmpty) {
-                mediaTasks.add(resourceManager.downloadAndCacheFile(story.audioUrl!, folder: 'audio'));
-              }
-              if (story.imageUrl.isNotEmpty) {
-                mediaTasks.add(resourceManager.downloadAndCacheFile(story.imageUrl, folder: 'images'));
-              }
-            }
-          } catch (e) {
-            debugPrint('Failed to sync mission ${mission.id}: $e');
-          }
+        final fetched = await Future.wait(remoteMissions.map((mission) async {
+          final results = await Future.wait([
+            remoteDataSource.getStories(mission.id),
+            remoteDataSource.getQuestions(mission.id),
+          ]);
+          return _MissionPackage(
+            mission: mission,
+            stories: results[0] as List<StoryModel>,
+            questions: results[1] as List<QuestionModel>,
+          );
         }));
+        packages.addAll(fetched);
       }));
 
-      // 4. Trigger media downloads in background without blocking
-      Future.wait(mediaTasks);
+      final worldMediaReady = await Future.wait(remoteWorlds.map((world) async {
+        if (world.imageUrl.trim().isEmpty) return true;
+        return (await resourceManager.downloadAndCacheFile(
+              world.imageUrl,
+              folder: 'images',
+            )) !=
+            null;
+      }));
+      if (worldMediaReady.any((ready) => !ready)) {
+        throw StateError('تعذر تنزيل صور العالم كاملة');
+      }
+
+      final packageReady = await Future.wait(
+        packages.map(_downloadPackageAssets),
+      );
+      if (packageReady.any((ready) => !ready)) {
+        throw StateError('تعذر تنزيل ملفات إحدى العادات كاملة');
+      }
+
+      // Commit only after *all* packages are complete. Readers either get the
+      // previous offline package or the new complete one, never a half-sync.
+      await localDataSource.cacheWorlds(remoteWorlds);
+      for (final world in remoteWorlds) {
+        await localDataSource.cacheMissions(
+          world.id,
+          worldMissions[world.id] ?? const <MissionModel>[],
+        );
+      }
+      for (final package in packages) {
+        await localDataSource.cacheStories(package.mission.id, package.stories);
+        await localDataSource.cacheQuestions(package.mission.id, package.questions);
+        await preferences.setInt(
+          '$_packageReadyPrefix${package.mission.id}',
+          DateTime.now().millisecondsSinceEpoch,
+        );
+      }
 
       // 5. Sync Child Progress
       if (childId != null && childId.isNotEmpty) {
@@ -285,4 +310,43 @@ class SyncService {
     _networkSubscription?.cancel();
     syncState.dispose();
   }
+
+  Future<bool> _downloadPackageAssets(_MissionPackage package) async {
+    final downloads = <Future<bool>>[];
+
+    for (final story in package.stories) {
+      final audioUrl = story.audioUrl?.trim() ?? '';
+      if (audioUrl.isNotEmpty && BuiltInHabitAudio.assetFor(story.id) == null) {
+        downloads.add(_downloadRequired(audioUrl, folder: 'audio'));
+      }
+      if (story.imageUrl.trim().isNotEmpty) {
+        downloads.add(_downloadRequired(story.imageUrl, folder: 'images'));
+      }
+      final character = story.characterName.trim();
+      if (character.startsWith('https://') || character.startsWith('http://')) {
+        downloads.add(_downloadRequired(character, folder: 'models'));
+      }
+    }
+
+    if (downloads.isEmpty) return true;
+    final results = await Future.wait(downloads);
+    return results.every((ready) => ready);
+  }
+
+  Future<bool> _downloadRequired(String url, {required String folder}) async {
+    return (await resourceManager.downloadAndCacheFile(url, folder: folder)) !=
+        null;
+  }
+}
+
+class _MissionPackage {
+  final MissionModel mission;
+  final List<StoryModel> stories;
+  final List<QuestionModel> questions;
+
+  const _MissionPackage({
+    required this.mission,
+    required this.stories,
+    required this.questions,
+  });
 }

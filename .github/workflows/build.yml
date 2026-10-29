@@ -35,13 +35,31 @@ jobs:
           yes | "$SM" --sdk_root="$SDK" --licenses >/dev/null || true
           "$SM" --sdk_root="$SDK" --install "ndk;28.2.13676358" "cmake;3.31.4"
 
-      - name: Build Android APK
-        run: flutter build apk --release --target-platform android-arm64
+      - name: Configure Android release signing
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          keyfile="$RUNNER_TEMP/glow-release.keystore"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keyfile"
+          echo "ANDROID_KEYSTORE_PATH=$keyfile" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build universal Android APK
+        run: |
+          flutter build apk --release \
+            --build-name "1.0.${GITHUB_RUN_NUMBER}" \
+            --build-number "${GITHUB_RUN_NUMBER}"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: android-universal-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
   build:

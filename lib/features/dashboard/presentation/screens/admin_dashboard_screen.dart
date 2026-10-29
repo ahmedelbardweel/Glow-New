@@ -72,12 +72,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 onPressed: () {
                   context.push('/custom-character-creator');
                 },
-                icon: const Icon(Icons.palette_outlined, size: 18),
-                label: const Text('اصنع شخصيتك', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'شخصياتك',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primaryContainer,
                   foregroundColor: AppColors.onPrimaryContainer,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppColors.border_radius),
                   ),

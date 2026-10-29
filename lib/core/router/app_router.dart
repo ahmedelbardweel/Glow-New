@@ -16,6 +16,8 @@ import '../../features/organization/presentation/screens/organization_dashboard_
 import '../../features/organization/presentation/screens/teacher_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/parent_reports_screen.dart';
 import '../../features/dashboard/presentation/screens/admin_dashboard_screen.dart';
+import '../../features/dashboard/presentation/screens/content_packages_screen.dart';
+import '../../features/dashboard/presentation/screens/content_package_detail_screen.dart';
 import '../../features/content/presentation/screens/add_world_screen.dart';
 import '../../features/content/presentation/screens/world_missions_screen.dart';
 import '../../features/content/presentation/screens/add_mission_screen.dart';
@@ -199,7 +201,17 @@ class AppRouter {
       ),
       GoRoute(
         path: '/admin-dashboard',
+        builder: (context, state) => const ContentPackagesScreen(),
+      ),
+      GoRoute(
+        path: '/admin/worlds-legacy',
         builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/admin/packages/:packageId',
+        builder: (context, state) => ContentPackageDetailScreen(
+          packageId: state.pathParameters['packageId']!,
+        ),
       ),
       GoRoute(
         path: '/admin/add-world',

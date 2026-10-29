@@ -36,13 +36,16 @@ jobs:
           "$SM" --sdk_root="$SDK" --install "ndk;28.2.13676358" "cmake;3.31.4"
 
       - name: Configure Android release signing
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "No release key configured; using the debug signing fallback."
+            exit 0
+          fi
           keyfile="$RUNNER_TEMP/glow-release.keystore"
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keyfile"
           echo "ANDROID_KEYSTORE_PATH=$keyfile" >> "$GITHUB_ENV"

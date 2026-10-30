@@ -70,10 +70,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: FilledButton.tonalIcon(
                 onPressed: () {
+                  context.push('/admin/packages');
+                },
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text(
+                  'البكجات',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.secondaryContainer,
+                  foregroundColor: AppColors.onSecondaryContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: FilledButton.tonalIcon(
+                onPressed: () {
                   context.push('/custom-character-creator');
                 },
                 label: const Text(
-                  'شخصياتك',
+                  'اصنع شخصيتك',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 style: FilledButton.styleFrom(
@@ -98,6 +120,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 showStaffSettingsSheet(
                   context,
                   settings: [
+                    StaffSetting(
+                      title: 'بكجات المحتوى',
+                      subtitle: 'إنشاء ومتابعة ونشر بكجات العوالم والعادات',
+                      onTap: (sheetContext) async {
+                        Navigator.of(sheetContext).pop();
+                        context.push('/admin/packages');
+                      },
+                    ),
                     StaffSetting(
                       title: 'مفاتيح الصوت والمونتاج',
                       subtitle: _apiKeysSubtitle(credit),

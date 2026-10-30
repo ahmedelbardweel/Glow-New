@@ -1,11 +1,17 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/config/admin_api_keys.dart';
+import '../../../../core/config/eleven_credit.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_sheet.dart';
+import '../../../auth/data/datasources/auth_local_data_source.dart';
+import '../../../organization/presentation/widgets/create_organization_sheet.dart';
+import '../../../organization/presentation/widgets/staff_settings_sheet.dart';
+import '../widgets/admin_api_keys_sheet.dart';
 
 class ContentPackagesScreen extends StatefulWidget {
   const ContentPackagesScreen({super.key});
@@ -23,6 +29,19 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
     _packages = _load();
   }
 
+  String _apiKeysSubtitle(ElevenCredit credit) {
+    final parts = <String>[];
+    if (credit.state == ElevenCreditState.ready) {
+      parts.add('Eleven المتبقي ${groupDigits(credit.remaining)}');
+    } else if (credit.exhausted || credit.state == ElevenCreditState.invalid) {
+      parts.add('Eleven ${credit.label}');
+    }
+    if (AdminApiKeys.geminiExhausted) parts.add('Gemini خلص الرصيد');
+    parts.insert(0, AdminApiKeys.montageChoice.label);
+    if (parts.length == 1) return 'المونتاج: ${AdminApiKeys.montageChoice.label}';
+    return parts.join(' · ');
+  }
+
   Future<List<Map<String, dynamic>>> _load() async {
     final rows = await sl<SupabaseClient>()
         .from('content_packages')
@@ -34,28 +53,22 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
   Future<void> _refresh() async => setState(() => _packages = _load());
 
   Future<void> _createPackage() async {
-    final title = TextEditingController();
-    final description = TextEditingController();
-    final ok = await showDialog<bool>(
+    HapticFeedback.lightImpact();
+    final result = await showAppSheet<Map<String, String>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('بكج جديد'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'اسم البكج')),
-          const SizedBox(height: 12),
-          TextField(controller: description, decoration: const InputDecoration(labelText: 'وصف مختصر')),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('إنشاء مسودة')),
-        ],
+      heightFactor: 0.58,
+      avoidKeyboard: true,
+      builder: (sheetContext) => const _PackageFormSheet(
+        title: 'بكج جديد',
+        subtitle: 'أنشئ بكجًا جديدًا لجمع العوالم والعادات قبل نشرها للمستخدمين',
+        submitLabel: 'إنشاء مسودة',
       ),
     );
-    if (ok != true || title.text.trim().isEmpty || !mounted) return;
+    if (result == null || (result['title'] ?? '').trim().isEmpty || !mounted) return;
     try {
       final row = await sl<SupabaseClient>().from('content_packages').insert({
-        'title': title.text.trim(),
-        'description': description.text.trim(),
+        'title': result['title']!.trim(),
+        'description': (result['description'] ?? '').trim(),
         'created_by': sl<SupabaseClient>().auth.currentUser?.id,
         'draft_content': {'worlds': []},
       }).select('id').single();
@@ -66,68 +79,382 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
     }
   }
 
+  Future<void> _deletePackage(String id, String title) async {
+    HapticFeedback.lightImpact();
+    final confirm = await showAppSheet<bool>(
+      context: context,
+      heightFactor: 0.38,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 48, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'تأكيد الحذف',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'هل أنت متأكد من حذف البكج "$title"؟ سيتم حذف المسودة نهائياً.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.secondary,
+                ),
+              ),
+              const Spacer(),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                child: const Text('حذف البكج', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    try {
+      await sl<SupabaseClient>().from('content_packages').delete().eq('id', id);
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حذف البكج بنجاح')),
+        );
+      }
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _editPackageMeta(Map<String, dynamic> package) async {
+    HapticFeedback.lightImpact();
+    final result = await showAppSheet<Map<String, String>>(
+      context: context,
+      heightFactor: 0.58,
+      avoidKeyboard: true,
+      builder: (sheetContext) => _PackageFormSheet(
+        title: 'تعديل بيانات البكج',
+        subtitle: 'تعديل اسم ووصف البكج الحالي',
+        initialTitle: '${package['title'] ?? ''}',
+        initialDescription: '${package['description'] ?? ''}',
+        submitLabel: 'حفظ التعديلات',
+      ),
+    );
+    if (result == null || (result['title'] ?? '').trim().isEmpty || !mounted) return;
+    try {
+      await sl<SupabaseClient>().from('content_packages').update({
+        'title': result['title']!.trim(),
+        'description': (result['description'] ?? '').trim(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', package['id']);
+      await _refresh();
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
   void _showError(Object error) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تنفيذ العملية: $error')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('تعذر تنفيذ العملية: $error')),
+    );
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('بكجات المحتوى'), actions: [
-          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded)),
-        ]),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _createPackage,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('بكج جديد'),
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('إدارة البكجات'),
+        centerTitle: false,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: FilledButton.tonalIcon(
+              onPressed: () {
+                context.push('/custom-character-creator');
+              },
+              label: const Text(
+                'شخصيتك',
+                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 10),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryContainer,
+                foregroundColor: AppColors.onPrimaryContainer,
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'تحديث',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          IconButton(
+            tooltip: 'الإعدادات',
+            icon: const Icon(Icons.more_vert),
+            onPressed: () async {
+              await AdminApiKeys.sync();
+              if (!context.mounted) return;
+              final credit = await ElevenCredit.load();
+              if (!context.mounted) return;
+              showStaffSettingsSheet(
+                context,
+                settings: [
+                  StaffSetting(
+                    title: 'بكجات المحتوى',
+                    subtitle: 'إنشاء ومتابعة ونشر بكجات العوالم والعادات',
+                    onTap: (sheetContext) async {
+                      Navigator.of(sheetContext).pop();
+                      context.push('/admin/packages');
+                    },
+                  ),
+                  StaffSetting(
+                    title: 'مفاتيح الصوت والمونتاج',
+                    subtitle: _apiKeysSubtitle(credit),
+                    onTap: (sheetContext) async {
+                      Navigator.of(sheetContext).pop();
+                      if (!context.mounted) return;
+                      await showAdminApiKeysSheet(context);
+                    },
+                  ),
+                  StaffSetting(
+                    title: 'إنشاء حساب منظمة',
+                    subtitle: 'اسم وبريد وكلمة مرور. المنظمة تدخل بهما لاحقاً',
+                    onTap: (sheetContext) async {
+                      Navigator.of(sheetContext).pop();
+                      if (!context.mounted) return;
+                      await showCreateOrganizationSheet(context);
+                    },
+                  ),
+                ],
+                onLogout: () async {
+                  await sl<AuthLocalDataSource>().clearCache();
+                  if (context.mounted) context.go('/role-selection');
+                },
+              );
+            },
+          ),
+
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _createPackage,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.onPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppColors.border_radius),
         ),
-        body: FutureBuilder<List<Map<String, dynamic>>>(
-          future: _packages,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Padding(
+        icon: const Icon(Icons.add),
+        label: const Text('بكج جديد', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _packages,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('تعذر تحميل البكجات. تأكد من تطبيق مخطط Supabase وتسجيل الدخول كأدمن.\n\n${snapshot.error}', textAlign: TextAlign.center),
-              ));
-            }
-            final items = snapshot.data ?? const [];
-            if (items.isEmpty) return _emptyState();
-            return RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                itemCount: items.length,
-                itemBuilder: (context, index) => _PackageWalletCard(
-                  package: items[index],
-                  onTap: () => context.push('/admin/packages/${items[index]['id']}').then((_) => _refresh()),
+                child: Text(
+                  'تعذر تحميل البكجات. تأكد من تطبيق مخطط Supabase وتسجيل الدخول كأدمن.\n\n${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.error),
                 ),
               ),
             );
-          },
+          }
+          final items = snapshot.data ?? const [];
+          if (items.isEmpty) return _emptyState();
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              itemCount: items.length,
+              itemBuilder: (context, index) => _PackageCard(
+                package: items[index],
+                onTap: () => context.push('/admin/packages/${items[index]['id']}').then((_) => _refresh()),
+                onEdit: () => _editPackageMeta(items[index]),
+                onDelete: () => _deletePackage(
+                  items[index]['id'].toString(),
+                  items[index]['title']?.toString() ?? '',
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _emptyState() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 20),
+              const Text(
+                'لا توجد بكجات محتوى حتى الآن',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'أنشئ بكجًا واجمع فيه العوالم والعادات والقصص قبل نشرها للمستخدمين.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _createPackage,
+                icon: const Icon(Icons.add),
+                label: const Text('إنشاء أول بكج'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
-
-  Widget _emptyState() => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 92, height: 92,
-          decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(28)),
-          child: const Icon(Icons.wallet_rounded, size: 44, color: AppColors.onPrimaryContainer),
-        ),
-        const SizedBox(height: 20),
-        const Text('محفظة العوالم تبدأ من هنا', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        const Text('أنشئ بكجًا واجمع فيه العوالم والعادات قبل نشرها.', textAlign: TextAlign.center),
-        const SizedBox(height: 20),
-        FilledButton.icon(onPressed: _createPackage, icon: const Icon(Icons.add), label: const Text('إنشاء أول بكج')),
-      ]));
 }
 
-class _PackageWalletCard extends StatelessWidget {
-  const _PackageWalletCard({required this.package, required this.onTap});
+class _PackageFormSheet extends StatefulWidget {
+  const _PackageFormSheet({
+    required this.title,
+    required this.subtitle,
+    this.initialTitle = '',
+    this.initialDescription = '',
+    required this.submitLabel,
+  });
+
+  final String title;
+  final String subtitle;
+  final String initialTitle;
+  final String initialDescription;
+  final String submitLabel;
+
+  @override
+  State<_PackageFormSheet> createState() => _PackageFormSheetState();
+}
+
+class _PackageFormSheetState extends State<_PackageFormSheet> {
+  late final TextEditingController _title;
+  late final TextEditingController _desc;
+
+  @override
+  void initState() {
+    super.initState();
+    _title = TextEditingController(text: widget.initialTitle);
+    _desc = TextEditingController(text: widget.initialDescription);
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _desc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 48, 20, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.title,
+              textAlign: TextAlign.center,
+              style: textTheme.titleLarge?.copyWith(
+                color: AppColors.secondary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.subtitle,
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.secondary.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              controller: _title,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'اسم البكج'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _desc,
+              minLines: 2,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'وصف مختصر'),
+            ),
+            const Spacer(),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                ),
+              ),
+              onPressed: () {
+                if (_title.text.trim().isEmpty) return;
+                Navigator.of(context).pop({
+                  'title': _title.text.trim(),
+                  'description': _desc.text.trim(),
+                });
+              },
+              child: Text(
+                widget.submitLabel,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PackageCard extends StatelessWidget {
+  const _PackageCard({
+    required this.package,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
   final Map<String, dynamic> package;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -138,64 +465,194 @@ class _PackageWalletCard extends StatelessWidget {
       return sum + (world['habits'] as List).length;
     });
     final published = package['status'] == 'published';
-    final colors = [AppColors.primaryContainer, AppColors.secondaryContainer, const Color(0xFFE2F4E8)];
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        border: Border.all(color: AppColors.inputBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            height: 210,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(.35)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(.07), blurRadius: 18, offset: const Offset(0, 8))],
-            ),
-            child: Stack(children: [
-              Positioned.fill(child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 54),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Icon(Icons.wallet_rounded, color: AppColors.secondary.withOpacity(.8)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('${package['title'] ?? 'بكج بدون اسم'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
-                    _StatusPill(published: published),
-                  ]),
-                  const SizedBox(height: 9),
-                  Text('${package['description'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).hintColor)),
-                  const Spacer(),
-                  Row(children: [
-                    _Count(icon: Icons.public_rounded, value: '${worlds.length}', label: 'عوالم'),
-                    const SizedBox(width: 14),
-                    _Count(icon: Icons.auto_awesome_rounded, value: '$missionCount', label: 'عادات'),
-                    const Spacer(),
-                    Text('الإصدار ${package['version'] ?? 0}', style: Theme.of(context).textTheme.labelSmall),
-                  ]),
-                ]),
-              )),
-              Positioned(left: 0, right: 0, bottom: 0, height: 60, child: Stack(
-                children: [
-                  for (var i = worlds.length - 1; i >= 0 && i < 3; i--)
-                    Positioned(
-                      left: 15.0 + i * 9,
-                      right: 15.0 + i * 9,
-                      bottom: 0,
-                      height: 38.0 + (2 - i) * 7,
-                      child: Container(
-                        alignment: Alignment.topRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-                        decoration: BoxDecoration(color: colors[i], borderRadius: const BorderRadius.vertical(top: Radius.circular(15)), border: Border.all(color: Colors.white, width: 2)),
-                        child: Text(worlds[i] is Map ? '${worlds[i]['title'] ?? 'عالم جديد'}' : 'عالم جديد', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(AppColors.border_radius),
+          child: Padding(
+            padding: const EdgeInsets.all(5),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${package['title'] ?? 'بكج بدون اسم'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                          if ((package['description'] ?? '').toString().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${package['description']}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  Positioned(left: 0, right: 0, bottom: 0, height: 12, child: Container(decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24))))),
+                    _StatusPill(published: published),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 25, color: Colors.black54),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppColors.border_radius),
+                      ),
+                      onSelected: (val) {
+                        if (val == 'edit') {
+                          onEdit();
+                        } else if (val == 'delete') {
+                          onDelete();
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 18),
+                              SizedBox(width: 8),
+                              Text('تعديل البيانات'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                              SizedBox(width: 8),
+                              Text('حذف البكج', style: TextStyle(color: AppColors.error)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                if (worlds.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var i = 0; i < worlds.length && i < 3; i++)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryContainer.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(AppColors.border_radius),
+                            border: Border.all(color: AppColors.inputBorder),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.public, size: 12, color: AppColors.secondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                worlds[i] is Map ? '${worlds[i]['title'] ?? 'عالم'}' : 'عالم',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (worlds.length > 3)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryContainer.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(AppColors.border_radius),
+                          ),
+                          child: Text(
+                            '+${worlds.length - 3}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
-              )),
-            ]),
+                const SizedBox(height: 5),
+                const Divider(height: 1, color: AppColors.inputBorder),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    _Badge(
+                      icon: Icons.public_rounded,
+                      value: '${worlds.length}',
+                      label: 'عوالم',
+                      bgColor: AppColors.secondaryContainer,
+                      fgColor: AppColors.onSecondaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    _Badge(
+                      icon: Icons.auto_awesome_rounded,
+                      value: '$missionCount',
+                      label: 'عادات',
+                      bgColor: AppColors.primaryContainer,
+                      fgColor: AppColors.onPrimaryContainer,
+                    ),
+                    const Spacer(),
+                    Text(
+                      'الإصدار ${package['version'] ?? 0}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black45,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 13,
+                      color: Colors.black38,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -206,19 +663,68 @@ class _PackageWalletCard extends StatelessWidget {
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.published});
   final bool published;
+
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: published ? AppColors.tertiary.withOpacity(.12) : AppColors.primary.withOpacity(.16), borderRadius: BorderRadius.circular(30)),
-        child: Text(published ? 'منشور' : 'مسودة', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: published ? AppColors.tertiary : AppColors.onPrimaryContainer)),
+    margin: EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: published ? AppColors.tertiaryContainer : AppColors.primaryContainer,
+          borderRadius: BorderRadius.circular(AppColors.border_radius),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 4),
+            Text(
+              published ? 'منشور' : 'مسودة',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: published ? AppColors.onTertiaryContainer : AppColors.onPrimaryContainer,
+              ),
+            ),
+          ],
+        ),
       );
 }
 
-class _Count extends StatelessWidget {
-  const _Count({required this.icon, required this.value, required this.label});
+class _Badge extends StatelessWidget {
+  const _Badge({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.bgColor,
+    required this.fgColor,
+  });
+
   final IconData icon;
   final String value;
   final String label;
+  final Color bgColor;
+  final Color fgColor;
+
   @override
-  Widget build(BuildContext context) => Row(children: [Icon(icon, size: 16, color: AppColors.secondary), const SizedBox(width: 4), Text('$value $label', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))]);
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(AppColors.border_radius),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: fgColor),
+            const SizedBox(width: 4),
+            Text(
+              '$value $label',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: fgColor,
+              ),
+            ),
+          ],
+        ),
+      );
 }

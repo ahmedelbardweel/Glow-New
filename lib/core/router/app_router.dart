@@ -204,14 +204,18 @@ class AppRouter {
         builder: (context, state) => const ContentPackagesScreen(),
       ),
       GoRoute(
-        path: '/admin/worlds-legacy',
-        builder: (context, state) => const AdminDashboardScreen(),
+        path: '/admin/packages',
+        builder: (context, state) => const ContentPackagesScreen(),
       ),
       GoRoute(
         path: '/admin/packages/:packageId',
         builder: (context, state) => ContentPackageDetailScreen(
           packageId: state.pathParameters['packageId']!,
         ),
+      ),
+      GoRoute(
+        path: '/admin/worlds-legacy',
+        builder: (context, state) => const AdminDashboardScreen(),
       ),
       GoRoute(
         path: '/admin/add-world',

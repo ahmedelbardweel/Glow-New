@@ -1,10 +1,16 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/admin_actions_bottom_sheet.dart';
+import '../../../../core/widgets/app_bottom_sheet.dart';
+import '../../../../core/widgets/offline_aware_image.dart';
+import '../../../content/domain/entities/world_entity.dart';
 
 class ContentPackageDetailScreen extends StatefulWidget {
   const ContentPackageDetailScreen({super.key, required this.packageId});
@@ -25,199 +31,686 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
     _package = _load();
   }
 
-  Future<Map<String, dynamic>> _load() async => Map<String, dynamic>.from(
-        await _db.from('content_packages').select().eq('id', widget.packageId).single(),
-      );
+  Future<Map<String, dynamic>> _load() async {
+    final row = await _db
+        .from('content_packages')
+        .select()
+        .eq('id', widget.packageId)
+        .single();
+    return Map<String, dynamic>.from(row);
+  }
 
   Future<void> _reload() async => setState(() => _package = _load());
-
-  Future<void> _save(Map<String, dynamic> package, Map<String, dynamic> content) async {
-    setState(() => _busy = true);
-    try {
-      await _db.from('content_packages').update({
-        'title': package['title'],
-        'description': package['description'],
-        'draft_content': content,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', widget.packageId);
-      await _reload();
-    } catch (error) {
-      _message('تعذر حفظ المسودة: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _editPackage(Map<String, dynamic> package) async {
-    final title = TextEditingController(text: '${package['title'] ?? ''}');
-    final description = TextEditingController(text: '${package['description'] ?? ''}');
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إعدادات البكج'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: title, decoration: const InputDecoration(labelText: 'اسم البكج')),
-          const SizedBox(height: 10),
-          TextField(controller: description, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'الوصف')),
-        ]),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ'))],
-      ),
-    );
-    if (accepted != true || !mounted) return;
-    package['title'] = title.text.trim();
-    package['description'] = description.text.trim();
-    await _save(package, _draft(package));
-  }
-
-  Future<void> _addWorld(Map<String, dynamic> package) async {
-    final title = TextEditingController();
-    final description = TextEditingController();
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إضافة عالم للمسودة'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'اسم العالم')),
-          const SizedBox(height: 10),
-          TextField(controller: description, decoration: const InputDecoration(labelText: 'وصف العالم')),
-        ]),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('إضافة'))],
-      ),
-    );
-    if (accepted != true || title.text.trim().isEmpty || !mounted) return;
-    final content = _draft(package);
-    final worlds = List<Map<String, dynamic>>.from(content['worlds'] as List? ?? const []);
-    worlds.add({'id': 'draft_${DateTime.now().microsecondsSinceEpoch}', 'title': title.text.trim(), 'description': description.text.trim(), 'image_url': '', 'habits': <Map<String, dynamic>>[]});
-    content['worlds'] = worlds;
-    await _save(package, content);
-  }
-
-  Future<void> _addHabit(Map<String, dynamic> package, Map<String, dynamic> world) async {
-    final title = TextEditingController();
-    final badge = TextEditingController();
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إضافة عادة'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'اسم العادة')),
-          const SizedBox(height: 10),
-          TextField(controller: badge, decoration: const InputDecoration(labelText: 'اسم الوسام')),
-        ]),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('إضافة'))],
-      ),
-    );
-    if (accepted != true || title.text.trim().isEmpty || !mounted) return;
-    final content = _draft(package);
-    final worlds = List<Map<String, dynamic>>.from(content['worlds'] as List? ?? const []);
-    final target = worlds.firstWhere((item) => item['id'] == world['id']);
-    final habits = List<Map<String, dynamic>>.from(target['habits'] as List? ?? const []);
-    habits.add({'id': 'draft_${DateTime.now().microsecondsSinceEpoch}', 'title': title.text.trim(), 'badge_name': badge.text.trim(), 'stories': <Map<String, dynamic>>[], 'questions': <Map<String, dynamic>>[]});
-    target['habits'] = habits;
-    content['worlds'] = worlds;
-    await _save(package, content);
-  }
-
-  Future<void> _publish(Map<String, dynamic> package) async {
-    final content = _draft(package);
-    final worlds = content['worlds'] as List? ?? const [];
-    if (worlds.isEmpty || worlds.every((w) => w is Map && (w['habits'] as List? ?? const []).isEmpty)) {
-      _message('أضف عالمًا وعادة واحدة على الأقل قبل النشر.');
-      return;
-    }
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('نشر البكج؟'),
-        content: const Text('سيصبح الإصدار الحالي متاحًا للمستخدمين. يمكنك تعديل المسودة لاحقًا ونشر إصدار جديد.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ليس الآن')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('نشر'))],
-      ),
-    );
-    if (accepted != true || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await _db.rpc('publish_content_package', params: {'package_id': widget.packageId});
-      await _reload();
-      _message('تم نشر إصدار البكج.');
-    } catch (error) {
-      _message('تعذر النشر: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
 
   Map<String, dynamic> _draft(Map<String, dynamic> package) {
     final raw = package['draft_content'];
     if (raw is Map) return Map<String, dynamic>.from(raw);
-    if (raw is String) return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    if (raw is String) {
+      try {
+        return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      } catch (_) {}
+    }
     return {'worlds': <dynamic>[]};
   }
 
-  void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  List<WorldEntity> _extractWorlds(Map<String, dynamic> package) {
+    final draft = _draft(package);
+    final list = draft['worlds'];
+    if (list is! List) return [];
+    return list.map((item) {
+      if (item is Map) {
+        return WorldEntity(
+          id: (item['id'] ?? '').toString(),
+          title: (item['title'] ?? '').toString(),
+          description: (item['description'] ?? '').toString(),
+          imageUrl: (item['image_url'] ?? '').toString(),
+        );
+      }
+      return const WorldEntity(id: '', title: '', description: '', imageUrl: '');
+    }).where((w) => w.id.isNotEmpty || w.title.isNotEmpty).toList();
+  }
+
+  Future<void> _saveWorlds(Map<String, dynamic> package, List<WorldEntity> worlds) async {
+    setState(() => _busy = true);
+    try {
+      final content = _draft(package);
+      content['worlds'] = worlds.map((w) => {
+        'id': w.id,
+        'title': w.title,
+        'description': w.description,
+        'image_url': w.imageUrl,
+      }).toList();
+
+      await _db.from('content_packages').update({
+        'draft_content': content,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', widget.packageId);
+      await _reload();
+    } catch (e) {
+      _showMessage('تعذر حفظ التغييرات: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _addNewWorld(Map<String, dynamic> package) async {
+    HapticFeedback.lightImpact();
+    final result = await context.push('/admin/add-world');
+    if (result == true && mounted) {
+      try {
+        // Fetch the newest created world from worlds table
+        final rows = await _db
+            .from('worlds')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(1);
+        if (rows.isNotEmpty) {
+          final row = rows.first;
+          final newWorld = WorldEntity(
+            id: row['id'] as String,
+            title: row['title'] as String? ?? '',
+            description: row['description'] as String? ?? '',
+            imageUrl: row['image_url'] as String? ?? '',
+          );
+          final worlds = _extractWorlds(package);
+          if (!worlds.any((w) => w.id == newWorld.id)) {
+            worlds.add(newWorld);
+            await _saveWorlds(package, worlds);
+            _showMessage('تمت إضافة العالم للبكج بنجاح');
+          }
+        }
+      } catch (e) {
+        _showMessage('تم حفظ العالم في النظام. يمكنك إضافته للبكج الآن.');
+      }
+    }
+  }
+
+  Future<void> _chooseExistingWorld(Map<String, dynamic> package) async {
+    HapticFeedback.lightImpact();
+    // Fetch all existing worlds from database
+    List<Map<String, dynamic>> allWorlds = [];
+    try {
+      final rows = await _db.from('worlds').select().order('created_at', ascending: false);
+      allWorlds = List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      _showMessage('تعذر جلب العوالم: $e');
+      return;
+    }
+
+    if (!mounted) return;
+    final currentWorlds = _extractWorlds(package);
+    final available = allWorlds.where((w) {
+      final id = (w['id'] ?? '').toString();
+      return !currentWorlds.any((cw) => cw.id == id);
+    }).toList();
+
+    if (available.isEmpty) {
+      _showMessage('جميع العوالم المتاحة مضافة بالفعل في هذا البكج.');
+      return;
+    }
+
+    final selected = await showAppSheet<Map<String, dynamic>>(
+      context: context,
+      heightFactor: 0.65,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 44, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'اختيار عالم للبكج',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'اختر عالماً من العوالم السابقة لإضافته إلى هذا البكج',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: available.length,
+                  itemBuilder: (ctx, i) {
+                    final w = available[i];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: (w['image_url'] != null && (w['image_url'] as String).isNotEmpty)
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                child: OfflineAwareImage(
+                                  imageUrl: w['image_url'] as String,
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                ),
+                                child: const Icon(Icons.public, color: AppColors.secondary),
+                              ),
+                        title: Text(
+                          w['title'] ?? 'عالم',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          w['description'] ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: FilledButton.tonal(
+                          onPressed: () => Navigator.of(sheetContext).pop(w),
+                          child: const Text('إضافة'),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (selected != null && mounted) {
+      final newWorld = WorldEntity(
+        id: selected['id'].toString(),
+        title: selected['title']?.toString() ?? '',
+        description: selected['description']?.toString() ?? '',
+        imageUrl: selected['image_url']?.toString() ?? '',
+      );
+      final worlds = _extractWorlds(package);
+      worlds.add(newWorld);
+      await _saveWorlds(package, worlds);
+      _showMessage('تمت إضافة العالم "${newWorld.title}" للبكج بنجاح');
+    }
+  }
+
+  Future<void> _openAddWorldOptions(Map<String, dynamic> package) async {
+    HapticFeedback.lightImpact();
+    await showAppSheet<void>(
+      context: context,
+      heightFactor: 0.36,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 44, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'إضافة عالم للبكج',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  _addNewWorld(package);
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('إنشاء عالم جديد', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.secondaryContainer,
+                  foregroundColor: AppColors.onSecondaryContainer,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  _chooseExistingWorld(package);
+                },
+                icon: const Icon(Icons.folder_open_outlined),
+                label: const Text('اختيار من العوالم السابقة', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _removeWorldFromPackage(Map<String, dynamic> package, WorldEntity world) async {
+    HapticFeedback.lightImpact();
+    final confirm = await showAppSheet<bool>(
+      context: context,
+      heightFactor: 0.36,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 44, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'إزالة العالم من البكج',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'هل أنت متأكد من إزالة عالم "${world.title}" من هذا البكج؟ (لن يتم حذف العالم من النظام).',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.black87),
+              ),
+              const Spacer(),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                child: const Text('إزالة من البكج', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final worlds = _extractWorlds(package);
+    worlds.removeWhere((w) => w.id == world.id);
+    await _saveWorlds(package, worlds);
+    _showMessage('تمت إزالة العالم من البكج');
+  }
+
+  Future<void> _publish(Map<String, dynamic> package) async {
+    HapticFeedback.lightImpact();
+    final worlds = _extractWorlds(package);
+    if (worlds.isEmpty) {
+      _showMessage('أضف عالماً واحداً على الأقل إلى البكج قبل النشر.');
+      return;
+    }
+    final confirm = await showAppSheet<bool>(
+      context: context,
+      heightFactor: 0.36,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 44, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'نشر البكج للمستخدمين',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'سيصبح هذا البكج بجميع عوالمه وعاداته متاحاً للمستخدمين على الفور.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black87),
+              ),
+              const Spacer(),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                  ),
+                ),
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                child: const Text('نشر البكج الآن', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _db.rpc('publish_content_package', params: {'package_id': widget.packageId});
+      await _reload();
+      _showMessage('تم نشر البكج بنجاح');
+    } catch (e) {
+      _showMessage('تعذر النشر: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('محتوى البكج'), actions: [
-          IconButton(onPressed: _reload, icon: const Icon(Icons.refresh_rounded), tooltip: 'تحديث'),
-        ]),
-        body: FutureBuilder<Map<String, dynamic>>(
-          future: _package,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-            if (snapshot.hasError) return Center(child: Text('تعذر تحميل المسودة: ${snapshot.error}'));
-            final package = snapshot.data!;
-            final worlds = List<Map<String, dynamic>>.from(_draft(package)['worlds'] as List? ?? const []);
-            return Stack(children: [
-              ListView(padding: const EdgeInsets.fromLTRB(20, 14, 20, 120), children: [
-                _header(package, worlds.length),
-                const SizedBox(height: 22),
-                for (final world in worlds) _worldCard(package, world),
-                OutlinedButton.icon(onPressed: () => _addWorld(package), icon: const Icon(Icons.add_rounded), label: const Text('إضافة عالم')),
-              ]),
-              Positioned(left: 16, right: 16, bottom: 16, child: SafeArea(child: FilledButton.icon(
-                onPressed: _busy ? null : () => _publish(package),
-                icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.publish_rounded),
-                label: Text(_busy ? 'جارٍ الحفظ…' : 'نشر البكج'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15)),
-              ))),
-            ]);
-          },
-        ),
-      );
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _package,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            backgroundColor: AppColors.background,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(title: const Text('تفاصيل البكج')),
+            body: Center(
+              child: Text(
+                'تعذر تحميل البكج: ${snapshot.error}',
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
+          );
+        }
 
-  Widget _header(Map<String, dynamic> package, int worldCount) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.primaryContainer, Color(0xFFFFF4CC)]), borderRadius: BorderRadius.circular(24)),
-        child: Row(children: [
-          const Icon(Icons.wallet_rounded, size: 40, color: AppColors.onPrimaryContainer),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${package['title']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text('${package['description'] ?? ''}'),
-            const SizedBox(height: 6),
-            Text('$worldCount عوالم  ·  الإصدار ${package['version'] ?? 0}  ·  ${package['status'] == 'published' ? 'منشور' : 'مسودة'}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          ])),
-          IconButton(onPressed: () => _editPackage(package), icon: const Icon(Icons.edit_outlined)),
-        ]),
-      );
+        final package = snapshot.data!;
+        final worlds = _extractWorlds(package);
+        final published = package['status'] == 'published';
 
-  Widget _worldCard(Map<String, dynamic> package, Map<String, dynamic> world) {
-    final habits = List<Map<String, dynamic>>.from(world['habits'] as List? ?? const []);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 14),
-      child: ExpansionTile(
-        leading: CircleAvatar(backgroundColor: AppColors.secondaryContainer, child: const Icon(Icons.public_rounded, color: AppColors.secondary)),
-        title: Text('${world['title'] ?? 'عالم جديد'}', style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${world['description'] ?? ''}  ·  ${habits.length} عادات'),
-        children: [
-          for (var i = 0; i < habits.length; i++) ListTile(
-            leading: Container(width: 34, height: 34, alignment: Alignment.center, decoration: BoxDecoration(color: [AppColors.primaryContainer, AppColors.secondaryContainer, const Color(0xFFE2F4E8)][i % 3], borderRadius: BorderRadius.circular(11)), child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.bold))),
-            title: Text('${habits[i]['title'] ?? 'عادة'}'),
-            subtitle: Text('${(habits[i]['stories'] as List? ?? const []).length} قصص · ${(habits[i]['questions'] as List? ?? const []).length} أسئلة'),
-            trailing: const Icon(Icons.chevron_left_rounded),
-            onTap: () => _message('إدارة القصص والأسئلة ستُربط في الخطوة التالية داخل هذا البكج.'),
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: Text('${package['title'] ?? 'عوالم البكج'}'),
+            centerTitle: false,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: FilledButton.tonal(
+                  onPressed: _busy ? null : () => _publish(package),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: published ? AppColors.tertiaryContainer : AppColors.primaryContainer,
+                    foregroundColor: published ? AppColors.onTertiaryContainer : AppColors.onPrimaryContainer,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppColors.border_radius),
+                    ),
+                  ),
+                  child: Text(
+                    published ? 'منشور (تحديث)' : 'نشر البكج',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'تحديث',
+                icon: const Icon(Icons.refresh),
+                onPressed: _reload,
+              ),
+            ],
           ),
-          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _addHabit(package, world), icon: const Icon(Icons.add), label: const Text('إضافة عادة')))),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.onPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppColors.border_radius),
+            ),
+            onPressed: () => _openAddWorldOptions(package),
+            child: const Icon(Icons.add),
+          ),
+          body: worlds.isEmpty
+              ? _buildEmptyState(package)
+              : RefreshIndicator(
+                  onRefresh: _reload,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                    itemCount: worlds.length,
+                    itemBuilder: (context, index) {
+                      final world = worlds[index];
+                      return _buildWorldCard(package, world);
+                    },
+                  ),
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(Map<String, dynamic> package) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(AppColors.border_radius),
+              ),
+              child: const Icon(
+                Icons.public,
+                size: 40,
+                color: AppColors.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'لا توجد عوالم في هذا البكج حتى الآن',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'أضف عوالم إلى هذا البكج لتبدأ بربط المهام والعادات به.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () => _openAddWorldOptions(package),
+              icon: const Icon(Icons.add),
+              label: const Text('أضف عالمك الأول'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppColors.border_radius),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Exact replica of the beautiful World Card from Image 1 / AdminDashboardScreen
+  Widget _buildWorldCard(Map<String, dynamic> package, WorldEntity world) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppColors.border_radius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Background Image
+          if (world.imageUrl.isNotEmpty)
+            OfflineAwareImage(
+              imageUrl: world.imageUrl,
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorWidget: Container(
+                height: 180,
+                width: double.infinity,
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: const Icon(Icons.broken_image, size: 64, color: Colors.white54),
+              ),
+            )
+          else
+            Container(
+              height: 180,
+              width: double.infinity,
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: const Icon(Icons.public, size: 64, color: Colors.white54),
+            ),
+          // Gradient Overlay
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withOpacity(0.8),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+              ),
+            ),
+          ),
+          // Content
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        world.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        world.description,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 12),
+                      // Badges
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(AppColors.border_radius),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.explore, color: Colors.white, size: 14),
+                                SizedBox(width: 4),
+                                Text(
+                                  'عالم استكشافي',
+                                  style: TextStyle(color: Colors.white, fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(AppColors.border_radius),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.star, color: Colors.amber, size: 14),
+                                SizedBox(width: 4),
+                                Text(
+                                  'مغامرة ممتعة',
+                                  style: TextStyle(color: Colors.white, fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Ripple Effect -> Opens WorldMissionsScreen (Image 2)
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  context.push('/admin/world-missions', extra: world);
+                },
+              ),
+            ),
+          ),
+          // Three dots for actions
+          Positioned(
+            top: 8,
+            left: 8,
+            child: IconButton(
+              icon: const Icon(Icons.more_vert, color: Colors.white),
+              onPressed: () {
+                showAdminActionsBottomSheet(
+                  context: context,
+                  onEdit: () {
+                    context.push('/admin/add-world', extra: world);
+                  },
+                  onDelete: () => _removeWorldFromPackage(package, world),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

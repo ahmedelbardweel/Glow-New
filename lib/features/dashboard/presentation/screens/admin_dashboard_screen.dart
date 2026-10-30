@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../content/domain/entities/world_entity.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -361,7 +362,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-world');
-            if (result == true) {
+            if (mounted && (result == true || result is WorldEntity)) {
               _contentBloc.add(const ContentEvent.getWorlds());
             }
           },

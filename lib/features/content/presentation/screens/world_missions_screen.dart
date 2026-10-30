@@ -45,7 +45,10 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
           title: Text('مهام: ${widget.world.title}'),
           centerTitle: true,
         ),
-        body: BlocBuilder<ContentBloc, ContentState>(
+        body: BlocConsumer<ContentBloc, ContentState>(
+          listener: (context, state) {
+            state.maybeWhen(initial: () => _contentBloc.add(ContentEvent.getMissions(widget.world.id, forceRefresh: true)), orElse: () {});
+          },
           builder: (context, state) {
             return state.maybeWhen(
               loading: () => const ShimmerLoading(),
@@ -77,7 +80,7 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
                                 context: context,
                                 onEdit: () async {
                                   final result = await context.push('/admin/add-mission', extra: {'world': widget.world, 'missionToEdit': mission});
-                                  if (result == true) {
+                                  if (mounted && result == true) {
                                     _contentBloc.add(ContentEvent.getMissions(widget.world.id));
                                   }
                                 },
@@ -121,7 +124,7 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-mission', extra: widget.world);
-            if (result == true) {
+            if (mounted && result == true) {
               _contentBloc.add(ContentEvent.getMissions(widget.world.id));
             }
           },

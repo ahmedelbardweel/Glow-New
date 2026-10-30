@@ -1,3 +1,5 @@
+import 'package:get_it/get_it.dart';
+import '../../../auth/data/datasources/auth_local_data_source.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
@@ -28,8 +30,20 @@ class ContentRepositoryImpl implements ContentRepository {
     required this.networkInfo,
   });
 
+  Future<bool> get _isAdmin async {
+    if (!GetIt.instance.isRegistered<AuthLocalDataSource>()) return false;
+    return (await GetIt.instance<AuthLocalDataSource>().getLastUser())?.role == 'admin';
+  }
+
   @override
   Future<Either<Failure, List<WorldEntity>>> getWorlds({bool forceRefresh = false}) async {
+    if (await _isAdmin) {
+      try {
+        return Right(await remoteDataSource.getWorlds().timeout(const Duration(seconds: 15)));
+      } catch (e) {
+        return Left(ServerFailure(userMessage(e)));
+      }
+    }
     final cachedWorlds = await localDataSource.getCachedWorlds();
     if (!forceRefresh && cachedWorlds.isNotEmpty) {
       unawaited(_refreshWorlds());
@@ -66,6 +80,7 @@ class ContentRepositoryImpl implements ContentRepository {
           imageUrl: world.imageUrl,
         );
         final result = await remoteDataSource.addWorld(model);
+        if (await _isAdmin) return Right(result);
         // Update local cache
         final current = await localDataSource.getCachedWorlds();
         current.add(result);
@@ -81,6 +96,13 @@ class ContentRepositoryImpl implements ContentRepository {
 
   @override
   Future<Either<Failure, List<MissionEntity>>> getMissions(String worldId, {bool forceRefresh = false}) async {
+    if (await _isAdmin) {
+      try {
+        return Right(await remoteDataSource.getMissions(worldId).timeout(const Duration(seconds: 15)));
+      } catch (e) {
+        return Left(ServerFailure(userMessage(e)));
+      }
+    }
     final cachedMissions = await localDataSource.getCachedMissions(worldId);
     if (!forceRefresh && cachedMissions.isNotEmpty) {
       unawaited(_refreshMissions(worldId));
@@ -117,6 +139,7 @@ class ContentRepositoryImpl implements ContentRepository {
           orderIndex: mission.orderIndex,
         );
         final result = await remoteDataSource.addMission(model);
+        if (await _isAdmin) return Right(result);
         final current = await localDataSource.getCachedMissions(mission.worldId);
         current.add(result);
         await localDataSource.cacheMissions(mission.worldId, current);
@@ -131,6 +154,13 @@ class ContentRepositoryImpl implements ContentRepository {
 
   @override
   Future<Either<Failure, List<StoryEntity>>> getStories(String missionId, {bool forceRefresh = false}) async {
+    if (await _isAdmin) {
+      try {
+        return Right(await remoteDataSource.getStories(missionId).timeout(const Duration(seconds: 15)));
+      } catch (e) {
+        return Left(ServerFailure(userMessage(e)));
+      }
+    }
     final cachedStories = await localDataSource.getCachedStories(missionId);
     if (!forceRefresh && cachedStories.isNotEmpty) {
       unawaited(_refreshStories(missionId));
@@ -160,6 +190,7 @@ class ContentRepositoryImpl implements ContentRepository {
       try {
         final model = StoryModel.fromEntity(story);
         final result = await remoteDataSource.addStory(model, audioFile: audioFile, characterFile: characterFile);
+        if (await _isAdmin) return Right(result);
         final current = await localDataSource.getCachedStories(story.missionId);
         current.add(result);
         await localDataSource.cacheStories(story.missionId, current);
@@ -174,6 +205,13 @@ class ContentRepositoryImpl implements ContentRepository {
 
   @override
   Future<Either<Failure, List<QuestionEntity>>> getQuestions(String missionId, {bool forceRefresh = false}) async {
+    if (await _isAdmin) {
+      try {
+        return Right(await remoteDataSource.getQuestions(missionId).timeout(const Duration(seconds: 15)));
+      } catch (e) {
+        return Left(ServerFailure(userMessage(e)));
+      }
+    }
     final cachedQuestions = await localDataSource.getCachedQuestions(missionId);
     if (!forceRefresh && cachedQuestions.isNotEmpty) {
       unawaited(_refreshQuestions(missionId));
@@ -208,6 +246,7 @@ class ContentRepositoryImpl implements ContentRepository {
         correctAnswerIndex: question.correctAnswerIndex,
       );
       final addedQuestion = await remoteDataSource.addQuestion(questionModel);
+        if (await _isAdmin) return Right(addedQuestion);
       final current = await localDataSource.getCachedQuestions(question.missionId);
       current.add(addedQuestion);
       await localDataSource.cacheQuestions(question.missionId, current);

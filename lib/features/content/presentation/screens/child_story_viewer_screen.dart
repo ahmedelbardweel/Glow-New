@@ -311,7 +311,7 @@ class _ChildStoryViewerScreenState extends State<ChildStoryViewerScreen>
 
     final currentStory = _stories[_currentIndex];
     final audioUrl = currentStory.audioUrl?.trim() ?? '';
-    final bundledAsset = BuiltInHabitAudio.assetFor(currentStory.id);
+    final bundledAsset = BuiltInHabitAudio.assetForSource(currentStory.id, audioUrl);
     if (currentStory.timelineData != null) {
       try {
         _currentTimeline = StoryTimeline.fromJson(

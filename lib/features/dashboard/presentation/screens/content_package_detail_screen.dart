@@ -40,7 +40,12 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
     return Map<String, dynamic>.from(row);
   }
 
-  Future<void> _reload() async => setState(() => _package = _load());
+  Future<void> _reload() async {
+    if (!mounted) return;
+    final request = _load();
+    setState(() => _package = request);
+    await request;
+  }
 
   Map<String, dynamic> _draft(Map<String, dynamic> package) {
     final raw = package['draft_content'];
@@ -70,7 +75,8 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
     }).where((w) => w.id.isNotEmpty || w.title.isNotEmpty).toList();
   }
 
-  Future<void> _saveWorlds(Map<String, dynamic> package, List<WorldEntity> worlds) async {
+  Future<bool> _saveWorlds(Map<String, dynamic> package, List<WorldEntity> worlds) async {
+    if (!mounted || _busy) return false;
     setState(() => _busy = true);
     try {
       final content = _draft(package);
@@ -86,8 +92,10 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', widget.packageId);
       await _reload();
+      return true;
     } catch (e) {
       _showMessage('تعذر حفظ التغييرات: $e');
+      return false;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -96,31 +104,12 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
   Future<void> _addNewWorld(Map<String, dynamic> package) async {
     HapticFeedback.lightImpact();
     final result = await context.push('/admin/add-world');
-    if (result == true && mounted) {
-      try {
-        // Fetch the newest created world from worlds table
-        final rows = await _db
-            .from('worlds')
-            .select()
-            .order('created_at', ascending: false)
-            .limit(1);
-        if (rows.isNotEmpty) {
-          final row = rows.first;
-          final newWorld = WorldEntity(
-            id: row['id'] as String,
-            title: row['title'] as String? ?? '',
-            description: row['description'] as String? ?? '',
-            imageUrl: row['image_url'] as String? ?? '',
-          );
-          final worlds = _extractWorlds(package);
-          if (!worlds.any((w) => w.id == newWorld.id)) {
-            worlds.add(newWorld);
-            await _saveWorlds(package, worlds);
-            _showMessage('تمت إضافة العالم للبكج بنجاح');
-          }
-        }
-      } catch (e) {
-        _showMessage('تم حفظ العالم في النظام. يمكنك إضافته للبكج الآن.');
+    if (!mounted || result is! WorldEntity) return;
+    final worlds = _extractWorlds(package);
+    if (!worlds.any((w) => w.id == result.id)) {
+      worlds.add(result);
+      if (await _saveWorlds(package, worlds)) {
+        _showMessage('تمت إضافة العالم للبكج بنجاح');
       }
     }
   }
@@ -233,8 +222,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
       );
       final worlds = _extractWorlds(package);
       worlds.add(newWorld);
-      await _saveWorlds(package, worlds);
-      _showMessage('تمت إضافة العالم "${newWorld.title}" للبكج بنجاح');
+      if (await _saveWorlds(package, worlds)) _showMessage('تمت إضافة العالم "${newWorld.title}" للبكج بنجاح');
     }
   }
 
@@ -344,8 +332,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
     if (confirm != true || !mounted) return;
     final worlds = _extractWorlds(package);
     worlds.removeWhere((w) => w.id == world.id);
-    await _saveWorlds(package, worlds);
-    _showMessage('تمت إزالة العالم من البكج');
+    if (await _saveWorlds(package, worlds)) _showMessage('تمت إزالة العالم من البكج');
   }
 
   Future<void> _publish(Map<String, dynamic> package) async {
@@ -480,7 +467,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppColors.border_radius),
             ),
-            onPressed: () => _openAddWorldOptions(package),
+            onPressed: _busy ? null : () => _openAddWorldOptions(package),
             child: const Icon(Icons.add),
           ),
           body: worlds.isEmpty
@@ -534,7 +521,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: () => _openAddWorldOptions(package),
+              onPressed: _busy ? null : () => _openAddWorldOptions(package),
               icon: const Icon(Icons.add),
               label: const Text('أضف عالمك الأول'),
               style: FilledButton.styleFrom(
@@ -703,8 +690,11 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
               onPressed: () {
                 showAdminActionsBottomSheet(
                   context: context,
-                  onEdit: () {
-                    context.push('/admin/add-world', extra: world);
+                  onEdit: () async {
+                    final updated = await context.push('/admin/add-world', extra: world);
+                    if (!mounted || updated is! WorldEntity) return;
+                    final worlds = _extractWorlds(package).map((w) => w.id == updated.id ? updated : w).toList();
+                    await _saveWorlds(package, worlds);
                   },
                   onDelete: () => _removeWorldFromPackage(package, world),
                 );

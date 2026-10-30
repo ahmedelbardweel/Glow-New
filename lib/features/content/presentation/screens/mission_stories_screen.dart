@@ -55,7 +55,10 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
             ),
           ],
         ),
-        body: BlocBuilder<ContentBloc, ContentState>(
+        body: BlocConsumer<ContentBloc, ContentState>(
+          listener: (context, state) {
+            state.maybeWhen(initial: () => _contentBloc.add(ContentEvent.getStories(widget.mission.id, forceRefresh: true)), orElse: () {});
+          },
           builder: (context, state) {
             return state.maybeWhen(
               loading: () => const ShimmerLoading(),
@@ -87,7 +90,7 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
                                 context: context,
                                 onEdit: () async {
                                   final result = await context.push('/admin/add-story', extra: {'mission': widget.mission, 'storyToEdit': story});
-                                  if (result == true) {
+                                  if (mounted && result == true) {
                                     _contentBloc.add(ContentEvent.getStories(widget.mission.id));
                                   }
                                 },
@@ -131,7 +134,7 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-story', extra: widget.mission);
-            if (result == true) {
+            if (mounted && result == true) {
               _contentBloc.add(ContentEvent.getStories(widget.mission.id));
             }
           },

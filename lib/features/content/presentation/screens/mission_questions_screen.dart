@@ -46,7 +46,10 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
           title: Text('أسئلة المهمة: ${widget.mission.title}'),
           centerTitle: true,
         ),
-        body: BlocBuilder<ContentBloc, ContentState>(
+        body: BlocConsumer<ContentBloc, ContentState>(
+          listener: (context, state) {
+            state.maybeWhen(initial: () => _contentBloc.add(ContentEvent.getQuestions(widget.mission.id, forceRefresh: true)), orElse: () {});
+          },
           builder: (context, state) {
             return state.maybeWhen(
               loading: () => const ShimmerLoading(),
@@ -90,7 +93,7 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
                                         context: context,
                                         onEdit: () async {
                                           final result = await context.push('/admin/add-question', extra: {'mission': widget.mission, 'questionToEdit': question});
-                                          if (result == true) {
+                                          if (mounted && result == true) {
                                             _contentBloc.add(ContentEvent.getQuestions(widget.mission.id));
                                           }
                                         },
@@ -158,7 +161,7 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-question', extra: widget.mission);
-            if (result == true) {
+            if (mounted && result == true) {
               _contentBloc.add(ContentEvent.getQuestions(widget.mission.id));
             }
           },

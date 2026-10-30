@@ -15,4 +15,11 @@ class BuiltInHabitAudio {
   };
 
   static String? assetFor(String storyId) => _assetsByStoryId[storyId];
+
+  /// A newly uploaded recording must take precedence over the launch audio.
+  static String? assetForSource(String storyId, String? audioUrl) {
+    final url = audioUrl?.trim() ?? '';
+    if (url.isNotEmpty && !RegExp(r'/habit_[1-5]_voice_').hasMatch(url)) return null;
+    return assetFor(storyId);
+  }
 }

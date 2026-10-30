@@ -121,7 +121,12 @@ class _AddMissionScreenState extends State<AddMissionScreen> {
                       controller: _starsController,
                       hint: 'عدد النجوم (مثال: 50)',
                       keyboardType: TextInputType.number,
-                      validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
+                      validator: (val) {
+                        final stars = int.tryParse(val?.trim() ?? '');
+                        return stars == null || stars < 0
+                            ? 'أدخل عدداً صحيحاً موجباً أو صفراً'
+                            : null;
+                      },
                     ),
                   ],
                     ),

@@ -8,6 +8,8 @@ void showAdminActionsBottomSheet({
 }) {
   showModalBottomSheet(
     context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) {
       return Container(

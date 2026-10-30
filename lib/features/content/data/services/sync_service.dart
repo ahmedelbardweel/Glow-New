@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import '../../../auth/data/datasources/auth_local_data_source.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
@@ -161,6 +164,10 @@ class SyncService {
 
   Future<void> syncAll({String? childId, bool silent = false}) async {
     if (_isSyncRunning) return;
+    if (GetIt.instance.isRegistered<AuthLocalDataSource>() &&
+        (await GetIt.instance<AuthLocalDataSource>().getLastUser())?.role ==
+            'admin')
+      return;
 
     // Throttle silent background syncs if synced recently (within 30 seconds)
     if (silent &&
@@ -275,16 +282,34 @@ class SyncService {
       // Keep the bundled launch world even when Supabase is empty, and append
       // any worlds added remotely. Remote rows with matching IDs update the
       // local copy; absence from Supabase never removes offline launch content.
-      final cachedWorlds = await localDataSource.getCachedWorlds();
+      // Retain only bundled launch content plus the current published rows.
+      // Previously cached drafts/deleted remote items must not survive a sync.
+      final launchRows = await Future.wait(
+        ['worlds', 'missions', 'stories', 'questions'].map(
+          (kind) async =>
+              jsonDecode(
+                    await rootBundle.loadString(
+                      'assets/content/launch_$kind.json',
+                    ),
+                  )
+                  as List,
+        ),
+      );
+      final launchWorlds = launchRows[0].map(
+        (row) => WorldModel.fromJson(Map<String, dynamic>.from(row as Map)),
+      );
       final worldsById = <String, WorldModel>{
-        for (final world in cachedWorlds) world.id: world,
+        for (final world in launchWorlds) world.id: world,
         for (final world in remoteWorlds) world.id: world,
       };
       await localDataSource.cacheWorlds(worldsById.values.toList());
-      for (final world in remoteWorlds) {
-        final cachedMissions = await localDataSource.getCachedMissions(
-          world.id,
-        );
+      for (final world in worldsById.values) {
+        final cachedMissions = launchRows[1]
+            .where((row) => row['world_id'] == world.id)
+            .map(
+              (row) =>
+                  MissionModel.fromJson(Map<String, dynamic>.from(row as Map)),
+            );
         final missionsById = <String, MissionModel>{
           for (final mission in cachedMissions) mission.id: mission,
           for (final mission
@@ -296,17 +321,35 @@ class SyncService {
           missionsById.values.toList(),
         );
       }
+      final remoteMissionIds = packages.map((package) => package.mission.id).toSet();
+      for (final row in launchRows[1]) {
+        final mission = MissionModel.fromJson(Map<String, dynamic>.from(row as Map));
+        if (remoteMissionIds.contains(mission.id)) continue;
+        packages.add(_MissionPackage(
+          mission: mission,
+          stories: launchRows[2].where((row) => row['mission_id'] == mission.id)
+              .map((row) => StoryModel.fromJson(Map<String, dynamic>.from(row as Map))).toList(),
+          questions: launchRows[3].where((row) => row['mission_id'] == mission.id)
+              .map((row) => QuestionModel.fromJson(Map<String, dynamic>.from(row as Map))).toList(),
+        ));
+      }
       for (final package in packages) {
-        final cachedStories = await localDataSource.getCachedStories(
-          package.mission.id,
-        );
+        final cachedStories = launchRows[2]
+            .where((row) => row['mission_id'] == package.mission.id)
+            .map(
+              (row) =>
+                  StoryModel.fromJson(Map<String, dynamic>.from(row as Map)),
+            );
         final storiesById = <String, StoryModel>{
           for (final story in cachedStories) story.id: story,
           for (final story in package.stories) story.id: story,
         };
-        final cachedQuestions = await localDataSource.getCachedQuestions(
-          package.mission.id,
-        );
+        final cachedQuestions = launchRows[3]
+            .where((row) => row['mission_id'] == package.mission.id)
+            .map(
+              (row) =>
+                  QuestionModel.fromJson(Map<String, dynamic>.from(row as Map)),
+            );
         final questionsById = <String, QuestionModel>{
           for (final question in cachedQuestions) question.id: question,
           for (final question in package.questions) question.id: question,
@@ -370,7 +413,7 @@ class SyncService {
 
     for (final story in package.stories) {
       final audioUrl = story.audioUrl?.trim() ?? '';
-      if (audioUrl.isNotEmpty && BuiltInHabitAudio.assetFor(story.id) == null) {
+      if (audioUrl.isNotEmpty && BuiltInHabitAudio.assetForSource(story.id, audioUrl) == null) {
         downloads.add(_downloadRequired(audioUrl, folder: 'audio'));
       }
       if (story.imageUrl.trim().isNotEmpty) {

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/world_model.dart';
 import '../models/mission_model.dart';
@@ -53,7 +52,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   @override
   Future<List<WorldModel>> getWorlds() async {
     final response = await supabaseClient
-        .from('worlds')
+        .from('content_worlds')
         .select()
         .order('created_at', ascending: true);
     return response.map((json) => WorldModel.fromJson(json)).toList();
@@ -88,7 +87,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   @override
   Future<List<MissionModel>> getMissions(String worldId) async {
     final response = await supabaseClient
-        .from('missions')
+        .from('content_missions')
         .select()
         .eq('world_id', worldId)
         .order('order_index', ascending: true);
@@ -124,7 +123,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   @override
   Future<List<StoryModel>> getStories(String missionId) async {
     final response = await supabaseClient
-        .from('stories')
+        .from('content_stories')
         .select()
         .eq('mission_id', missionId)
         .order('order_index', ascending: true);
@@ -274,7 +273,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
   @override
   Future<List<QuestionModel>> getQuestions(String missionId) async {
     final response = await supabaseClient
-        .from('questions')
+        .from('content_questions')
         .select()
         .eq('mission_id', missionId);
     return response.map((json) => QuestionModel.fromJson(json)).toList();
@@ -319,7 +318,7 @@ class ContentRemoteDataSourceImpl implements ContentRemoteDataSource {
     if (existing == null) {
       // First time completion! Let's award stars and badges to the profile.
       final mission = await supabaseClient
-          .from('missions')
+          .from('content_missions')
           .select('stars_reward, badge_name')
           .eq('id', missionId)
           .single();

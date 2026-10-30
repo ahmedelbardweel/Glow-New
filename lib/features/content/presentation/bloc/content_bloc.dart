@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/errors/user_message.dart';
-import '../../../../core/usecases/usecase.dart';
 import '../../domain/usecases/world_usecases.dart';
 import '../../domain/usecases/mission_usecases.dart';
 import '../../domain/usecases/story_usecases.dart';
@@ -83,7 +82,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           final result = await updateWorld(e.world);
           result.fold(
             (failure) => emit(ContentState.error(userMessage(failure.message))),
-            (_) => add(const ContentEvent.getWorlds()),
+            (world) => emit(ContentState.worldAdded(world)),
           );
         },
         deleteWorld: (e) async {
@@ -122,7 +121,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           final result = await updateMission(e.mission);
           result.fold(
             (failure) => emit(ContentState.error(userMessage(failure.message))),
-            (_) => add(ContentEvent.getMissions(e.mission.worldId)),
+            (mission) => emit(ContentState.missionAdded(mission)),
           );
         },
         deleteMission: (e) async {
@@ -164,7 +163,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           final result = await updateStory(AddStoryParams(e.story, audioFile: e.audioFile, characterFile: e.characterFile));
           result.fold(
             (failure) => emit(ContentState.error(userMessage(failure.message))),
-            (_) => add(ContentEvent.getStories(e.story.missionId)),
+            (story) => emit(ContentState.storyAdded(story)),
           );
         },
         deleteStory: (e) async {
@@ -203,7 +202,7 @@ class ContentBloc extends Bloc<ContentEvent, ContentState> {
           final result = await updateQuestion(e.question);
           result.fold(
             (failure) => emit(ContentState.error(userMessage(failure.message))),
-            (_) => add(ContentEvent.getQuestions(e.question.missionId)),
+            (question) => emit(ContentState.questionAdded(question)),
           );
         },
         deleteQuestion: (e) async {

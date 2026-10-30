@@ -43,11 +43,12 @@ Future<T?> showAppSheet<T>({
   required BuildContext context,
   required double heightFactor,
   required Widget Function(BuildContext sheetContext) builder,
-  bool avoidKeyboard = false,
+  bool avoidKeyboard = true,
 }) {
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     isDismissible: false,
     enableDrag: false,
     constraints: const BoxConstraints(maxWidth: double.infinity),
@@ -56,8 +57,8 @@ Future<T?> showAppSheet<T>({
       final media = MediaQuery.of(sheetContext);
       final keyboard = avoidKeyboard ? media.viewInsets.bottom : 0.0;
       final available = math.max(
-        220.0,
-        media.size.height - keyboard - media.padding.top - 12,
+        0.0,
+        media.size.height - keyboard - MediaQuery.of(context).viewPadding.top - 12,
       );
       final height = math.min(media.size.height * heightFactor, available);
       // The sheet itself sits on the keyboard. Children must not see the
@@ -195,7 +196,7 @@ class _SheetFrameState extends State<_SheetFrame> {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: RepaintBoundary(child: widget.child),
+                      child: SafeArea(top: false, child: RepaintBoundary(child: widget.child)),
                     ),
                     PositionedDirectional(
                       top: 10,

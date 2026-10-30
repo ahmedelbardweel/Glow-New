@@ -55,8 +55,8 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
 
   Future<void> _pickImage() async {
     final result = await FilePicker.pickFiles(type: FileType.image);
-    final path = (result == null || result.isEmpty) ? null : result.first.path;
-    if (path == null) return;
+    final path = result.isEmpty ? null : result.first.path;
+    if (path == null || !mounted) return;
     setState(() {
       _imageFile = File(path);
       _imageController.text = path.split(Platform.pathSeparator).last;
@@ -125,9 +125,9 @@ class _AddWorldScreenState extends State<AddWorldScreen> {
         body: BlocConsumer<ContentBloc, ContentState>(
           listener: (context, state) {
             state.maybeWhen(
-              worldAdded: (_) {
+              worldAdded: (world) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت الإضافة بنجاح!')));
-                context.pop(true);
+                context.pop(world);
               },
               error: (msg) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userMessage(msg))));

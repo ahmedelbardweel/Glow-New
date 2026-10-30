@@ -9,6 +9,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
+import '../../../content/data/services/launch_admin_package.dart';
 import '../../../organization/presentation/widgets/create_organization_sheet.dart';
 import '../../../organization/presentation/widgets/staff_settings_sheet.dart';
 import '../widgets/admin_api_keys_sheet.dart';
@@ -43,14 +44,53 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
   }
 
   Future<List<Map<String, dynamic>>> _load() async {
-    final rows = await sl<SupabaseClient>()
+    final client = sl<SupabaseClient>();
+    final rows = await client
         .from('content_packages')
         .select('id,title,description,cover_url,status,version,draft_content,updated_at')
         .order('updated_at', ascending: false);
-    return List<Map<String, dynamic>>.from(rows);
+    if (!rows.any((row) => row['id'] == LaunchAdminPackage.id)) {
+      await LaunchAdminPackage.ensureCreated(client);
+      final starter = await client.from('content_packages').select()
+          .eq('id', LaunchAdminPackage.id).single();
+      rows.insert(0, starter);
+    }
+    final packages = List<Map<String, dynamic>>.from(rows);
+    final starterIndex = packages.indexWhere((row) => row['id'] == LaunchAdminPackage.id);
+    if (starterIndex > 0) packages.insert(0, packages.removeAt(starterIndex));
+    final worldIds = <String>{};
+    for (final package in packages) {
+      final draft = package['draft_content'];
+      if (draft is! Map || draft['worlds'] is! List) continue;
+      for (final world in draft['worlds'] as List) {
+        if (world is Map && world['id'] is String) worldIds.add(world['id'] as String);
+      }
+    }
+    if (worldIds.isNotEmpty) {
+      // One aggregate request for every card, rather than loading each habit.
+      final counts = await client.from('worlds').select('id,missions(count)')
+          .inFilter('id', worldIds.toList());
+      final byWorld = <String, int>{};
+      for (final row in counts) {
+        final missions = row['missions'] as List;
+        byWorld[row['id'] as String] = missions.isEmpty ? 0 : (missions.first['count'] as num).toInt();
+      }
+      for (final package in packages) {
+        final draft = package['draft_content'];
+        final worlds = draft is Map && draft['worlds'] is List ? draft['worlds'] as List : const [];
+        package['_mission_count'] = worlds.fold<int>(0,
+            (count, world) => count + (world is Map ? byWorld[world['id']] ?? 0 : 0));
+      }
+    }
+    return packages;
   }
 
-  Future<void> _refresh() async => setState(() => _packages = _load());
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final request = _load();
+    setState(() => _packages = request);
+    await request;
+  }
 
   Future<void> _createPackage() async {
     HapticFeedback.lightImpact();
@@ -166,6 +206,7 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
   }
 
   void _showError(Object error) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('تعذر تنفيذ العملية: $error')),
     );
@@ -320,19 +361,6 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.black54),
               ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _createPackage,
-                icon: const Icon(Icons.add),
-                label: const Text('إنشاء أول بكج'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppColors.border_radius),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -460,7 +488,7 @@ class _PackageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final draft = package['draft_content'];
     final worlds = draft is Map && draft['worlds'] is List ? draft['worlds'] as List : const [];
-    final missionCount = worlds.fold<int>(0, (sum, world) {
+    final missionCount = package['_mission_count'] as int? ?? worlds.fold<int>(0, (sum, world) {
       if (world is! Map || world['habits'] is! List) return sum;
       return sum + (world['habits'] as List).length;
     });

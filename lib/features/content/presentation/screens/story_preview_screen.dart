@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../data/built_in_habit_audio.dart';
 
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/smart_character_viewer.dart';
@@ -31,7 +32,9 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen>
   bool _audioCompleted = false;
   int _audioGeneration = 0;
 
-  bool get _hasAudioUrl => widget.story.audioUrl?.trim().isNotEmpty ?? false;
+  bool get _hasAudioUrl =>
+      BuiltInHabitAudio.assetForSource(widget.story.id, widget.story.audioUrl) != null ||
+      (widget.story.audioUrl?.trim().isNotEmpty ?? false);
 
   @override
   void initState() {
@@ -77,7 +80,12 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen>
     try {
       await player.setReleaseMode(ReleaseMode.stop);
       if (!_isCurrentAudio(generation)) return;
-      await player.setSourceUrl(widget.story.audioUrl!.trim());
+      final asset = BuiltInHabitAudio.assetForSource(widget.story.id, widget.story.audioUrl);
+      if (asset != null) {
+        await player.setSource(AssetSource(asset));
+      } else {
+        await player.setSourceUrl(widget.story.audioUrl!.trim());
+      }
       if (!_isCurrentAudio(generation)) return;
       _hasLoadedAudio = true;
       _loadingAudio = false;

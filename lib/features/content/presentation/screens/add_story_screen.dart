@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import '../../data/built_in_habit_audio.dart';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -154,7 +157,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     _scriptController.text = _scriptFromLines(_lines);
     _previousScriptText = _scriptController.text;
     final url = story.audioUrl?.trim() ?? '';
-    if (url.isNotEmpty) {
+    if (url.isNotEmpty || BuiltInHabitAudio.assetForSource(story.id, url) != null) {
       _preparingEdit = true;
       unawaited(_loadExistingAudio(url));
     }
@@ -194,6 +197,17 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
 
   Future<void> _loadExistingAudio(String url) async {
     try {
+      final bundled = BuiltInHabitAudio.assetForSource(widget.storyToEdit!.id, url);
+      if (bundled != null) {
+        final bytes = await rootBundle.load('assets/$bundled');
+        final directory = await getTemporaryDirectory();
+        final file = File('${directory.path}/${widget.storyToEdit!.id}_launch.wav');
+        await file.writeAsBytes(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes), flush: true);
+        if (!mounted) return;
+        _audioFile = file;
+        await _initAudio(DeviceFileSource(file.path));
+        return;
+      }
       final resources = sl<ResourceManager>();
       final path = resources.getLocalFilePath(url) ??
           await resources.downloadAndCacheFile(url, folder: 'audio');
@@ -392,9 +406,10 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
     final selectedName = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return _CharacterPickerSheet(
+        return SafeArea(top: false, child: _CharacterPickerSheet(
           customCharacters: _customCharacters,
           onOpenCreator: () async {
             Navigator.pop(sheetContext);
@@ -406,7 +421,7 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
             await context.push('/custom-character-creator', extra: character);
             _loadCustomCharacters();
           },
-        );
+        ));
       },
     );
 

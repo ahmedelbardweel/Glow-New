@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/admin_actions_bottom_sheet.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/offline_aware_image.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../content/domain/entities/world_entity.dart';
 
 class ContentPackageDetailScreen extends StatefulWidget {
@@ -187,7 +188,11 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                                   color: AppColors.secondaryContainer,
                                   borderRadius: BorderRadius.circular(AppColors.border_radius),
                                 ),
-                                child: const Icon(Icons.public, color: AppColors.secondary),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${w['title'] ?? ''}'.characters.take(1).toString(),
+                                  style: const TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold),
+                                ),
                               ),
                         title: Text(
                           w['title'] ?? 'عالم',
@@ -246,7 +251,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
+              FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
@@ -259,11 +264,10 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                   Navigator.of(sheetContext).pop();
                   _addNewWorld(package);
                 },
-                icon: const Icon(Icons.add),
-                label: const Text('إنشاء عالم جديد', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('إنشاء عالم جديد', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 10),
-              FilledButton.tonalIcon(
+              FilledButton.tonal(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.secondaryContainer,
                   foregroundColor: AppColors.onSecondaryContainer,
@@ -276,8 +280,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                   Navigator.of(sheetContext).pop();
                   _chooseExistingWorld(package);
                 },
-                icon: const Icon(Icons.folder_open_outlined),
-                label: const Text('اختيار من العوالم السابقة', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('اختيار من العوالم السابقة', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -407,9 +410,10 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
       future: _package,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(child: CircularProgressIndicator()),
+            appBar: AppBar(title: const Text('تفاصيل البكج')),
+            body: const ShimmerLoading(itemCount: 3),
           );
         }
         if (snapshot.hasError || snapshot.data == null) {
@@ -454,21 +458,25 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                 ),
               ),
               const SizedBox(width: 4),
-              IconButton(
-                tooltip: 'تحديث',
-                icon: const Icon(Icons.refresh),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: _reload,
+                child: const Text('تحديث'),
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppColors.border_radius),
             ),
             onPressed: _busy ? null : () => _openAddWorldOptions(package),
-            child: const Icon(Icons.add),
+            label: const Text('إضافة'),
           ),
           body: worlds.isEmpty
               ? _buildEmptyState(package)
@@ -495,20 +503,6 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(AppColors.border_radius),
-              ),
-              child: const Icon(
-                Icons.public,
-                size: 40,
-                color: AppColors.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(height: 20),
             const Text(
               'لا توجد عوالم في هذا البكج حتى الآن',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -520,10 +514,8 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
               style: TextStyle(color: Colors.black54),
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
+            FilledButton(
               onPressed: _busy ? null : () => _openAddWorldOptions(package),
-              icon: const Icon(Icons.add),
-              label: const Text('أضف عالمك الأول'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,
@@ -532,6 +524,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                   borderRadius: BorderRadius.circular(AppColors.border_radius),
                 ),
               ),
+              child: const Text('أضف عالمك الأول'),
             ),
           ],
         ),
@@ -567,7 +560,6 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                 height: 180,
                 width: double.infinity,
                 color: Theme.of(context).colorScheme.primaryContainer,
-                child: const Icon(Icons.broken_image, size: 64, color: Colors.white54),
               ),
             )
           else
@@ -575,7 +567,6 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
               height: 180,
               width: double.infinity,
               color: Theme.of(context).colorScheme.primaryContainer,
-              child: const Icon(Icons.public, size: 64, color: Colors.white54),
             ),
           // Gradient Overlay
           Positioned.fill(
@@ -632,15 +623,9 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(AppColors.border_radius),
                             ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.explore, color: Colors.white, size: 14),
-                                SizedBox(width: 4),
-                                Text(
-                                  'عالم استكشافي',
-                                  style: TextStyle(color: Colors.white, fontSize: 10),
-                                ),
-                              ],
+                            child: const Text(
+                              'عالم استكشافي',
+                              style: TextStyle(color: Colors.white, fontSize: 10),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -650,15 +635,9 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(AppColors.border_radius),
                             ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.star, color: Colors.amber, size: 14),
-                                SizedBox(width: 4),
-                                Text(
-                                  'مغامرة ممتعة',
-                                  style: TextStyle(color: Colors.white, fontSize: 10),
-                                ),
-                              ],
+                            child: const Text(
+                              'مغامرة ممتعة',
+                              style: TextStyle(color: Colors.white, fontSize: 10),
                             ),
                           ),
                         ],
@@ -685,8 +664,12 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
           Positioned(
             top: 8,
             left: 8,
-            child: IconButton(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
+            child: TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: () {
                 showAdminActionsBottomSheet(
                   context: context,
@@ -699,6 +682,7 @@ class _ContentPackageDetailScreenState extends State<ContentPackageDetailScreen>
                   onDelete: () => _removeWorldFromPackage(package, world),
                 );
               },
+              child: const Text('خيارات', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
         ],

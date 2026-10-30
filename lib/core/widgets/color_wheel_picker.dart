@@ -250,15 +250,6 @@ class _ColorWheelPickerState extends State<ColorWheelPicker> {
                               width: isSelected ? 2.2 : 1,
                             ),
                           ),
-                          child: isSelected
-                              ? Icon(
-                                  Icons.check,
-                                  size: 16,
-                                  color: preset.computeLuminance() > 0.55
-                                      ? AppColors.secondary
-                                      : AppColors.onSecondary,
-                                )
-                              : null,
                         ),
                       );
                     }).toList(),
@@ -280,12 +271,6 @@ class _ColorWheelPickerState extends State<ColorWheelPicker> {
           ),
           child: Row(
             children: [
-              const Icon(
-                Icons.brightness_low_rounded,
-                size: 18,
-                color: AppColors.secondary,
-              ),
-              const SizedBox(width: 6),
               const Text(
                 'الإضاءة',
                 style: TextStyle(

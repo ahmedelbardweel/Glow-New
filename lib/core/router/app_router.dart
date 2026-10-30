@@ -44,6 +44,9 @@ import '../../features/content/presentation/screens/custom_character_creator_scr
 import '../widgets/character_studio_screen.dart';
 
 class AppRouter {
+  static Widget _kid(Widget screen) =>
+      ActionIconTheme(data: const ActionIconThemeData(), child: screen);
+
   static final router = GoRouter(
     initialLocation: '/',
     routes: [
@@ -61,7 +64,7 @@ class AppRouter {
           final nextRoute = state.extra is String
               ? state.extra as String
               : '/role-selection';
-          return CharactersIntroScreen(nextRoute: nextRoute);
+          return _kid(CharactersIntroScreen(nextRoute: nextRoute));
         },
       ),
       GoRoute(
@@ -70,12 +73,12 @@ class AppRouter {
       ),
       GoRoute(
         path: '/child-onboarding',
-        builder: (context, state) => const ChildOnboardingScreen(),
+        builder: (context, state) => _kid(const ChildOnboardingScreen()),
       ),
       GoRoute(
         path: '/child-dashboard',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const ChildDashboardScreen(),
+          child: _kid(const ChildDashboardScreen()),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
@@ -87,7 +90,7 @@ class AppRouter {
         pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
           return CustomTransitionPage(
-            child: ChildStoryViewerScreen(mission: mission),
+            child: _kid(ChildStoryViewerScreen(mission: mission)),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
@@ -101,7 +104,7 @@ class AppRouter {
         pageBuilder: (context, state) {
           final world = state.extra as WorldEntity;
           return CustomTransitionPage(
-            child: ChildWorldMissionsScreen(world: world),
+            child: _kid(ChildWorldMissionsScreen(world: world)),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(
                 opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
@@ -118,7 +121,7 @@ class AppRouter {
         pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
           return CustomTransitionPage(
-            child: ChildQuizScreen(mission: mission),
+            child: _kid(ChildQuizScreen(mission: mission)),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
@@ -131,7 +134,7 @@ class AppRouter {
         pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
           return CustomTransitionPage(
-            child: ChildQuizIntroScreen(mission: mission),
+            child: _kid(ChildQuizIntroScreen(mission: mission)),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
@@ -144,7 +147,7 @@ class AppRouter {
         pageBuilder: (context, state) {
           final mission = state.extra as MissionEntity;
           return CustomTransitionPage(
-            child: ChildMissionCompleteScreen(mission: mission),
+            child: _kid(ChildMissionCompleteScreen(mission: mission)),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
@@ -155,7 +158,7 @@ class AppRouter {
       GoRoute(
         path: '/child/badges',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const ChildBadgesScreen(),
+          child: _kid(const ChildBadgesScreen()),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },

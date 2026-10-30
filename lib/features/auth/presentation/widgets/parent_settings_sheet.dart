@@ -287,11 +287,6 @@ class _ParentTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: AppColors.secondary,
-                size: 16,
-              ),
             ],
           ),
         ),
@@ -432,7 +427,13 @@ class _ChildChoice extends StatelessWidget {
                 ),
               ),
               if (selected)
-                const Icon(Icons.check_circle, color: AppColors.secondary),
+                const Text(
+                  'محدد',
+                  style: TextStyle(
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
             ],
           ),
         ),

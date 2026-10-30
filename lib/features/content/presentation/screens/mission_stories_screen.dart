@@ -45,13 +45,17 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
           title: Text('قصص المهمة: ${widget.mission.title}'),
           centerTitle: true,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.quiz),
-              tooltip: 'الأسئلة والاختبارات',
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: () {
                 HapticFeedback.lightImpact();
                 context.push('/admin/mission-questions', extra: widget.mission);
               },
+              child: const Text('الأسئلة'),
             ),
           ],
         ),
@@ -83,8 +87,12 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
                           leading: CircleAvatar(child: Text('${index + 1}')),
                           title: Text(story.title, style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text('الشخصية الراوية: ${story.characterName}', maxLines: 1),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.more_vert),
+                          trailing: TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             onPressed: () {
                               showAdminActionsBottomSheet(
                                 context: context,
@@ -115,6 +123,7 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
                                 },
                               );
                             },
+                            child: const Text('خيارات', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                           onTap: () {
                             HapticFeedback.lightImpact();
@@ -130,7 +139,7 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
             );
           },
         ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-story', extra: widget.mission);
@@ -138,7 +147,7 @@ class _MissionStoriesScreenState extends State<MissionStoriesScreen> {
               _contentBloc.add(ContentEvent.getStories(widget.mission.id));
             }
           },
-          child: const Icon(Icons.add),
+          label: const Text('إضافة'),
         ),
       ),
     );

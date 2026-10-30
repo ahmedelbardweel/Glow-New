@@ -73,8 +73,12 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
                           leading: CircleAvatar(child: Text('${index + 1}')),
                           title: Text(mission.title, style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text('الوسم: ${mission.badgeName} | النجوم: ${mission.starsReward}'),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.more_vert),
+                          trailing: TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             onPressed: () {
                               showAdminActionsBottomSheet(
                                 context: context,
@@ -105,6 +109,7 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
                                 },
                               );
                             },
+                            child: const Text('خيارات', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                           onTap: () {
                             HapticFeedback.lightImpact();
@@ -120,7 +125,7 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
             );
           },
         ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-mission', extra: widget.world);
@@ -128,7 +133,7 @@ class _WorldMissionsScreenState extends State<WorldMissionsScreen> {
               _contentBloc.add(ContentEvent.getMissions(widget.world.id));
             }
           },
-          child: const Icon(Icons.add),
+          label: const Text('إضافة'),
         ),
       ),
     );

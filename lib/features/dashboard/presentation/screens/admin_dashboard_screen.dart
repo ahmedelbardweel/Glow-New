@@ -69,15 +69,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           actions: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: FilledButton.tonalIcon(
+              child: FilledButton.tonal(
                 onPressed: () {
                   context.push('/admin/packages');
                 },
-                icon: const Icon(Icons.inventory_2_outlined, size: 18),
-                label: const Text(
-                  'البكجات',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.secondaryContainer,
                   foregroundColor: AppColors.onSecondaryContainer,
@@ -86,19 +81,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     borderRadius: BorderRadius.circular(AppColors.border_radius),
                   ),
                 ),
+                child: const Text(
+                  'البكجات',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(width: 4),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: FilledButton.tonalIcon(
+              child: FilledButton.tonal(
                 onPressed: () {
                   context.push('/custom-character-creator');
                 },
-                label: const Text(
-                  'اصنع شخصيتك',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primaryContainer,
                   foregroundColor: AppColors.onPrimaryContainer,
@@ -107,12 +102,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     borderRadius: BorderRadius.circular(AppColors.border_radius),
                   ),
                 ),
+                child: const Text(
+                  'اصنع شخصيتك',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(width: 4),
-            IconButton(
-              tooltip: 'الإعدادات',
-              icon: const Icon(Icons.more_vert),
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: () async {
                 await AdminApiKeys.sync();
                 if (!context.mounted) return;
@@ -154,6 +156,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   },
                 );
               },
+              child: const Text('الإعدادات'),
             ),
           ],
         ),
@@ -204,7 +207,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   height: 180,
                                   width: double.infinity,
                                   color: Theme.of(context).colorScheme.primaryContainer,
-                                  child: const Icon(Icons.broken_image, size: 64, color: Colors.white54),
                                 ),
                               )
                             else
@@ -212,7 +214,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 height: 180,
                                 width: double.infinity,
                                 color: Theme.of(context).colorScheme.primaryContainer,
-                                child: const Icon(Icons.public, size: 64, color: Colors.white54),
                               ),
                           // Gradient Overlay
                           Positioned.fill(
@@ -269,13 +270,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               color: Colors.white.withOpacity(0.2),
                                               borderRadius: BorderRadius.circular(AppColors.border_radius),
                                             ),
-                                            child: const Row(
-                                              children: [
-                                                Icon(Icons.explore, color: Colors.white, size: 14),
-                                                SizedBox(width: 4),
-                                                Text('عالم استكشافي', style: TextStyle(color: Colors.white, fontSize: 10)),
-                                              ],
-                                            ),
+                                            child: const Text('عالم استكشافي', style: TextStyle(color: Colors.white, fontSize: 10)),
                                           ),
                                           const SizedBox(width: 8),
                                           Container(
@@ -284,13 +279,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               color: Colors.white.withOpacity(0.2),
                                               borderRadius: BorderRadius.circular(AppColors.border_radius),
                                             ),
-                                            child: const Row(
-                                              children: [
-                                                Icon(Icons.star, color: Colors.amber, size: 14),
-                                                SizedBox(width: 4),
-                                                Text('مغامرة ممتعة', style: TextStyle(color: Colors.white, fontSize: 10)),
-                                              ],
-                                            ),
+                                            child: const Text('مغامرة ممتعة', style: TextStyle(color: Colors.white, fontSize: 10)),
                                           ),
                                         ],
                                       ),
@@ -316,8 +305,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           Positioned(
                             top: 8,
                             left: 8,
-                            child: IconButton(
-                              icon: const Icon(Icons.more_vert, color: Colors.white),
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: const Size(0, 36),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
                               onPressed: () {
                                 showAdminActionsBottomSheet(
                                   context: context,
@@ -345,6 +338,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   },
                                 );
                               },
+                              child: const Text('خيارات', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
@@ -358,7 +352,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             );
           },
         ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-world');
@@ -366,7 +360,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               _contentBloc.add(const ContentEvent.getWorlds());
             }
           },
-          child: const Icon(Icons.add),
+          label: const Text('إضافة'),
         ),
       ),
     );

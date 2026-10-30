@@ -55,6 +55,17 @@ class AppTheme {
         scrolledUnderElevation: 0,
         systemOverlayStyle: overlayStyle,
       ),
+      // Adult screens read text instead of icons; child routes restore the arrow (see AppRouter._kid).
+      actionIconTheme: ActionIconThemeData(
+        backButtonIconBuilder: (_) => const Text(
+          'رجوع',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+        closeButtonIconBuilder: (_) => const Text(
+          'إغلاق',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+      ),
       textTheme: GoogleFonts.cairoTextTheme().apply(
         bodyColor: AppColors.onBackground,
         displayColor: AppColors.onBackground,

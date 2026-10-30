@@ -203,8 +203,13 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'الإعدادات',
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.secondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             onPressed: () {
               showParentSettingsSheet(
                 context,
@@ -233,7 +238,10 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                 },
               );
             },
-            icon: const Icon(Icons.more_vert, color: AppColors.secondary),
+            child: const Text(
+              'الإعدادات',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -311,12 +319,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.qr_code_scanner,
-            size: 64,
-            color: AppColors.secondary,
-          ),
-          const SizedBox(height: 16),
           Text(
             'لم تربط حساب ابنك بعد',
             style: textTheme.titleMedium?.copyWith(
@@ -360,16 +362,13 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   Widget _buildInsightsBanner() {
     // Dynamic insight message based on engagement
     String message = 'لم يبدأ البطل أي مهمات بعد. شجعه على الانطلاق!';
-    IconData icon = Icons.wb_incandescent_rounded;
     Color color = AppColors.primary;
 
     if (_totalMissions > 10) {
       message = 'رائع جداً! بطلنا يتقدم بشكل ممتاز ومنتظم في إنجاز التحديات.';
-      icon = Icons.emoji_events_rounded;
       color = AppColors.tertiary;
     } else if (_totalMissions > 0) {
       message = 'بداية موفقة! بطلنا يكتسب مهارات جديدة مع كل مهمة.';
-      icon = Icons.star_rounded;
       color = AppColors.secondary;
     }
 
@@ -383,15 +382,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 32),
-          ),
-          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,7 +419,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           child: _buildMetricCard(
             title: 'المهمات',
             value: _totalMissions.toString(),
-            icon: Icons.task_alt_rounded,
             color: AppColors.secondary,
           ),
         ),
@@ -438,7 +427,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           child: _buildMetricCard(
             title: 'النقاط',
             value: _totalStars.toString(),
-            icon: Icons.star_rounded,
             color: AppColors.primary,
           ),
         ),
@@ -447,7 +435,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           child: _buildMetricCard(
             title: 'الأوسمة',
             value: _totalBadges.toString(),
-            icon: Icons.workspace_premium_rounded,
             color: AppColors.tertiary,
           ),
         ),
@@ -458,7 +445,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   Widget _buildMetricCard({
     required String title,
     required String value,
-    required IconData icon,
     required Color color,
   }) {
     return Container(
@@ -470,15 +456,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
       ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
@@ -508,8 +485,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           padding: const EdgeInsets.symmetric(vertical: 40),
           child: Column(
             children: [
-              const Icon(Icons.history_rounded, size: 60, color: AppColors.inputBorder),
-              const SizedBox(height: 16),
               Text(
                 'لا توجد إنجازات بعد',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -548,24 +523,6 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: hasBadge
-                      ? AppColors.tertiary.withValues(alpha: 0.12)
-                      : AppColors.secondary.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  hasBadge
-                      ? Icons.workspace_premium_rounded
-                      : Icons.task_alt_rounded,
-                  color: hasBadge ? AppColors.tertiary : AppColors.secondary,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,23 +554,13 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        '+${progress.starsReward ?? 0}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.star_rounded,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                    ],
+                  Text(
+                    '+${progress.starsReward ?? 0} نقطة',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(

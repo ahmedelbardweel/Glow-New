@@ -84,10 +84,12 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.more_vert),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      minimumSize: const Size(0, 36),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
                                     onPressed: () {
                                       showAdminActionsBottomSheet(
                                         context: context,
@@ -118,6 +120,7 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
                                         },
                                       );
                                     },
+                                    child: const Text('خيارات', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
@@ -134,12 +137,6 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(
-                                        isCorrect ? Icons.check_circle : Icons.circle_outlined,
-                                        color: isCorrect ? Colors.green : Colors.grey,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
                                       Expanded(child: Text(question.options[optIndex])),
                                     ],
                                   ),
@@ -157,7 +154,7 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
             );
           },
         ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
             HapticFeedback.lightImpact();
             final result = await context.push('/admin/add-question', extra: widget.mission);
@@ -165,7 +162,7 @@ class _MissionQuestionsScreenState extends State<MissionQuestionsScreen> {
               _contentBloc.add(ContentEvent.getQuestions(widget.mission.id));
             }
           },
-          child: const Icon(Icons.add),
+          label: const Text('إضافة'),
         ),
       ),
     );

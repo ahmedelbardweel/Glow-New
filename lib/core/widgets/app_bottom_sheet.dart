@@ -104,10 +104,16 @@ class SheetCloseButton extends StatelessWidget {
           onPressed();
         },
         borderRadius: radius,
-        child: const SizedBox(
-          width: 32,
-          height: 32,
-          child: Icon(Icons.close, size: 18, color: AppColors.secondary),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Text(
+            'إغلاق',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppColors.secondary,
+            ),
+          ),
         ),
       ),
     );

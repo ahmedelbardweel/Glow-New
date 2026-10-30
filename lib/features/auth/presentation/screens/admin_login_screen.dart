@@ -34,9 +34,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       },
       child: Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'رجوع',
-          icon: const BackButtonIcon(),
+        leadingWidth: 72,
+        leading: TextButton(
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: const Size(0, 36),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -44,6 +48,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               context.go('/role-selection');
             }
           },
+          child: const Text('رجوع', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         title: const Text('دخول الإدارة'),
         centerTitle: true,
@@ -81,7 +86,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   controller: _emailController,
                   decoration: const InputDecoration(
                     hintText: 'البريد الإلكتروني للإدارة',
-                    prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
                 ),
@@ -90,7 +94,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   controller: _passwordController,
                   decoration: const InputDecoration(
                     hintText: 'كلمة المرور',
-                    prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
                 ),

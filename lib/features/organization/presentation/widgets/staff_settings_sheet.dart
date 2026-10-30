@@ -146,7 +146,6 @@ class _SettingTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, color: AppColors.secondary, size: 16),
             ],
           ),
         ),

@@ -118,10 +118,18 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            tooltip: 'الإعدادات',
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.secondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             onPressed: _openSettings,
-            icon: const Icon(Icons.more_vert, color: AppColors.secondary),
+            child: const Text(
+              'الإعدادات',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -460,7 +468,6 @@ class _StudentCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.secondary),
             ],
           ),
         ),

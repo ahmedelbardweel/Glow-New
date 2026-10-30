@@ -64,9 +64,14 @@ class _OrganizationAuthScreenState extends State<OrganizationAuthScreen> {
       child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'رجوع',
-          icon: const BackButtonIcon(),
+        leadingWidth: 72,
+        leading: TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.secondary,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: const Size(0, 36),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -74,6 +79,7 @@ class _OrganizationAuthScreenState extends State<OrganizationAuthScreen> {
               context.go('/role-selection');
             }
           },
+          child: const Text('رجوع', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         title: Text(
           'دخول المنظمة',
@@ -87,8 +93,6 @@ class _OrganizationAuthScreenState extends State<OrganizationAuthScreen> {
         padding: const EdgeInsets.all(10),
         children: [
           const SizedBox(height: 12),
-          const Icon(Icons.apartment_rounded, size: 64, color: AppColors.secondary),
-          const SizedBox(height: 16),
           Text(
             'الحساب ينشئه مدير النظام. أدخل البريد وكلمة المرور. المعلم يدخل من هنا أيضاً.',
             textAlign: TextAlign.center,

@@ -19,15 +19,23 @@ class RoleSelectionScreen extends StatelessWidget {
         ),
         elevation: 0,
         actions: [
-          IconButton(
-            tooltip: 'مسح نقل الحساب',
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.secondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             onPressed: () async {
               HapticFeedback.lightImpact();
               final code = await showAccountScanner(context);
               if (code == null || !context.mounted) return;
               await claimScannedCode(context, code);
             },
-            icon: const Icon(Icons.qr_code_scanner, color: AppColors.secondary),
+            child: const Text(
+              'مسح QR',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -39,7 +47,6 @@ class RoleSelectionScreen extends StatelessWidget {
             _buildRoleCard(
               context,
               title: 'طفل (مغامر صغير)',
-              icon: Icons.face_retouching_natural,
               color: Theme.of(context).colorScheme.tertiary,
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -50,7 +57,6 @@ class RoleSelectionScreen extends StatelessWidget {
             _buildRoleCard(
               context,
               title: 'ولي أمر (متابع الأبطال)',
-              icon: Icons.family_restroom,
               color: Theme.of(context).colorScheme.secondary,
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -61,7 +67,6 @@ class RoleSelectionScreen extends StatelessWidget {
             _buildRoleCard(
               context,
               title: 'منظمة',
-              icon: Icons.apartment_rounded,
               color: Theme.of(context).colorScheme.secondary,
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -72,7 +77,6 @@ class RoleSelectionScreen extends StatelessWidget {
             _buildRoleCard(
               context,
               title: 'طالب',
-              icon: Icons.school_rounded,
               color: Theme.of(context).colorScheme.tertiary,
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -83,7 +87,6 @@ class RoleSelectionScreen extends StatelessWidget {
             _buildRoleCard(
               context,
               title: 'إدارة النظام (مشرف)',
-              icon: Icons.admin_panel_settings,
               color: Theme.of(context).colorScheme.primary,
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -99,7 +102,6 @@ class RoleSelectionScreen extends StatelessWidget {
   Widget _buildRoleCard(
     BuildContext context, {
     required String title,
-    required IconData icon,
     required Color color,
     required VoidCallback onTap,
   }) {
@@ -108,18 +110,9 @@ class RoleSelectionScreen extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 10.0),
+          padding: const EdgeInsets.symmetric(vertical: 22.0, horizontal: 16.0),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 32, color: color),
-              ),
-              const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   title,
@@ -129,7 +122,10 @@ class RoleSelectionScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, color: color),
+              Text(
+                'دخول',
+                style: TextStyle(color: color, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
         ),

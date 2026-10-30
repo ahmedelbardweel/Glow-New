@@ -420,13 +420,8 @@ class _CustomCharacterCreatorScreenState
           // Randomize button
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: OutlinedButton.icon(
+            child: OutlinedButton(
               onPressed: _randomizeCharacter,
-              icon: const Icon(Icons.auto_awesome_outlined, size: 16),
-              label: const Text(
-                'عشوائي',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.secondary,
                 backgroundColor: AppColors.surface,
@@ -434,14 +429,27 @@ class _CustomCharacterCreatorScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 shape: RoundedRectangleBorder(borderRadius: radius),
               ),
+              child: const Text(
+                'عشوائي',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
           const SizedBox(width: 6),
           // Reset button
-          IconButton(
-            tooltip: 'إعادة ضبط الشخصية',
-            icon: const Icon(Icons.refresh_rounded, color: AppColors.secondary),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.secondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 34),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
             onPressed: () => _resetToRaw(clearEditing: false),
+            child: const Text(
+              'إعادة ضبط',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
           ),
           const SizedBox(width: 4),
         ],
@@ -533,12 +541,6 @@ class _CustomCharacterCreatorScreenState
                                       child: const Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
-                                            Icons.threesixty_rounded,
-                                            size: 14,
-                                            color: AppColors.secondary,
-                                          ),
-                                          SizedBox(width: 4),
                                           Text(
                                             'اسحب للتدوير',
                                             style: TextStyle(
@@ -554,7 +556,6 @@ class _CustomCharacterCreatorScreenState
                                       const SizedBox(width: 4),
                                       _buildStageQuickBadge(
                                         label: 'طاقية',
-                                        icon: Icons.face_retouching_natural,
                                         onRemove: () {
                                           _draft.value =
                                               draft.copyWith(hasHat: false);
@@ -572,7 +573,6 @@ class _CustomCharacterCreatorScreenState
                                       const SizedBox(width: 4),
                                       _buildStageQuickBadge(
                                         label: 'نظارة',
-                                        icon: Icons.visibility_outlined,
                                         onRemove: () {
                                           _draft.value =
                                               draft.copyWith(hasGlasses: false);
@@ -591,9 +591,6 @@ class _CustomCharacterCreatorScreenState
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     _buildStageActionBtn(
-                                      icon: draft.framing == 'face'
-                                          ? Icons.face_retouching_natural
-                                          : Icons.accessibility_new_rounded,
                                       label: draft.framing == 'face'
                                           ? 'الوجه'
                                           : 'الجسم',
@@ -608,7 +605,6 @@ class _CustomCharacterCreatorScreenState
                                     ),
                                     const SizedBox(width: 4),
                                     _buildStageActionBtn(
-                                      icon: Icons.cameraswitch_outlined,
                                       label: draft.cameraAngle == 0
                                           ? 'أمامي'
                                           : draft.cameraAngle == -45
@@ -716,12 +712,6 @@ class _CustomCharacterCreatorScreenState
                                         child: const Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(
-                                              Icons.add_circle_outline,
-                                              color: AppColors.onPrimary,
-                                              size: 18,
-                                            ),
-                                            SizedBox(width: 8),
                                             Text(
                                               'أفلت الإكسسوار هنا لتطبيقه على الشخصية',
                                               style: TextStyle(
@@ -769,11 +759,6 @@ class _CustomCharacterCreatorScreenState
                                   color: AppColors.onSurface,
                                 ),
                                 decoration: InputDecoration(
-                                  prefixIcon: const Icon(
-                                    Icons.badge_outlined,
-                                    color: AppColors.secondary,
-                                    size: 18,
-                                  ),
                                   hintText: 'اسم الشخصية (مثال: بطل العلوم)...',
                                   hintStyle: const TextStyle(fontSize: 12),
                                   contentPadding: const EdgeInsets.symmetric(
@@ -809,17 +794,9 @@ class _CustomCharacterCreatorScreenState
                             const SizedBox(width: 6),
                             SizedBox(
                               height: 42,
-                              child: OutlinedButton.icon(
+                              child: OutlinedButton(
                                 onPressed: () =>
                                     _resetToRaw(clearEditing: true),
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text(
-                                  'جديدة',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.secondary,
                                   backgroundColor: AppColors.surface,
@@ -831,6 +808,13 @@ class _CustomCharacterCreatorScreenState
                                   ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: radius,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'جديدة',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
@@ -845,19 +829,16 @@ class _CustomCharacterCreatorScreenState
                         children: [
                           _buildSectionTab(
                             section: _CreatorSection.colors,
-                            icon: Icons.palette_outlined,
                             label: 'الألوان',
                           ),
                           const SizedBox(width: 6),
                           _buildSectionTab(
                             section: _CreatorSection.accessories,
-                            icon: Icons.checkroom_outlined,
                             label: 'الإكسسوارات',
                           ),
                           const SizedBox(width: 6),
                           _buildSectionTab(
                             section: _CreatorSection.saved,
-                            icon: Icons.bookmarks_outlined,
                             label: 'شخصياتي (${_savedCharacters.length})',
                           ),
                         ],
@@ -916,11 +897,6 @@ class _CustomCharacterCreatorScreenState
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           children: [
-                                            const Icon(
-                                              Icons.check_circle_rounded,
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 8),
                                             Text(
                                               _editingId != null
                                                   ? 'حفظ تعديلات الشخصية'
@@ -939,21 +915,10 @@ class _CustomCharacterCreatorScreenState
                               const SizedBox(width: 8),
                               SizedBox(
                                 height: 46,
-                                child: OutlinedButton.icon(
+                                child: OutlinedButton(
                                   onPressed: _isSaving
                                       ? null
                                       : () => _saveAndApply(saveAsNew: true),
-                                  icon: const Icon(
-                                    Icons.copy_outlined,
-                                    size: 16,
-                                  ),
-                                  label: const Text(
-                                    'حفظ كجديدة',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppColors.secondary,
                                     backgroundColor: AppColors.surface,
@@ -965,6 +930,13 @@ class _CustomCharacterCreatorScreenState
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: radius,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'حفظ كجديدة',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
@@ -986,7 +958,6 @@ class _CustomCharacterCreatorScreenState
 
   Widget _buildSectionTab({
     required _CreatorSection section,
-    required IconData icon,
     required String label,
   }) {
     final isSelected = _activeSection == section;
@@ -1007,12 +978,6 @@ class _CustomCharacterCreatorScreenState
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 15,
-                color: isSelected ? AppColors.onSecondary : AppColors.secondary,
-              ),
-              const SizedBox(width: 5),
               Flexible(
                 child: Text(
                   label,
@@ -1110,7 +1075,6 @@ class _CustomCharacterCreatorScreenState
                       type: 'glasses',
                       title: 'نظارة ذكية',
                       subtitle: draft.hasGlasses ? 'مُفعّلة' : 'اضغط أو اسحب',
-                      icon: Icons.visibility_outlined,
                       isActive: draft.hasGlasses,
                       onToggle: () {
                         _draft.value = draft.copyWith(
@@ -1125,7 +1089,6 @@ class _CustomCharacterCreatorScreenState
                       type: 'hat',
                       title: 'طاقية الرأس',
                       subtitle: draft.hasHat ? 'مُفعّلة' : 'اضغط أو اسحب',
-                      icon: Icons.face_retouching_natural,
                       isActive: draft.hasHat,
                       onToggle: () {
                         final nextHat = !draft.hasHat;
@@ -1153,12 +1116,6 @@ class _CustomCharacterCreatorScreenState
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.color_lens_outlined,
-                          size: 16,
-                          color: AppColors.secondary,
-                        ),
-                        const SizedBox(width: 6),
                         const Text(
                           'ألوان الطاقية السريعة',
                           style: TextStyle(
@@ -1228,15 +1185,6 @@ class _CustomCharacterCreatorScreenState
                                 width: isSelected ? 2.2 : 1,
                               ),
                             ),
-                            child: isSelected
-                                ? Icon(
-                                    Icons.check,
-                                    size: 15,
-                                    color: color.computeLuminance() > 0.55
-                                        ? AppColors.secondary
-                                        : AppColors.onSecondary,
-                                  )
-                                : null,
                           ),
                         );
                       }).toList(),
@@ -1258,12 +1206,6 @@ class _CustomCharacterCreatorScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.person_add_alt_1_outlined,
-              size: 36,
-              color: AppColors.secondary,
-            ),
-            const SizedBox(height: 8),
             const Text(
               'لا توجد شخصيات محفوظة حتى الآن',
               style: TextStyle(
@@ -1279,16 +1221,15 @@ class _CustomCharacterCreatorScreenState
               style: TextStyle(fontSize: 11, color: AppColors.onSurface),
             ),
             const SizedBox(height: 10),
-            OutlinedButton.icon(
+            OutlinedButton(
               onPressed: () =>
                   setState(() => _activeSection = _CreatorSection.colors),
-              icon: const Icon(Icons.palette_outlined, size: 16),
-              label: const Text('ابدأ التصميم الآن'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.secondary,
                 side: const BorderSide(color: AppColors.secondary),
                 shape: RoundedRectangleBorder(borderRadius: radius),
               ),
+              child: const Text('ابدأ التصميم الآن'),
             ),
           ],
         ),
@@ -1367,12 +1308,6 @@ class _CustomCharacterCreatorScreenState
                         ),
                         if (c.hasHat) ...[
                           const SizedBox(width: 6),
-                          const Icon(
-                            Icons.face_retouching_natural,
-                            size: 13,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(width: 2),
                           const Text(
                             'طاقية',
                             style: TextStyle(
@@ -1383,12 +1318,6 @@ class _CustomCharacterCreatorScreenState
                         ],
                         if (c.hasGlasses) ...[
                           const SizedBox(width: 6),
-                          const Icon(
-                            Icons.visibility_outlined,
-                            size: 13,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(width: 2),
                           const Text(
                             'نظارة',
                             style: TextStyle(
@@ -1416,24 +1345,13 @@ class _CustomCharacterCreatorScreenState
                     borderRadius: radius,
                     border: Border.all(color: AppColors.primary),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.edit_outlined,
-                        size: 14,
-                        color: AppColors.onPrimaryContainer,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'تعديل',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
+                  child: const Text(
+                    'تعديل',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onPrimaryContainer,
+                    ),
                   ),
                 ),
               ),
@@ -1443,16 +1361,22 @@ class _CustomCharacterCreatorScreenState
                 onTap: () => _deleteSavedCharacter(c),
                 borderRadius: radius,
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: radius,
                     border: Border.all(color: AppColors.inputBorder),
                   ),
-                  child: const Icon(
-                    Icons.delete_outline,
-                    size: 16,
-                    color: AppColors.error,
+                  child: const Text(
+                    'حذف',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.error,
+                    ),
                   ),
                 ),
               ),
@@ -1525,7 +1449,6 @@ class _CustomCharacterCreatorScreenState
 
   Widget _buildStageQuickBadge({
     required String label,
-    required IconData icon,
     required VoidCallback onRemove,
   }) {
     final radius = BorderRadius.circular(AppColors.border_radius);
@@ -1542,8 +1465,6 @@ class _CustomCharacterCreatorScreenState
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 12, color: AppColors.onSecondaryContainer),
-            const SizedBox(width: 4),
             Text(
               label,
               style: const TextStyle(
@@ -1552,11 +1473,13 @@ class _CustomCharacterCreatorScreenState
                 color: AppColors.onSecondaryContainer,
               ),
             ),
-            const SizedBox(width: 3),
-            const Icon(
-              Icons.close,
-              size: 11,
-              color: AppColors.onSecondaryContainer,
+            const SizedBox(width: 4),
+            const Text(
+              'إزالة',
+              style: TextStyle(
+                fontSize: 9,
+                color: AppColors.onSecondaryContainer,
+              ),
             ),
           ],
         ),
@@ -1565,7 +1488,6 @@ class _CustomCharacterCreatorScreenState
   }
 
   Widget _buildStageActionBtn({
-    required IconData icon,
     required String label,
     required bool isActive,
     required VoidCallback onTap,
@@ -1583,24 +1505,13 @@ class _CustomCharacterCreatorScreenState
             color: isActive ? AppColors.secondary : AppColors.inputBorder,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 13,
-              color: isActive ? AppColors.onSecondary : AppColors.secondary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: isActive ? AppColors.onSecondary : AppColors.secondary,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: isActive ? AppColors.onSecondary : AppColors.secondary,
+          ),
         ),
       ),
     );
@@ -1610,7 +1521,6 @@ class _CustomCharacterCreatorScreenState
     required String type,
     required String title,
     required String subtitle,
-    required IconData icon,
     required bool isActive,
     required VoidCallback onToggle,
   }) {
@@ -1627,21 +1537,6 @@ class _CustomCharacterCreatorScreenState
       ),
       child: Row(
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: isActive ? AppColors.secondary : AppColors.surface,
-              borderRadius: radius,
-              border: Border.all(color: AppColors.inputBorder),
-            ),
-            child: Icon(
-              icon,
-              color: isActive ? AppColors.onSecondary : AppColors.secondary,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1668,11 +1563,6 @@ class _CustomCharacterCreatorScreenState
                 ),
               ],
             ),
-          ),
-          Icon(
-            isActive ? Icons.check_circle : Icons.drag_indicator,
-            size: 18,
-            color: AppColors.secondary,
           ),
         ],
       ),

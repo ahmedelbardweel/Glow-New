@@ -170,20 +170,19 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
           actions: [
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 12),
-              child: TextButton.icon(
+              child: TextButton(
                 onPressed: () async {
                   await context.push('/custom-character-creator');
                   _loadCustomCharacters();
                 },
-                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-                label: const Text(
-                  'اصنع شخصية',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                ),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   shape: RoundedRectangleBorder(borderRadius: radius),
+                ),
+                child: const Text(
+                  'اصنع شخصية',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -288,7 +287,6 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 top: 16,
                 start: 16,
                 child: _badge(
-                  icon: Icons.view_in_ar_outlined,
                   label: switch (_mode) {
                     _StudioMode.poses =>
                       'الوضعيات · ${CharacterPoses.all.length} وضعية',
@@ -303,16 +301,10 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 top: 16,
                 end: 16,
                 child: _posesMode
-                    ? _badge(
-                        icon: Icons.accessibility_new_rounded,
-                        label: _pose.label,
-                      )
+                    ? _badge(label: _pose.label)
                     : ValueListenableBuilder<Duration>(
                         valueListenable: _position,
                         builder: (context, position, child) => _badge(
-                          icon: _playing
-                              ? Icons.play_arrow_rounded
-                              : Icons.pause,
                           label: _playing
                               ? (_selectedMotion ?? _plan.motionAt(position))
                                     .arabicLabel
@@ -329,9 +321,6 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   runSpacing: 6,
                   children: [
                     _stageButton(
-                      icon: _framing == 'face'
-                          ? Icons.face_retouching_natural_rounded
-                          : Icons.accessibility_new_rounded,
                       label: _framing == 'face' ? 'الوجه' : 'كامل الجسم',
                       active: _framing == 'face',
                       onTap: () => setState(
@@ -339,9 +328,6 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                       ),
                     ),
                     _stageButton(
-                      icon: _isSpeaking
-                          ? Icons.record_voice_over_rounded
-                          : Icons.voice_over_off_rounded,
                       label: _isSpeaking ? 'يتحدث' : 'تحدث',
                       active: _isSpeaking,
                       onTap: () => setState(() => _isSpeaking = !_isSpeaking),
@@ -407,17 +393,14 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
       segments: const [
         ButtonSegment(
           value: _StudioMode.rigged,
-          icon: Icon(Icons.auto_awesome_rounded, size: 18),
           label: Text('الجديدة'),
         ),
         ButtonSegment(
           value: _StudioMode.poses,
-          icon: Icon(Icons.accessibility_new_rounded, size: 18),
           label: Text('الوضعيات'),
         ),
         ButtonSegment(
           value: _StudioMode.legacy,
-          icon: Icon(Icons.animation_rounded, size: 18),
           label: Text('القديمة'),
         ),
       ],
@@ -497,23 +480,33 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                       shape: RoundedRectangleBorder(borderRadius: radius),
                     ),
                     onPressed: _togglePlayback,
-                    child: Tooltip(
-                      message: _playing ? 'إيقاف مؤقت' : 'تشغيل',
-                      child: Icon(
-                        _playing
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
+                    child: Text(
+                      _playing ? 'إيقاف' : 'تشغيل',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'إعادة المشهد',
+                  const SizedBox(width: 4),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: _ink,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 34),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: () => _seek(Duration.zero),
-                    icon: const Icon(Icons.replay_rounded, color: _ink),
+                    child: const Text(
+                      'إعادة',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.repeat_rounded, size: 16, color: _muted),
-                  const SizedBox(width: 8),
                   Text(
                     '${_time(position)} / ${_time(_playbackDuration)}',
                     textDirection: TextDirection.ltr,
@@ -591,7 +584,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
             children: [
               _modeSwitch(),
               const SizedBox(height: 22),
-              _sectionTitle('الشخصية ولونها', Icons.palette_outlined),
+              _sectionTitle('الشخصية ولونها'),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -649,7 +642,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                 ],
               ),
               const SizedBox(height: 22),
-              _sectionTitle('زاوية الكاميرا والعرض', Icons.camera_alt_outlined),
+              _sectionTitle('زاوية الكاميرا والعرض'),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -657,15 +650,10 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   segments: const [
                     ButtonSegment(
                       value: 'body',
-                      icon: Icon(Icons.accessibility_new_rounded, size: 16),
                       label: Text('كامل الجسم'),
                     ),
                     ButtonSegment(
                       value: 'face',
-                      icon: Icon(
-                        Icons.face_retouching_natural_rounded,
-                        size: 16,
-                      ),
                       label: Text('تركيز على الوجه'),
                     ),
                   ],
@@ -696,31 +684,22 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
               ),
               if (_posesMode) ...[
                 const SizedBox(height: 22),
-                _sectionTitle('الوضعيات', Icons.accessibility_new_rounded),
+                _sectionTitle('الوضعيات'),
                 const SizedBox(height: 12),
                 _poseGrid(),
               ] else ...[
                 const SizedBox(height: 22),
                 _sectionTitle(
-                  'الحركة والتعبير (${CharacterMotion.values.length} حركة)',
-                  Icons.accessibility_new_rounded,
-                ),
+                  'الحركة والتعبير (${CharacterMotion.values.length} حركة)'),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
+                  child: OutlinedButton(
                     onPressed: () => setState(() {
                       _referenceSequence = false;
                       _selectedMotion = null;
                       _seek(Duration.zero);
                     }),
-                    icon: Icon(
-                      _selectedMotion == null
-                          ? Icons.check_circle_rounded
-                          : Icons.auto_stories_outlined,
-                      size: 18,
-                    ),
-                    label: const Text('تلقائي حسب القصة'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       backgroundColor: _selectedMotion == null
@@ -734,13 +713,14 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                       shape: RoundedRectangleBorder(borderRadius: radius),
                       padding: const EdgeInsets.all(13),
                     ),
+                    child: const Text('تلقائي حسب القصة'),
                   ),
                 ),
                 const SizedBox(height: 10),
                 LayoutBuilder(
                   builder: (context, constraints) => Column(
                     children: [
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: () => setState(() {
                           _referenceSequence = !_referenceSequence;
                           if (_referenceSequence) {
@@ -748,12 +728,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                             _seek(Duration.zero);
                           }
                         }),
-                        icon: Icon(
-                          _referenceSequence
-                              ? Icons.stop_circle_outlined
-                              : Icons.play_circle_outline,
-                        ),
-                        label: Text(
+                        child: Text(
                           _referenceSequence
                               ? 'إيقاف العرض المتتابع'
                               : 'تشغيل حركات الصورة بالتتابع',
@@ -784,25 +759,15 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                             }),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    _motionIcon(motion),
-                                    size: 21,
-                                    color: selected ? Colors.white : _muted,
-                                  ),
-                                  const SizedBox(height: 7),
-                                  Text(
-                                    motion.arabicLabel,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: selected ? Colors.white : _ink,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                motion.arabicLabel,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: selected ? Colors.white : _ink,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -831,7 +796,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _sectionTitle('العيون والجفون', Icons.remove_red_eye_outlined),
+                _sectionTitle('العيون والجفون'),
                 const SizedBox(height: 8),
                 SwitchListTile.adaptive(
                   value: _autoBlink,
@@ -862,7 +827,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                _sectionTitle('المظهر والمؤثرات', Icons.tune_rounded),
+                _sectionTitle('المظهر والمؤثرات'),
                 const SizedBox(height: 8),
                 SwitchListTile.adaptive(
                   value: _clay,
@@ -983,7 +948,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _sectionTitle('جرّب حكايتك', Icons.edit_note_rounded),
+                _sectionTitle('جرّب حكايتك'),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _storyController,
@@ -1020,15 +985,14 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                FilledButton.icon(
+                FilledButton(
                   onPressed: _applyStory,
-                  icon: const Icon(Icons.auto_stories_outlined, size: 18),
-                  label: const Text('تطبيق القصة'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: radius),
                   ),
+                  child: const Text('تطبيق القصة'),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -1056,42 +1020,29 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
     child: child,
   );
 
-  Widget _sectionTitle(String title, IconData icon) => Row(
-    children: [
-      Icon(icon, color: AppColors.primary, size: 20),
-      const SizedBox(width: 9),
-      Text(
-        title,
-        style: const TextStyle(
-          color: _ink,
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ],
+  Widget _sectionTitle(String title) => Text(
+    title,
+    style: const TextStyle(
+      color: _ink,
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+    ),
   );
 
-  Widget _badge({required IconData icon, required String label}) => Container(
+  Widget _badge({required String label}) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
       color: AppColors.surface.withValues(alpha: 0.94),
       borderRadius: BorderRadius.circular(AppColors.border_radius),
       border: Border.all(color: AppColors.inputBorder),
     ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: AppColors.primary),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            color: _ink,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: _ink,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
     ),
   );
 
@@ -1099,31 +1050,7 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
       '${time.inMinutes.toString().padLeft(2, '0')}:'
       '${(time.inSeconds % 60).toString().padLeft(2, '0')}';
 
-  IconData _motionIcon(CharacterMotion motion) => switch (motion) {
-    CharacterMotion.idle => Icons.self_improvement_rounded,
-    CharacterMotion.talk => Icons.chat_bubble_outline_rounded,
-    CharacterMotion.wave => Icons.waving_hand_outlined,
-    CharacterMotion.happy => Icons.sentiment_very_satisfied_rounded,
-    CharacterMotion.sad => Icons.sentiment_dissatisfied_rounded,
-    CharacterMotion.thinking => Icons.psychology_outlined,
-    CharacterMotion.victory => Icons.emoji_events_outlined,
-    CharacterMotion.walk => Icons.directions_walk_rounded,
-    CharacterMotion.smile => Icons.sentiment_satisfied_alt_rounded,
-    CharacterMotion.laugh => Icons.sentiment_very_satisfied_rounded,
-    CharacterMotion.powerPose => Icons.fitness_center_rounded,
-    CharacterMotion.neutral => Icons.accessibility_new_rounded,
-    CharacterMotion.excited => Icons.auto_awesome_rounded,
-    CharacterMotion.curious => Icons.psychology_alt_outlined,
-    CharacterMotion.encourage => Icons.thumb_up_alt_outlined,
-    CharacterMotion.winCelebration => Icons.star_rounded,
-    CharacterMotion.frustrated => Icons.sentiment_very_dissatisfied_rounded,
-    CharacterMotion.nervous => Icons.sentiment_dissatisfied_rounded,
-    CharacterMotion.confused => Icons.help_outline_rounded,
-    CharacterMotion.ultimateWin => Icons.emoji_events_rounded,
-  };
-
   Widget _stageButton({
-    required IconData icon,
     required String label,
     required bool active,
     required VoidCallback onTap,
@@ -1145,24 +1072,13 @@ class _CharacterStudioScreenState extends State<CharacterStudioScreen> {
               color: active ? AppColors.primary : AppColors.inputBorder,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: active ? Colors.white : AppColors.primary,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : _ink,
-                ),
-              ),
-            ],
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: active ? Colors.white : _ink,
+            ),
           ),
         ),
       ),

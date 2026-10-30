@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:Glow/core/theme/app_colors.dart';
+import 'package:Glow/core/widgets/shimmer_loading.dart';
 import 'package:flutter/material.dart';
 import '../animation/story_motion.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -1309,7 +1310,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ShimmerLoading(type: ShimmerType.timeline);
     }
 
     final totalSeconds = _totalDuration.inMilliseconds / 1000.0;
@@ -1511,8 +1512,6 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                       child: const Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.add_circle_outline, size: 16, color: AppColors.secondary),
-                                          SizedBox(width: 4),
                                           Text(
                                             'اصنع شخصية +',
                                             style: TextStyle(
@@ -1632,7 +1631,6 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                                         borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                         border: Border.all(color: Colors.black26),
                                       ),
-                                      child: const Icon(Icons.face_retouching_natural, color: Colors.white70, size: 22),
                                     ),
                                   ),
                                   childWhenDragging: Opacity(
@@ -1748,7 +1746,6 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                     children: [
                       if (widget.audioPlayer != null) ...[
                         _buildToolButton(
-                          Icons.replay,
                           'إعادة',
                           () {
                             widget.audioPlayer?.seek(Duration.zero);
@@ -1757,22 +1754,20 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                         ),
                         const SizedBox(width: 5),
                         _buildToolButton(
-                          widget.isPlaying ? Icons.pause : Icons.play_arrow,
                           widget.isPlaying ? 'إيقاف' : 'تشغيل',
                           widget.onTogglePlay,
                         ),
                         const SizedBox(width: 5),
                       ],
-                      _buildToolButton(Icons.call_split, 'تقسيم', _picked(_selectedBlockIndex, _blocks.length) ? _splitBlock : null),
+                      _buildToolButton('تقسيم', _picked(_selectedBlockIndex, _blocks.length) ? _splitBlock : null),
                       const SizedBox(width: 5),
-                      _buildToolButton(Icons.copy, 'تكرار', _canDuplicate ? _duplicateBlock : null),
+                      _buildToolButton('تكرار', _canDuplicate ? _duplicateBlock : null),
                       const SizedBox(width: 5),
-                      _buildToolButton(Icons.auto_awesome, 'نسخ الشكل', _canCopyLook ? _copyLook : null),
+                      _buildToolButton('نسخ الشكل', _canCopyLook ? _copyLook : null),
                       const SizedBox(width: 5),
-                      _buildToolButton(Icons.undo, 'تراجع', _history.isNotEmpty ? _undo : null),
+                      _buildToolButton('تراجع', _history.isNotEmpty ? _undo : null),
                       const SizedBox(width: 5),
                       _buildToolButton(
-                        Icons.delete_outline,
                         'حذف',
                         (_selectedBlockIndex != null ||
                                 _selectedMotionBlockIndex != null ||
@@ -1786,9 +1781,9 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                         isDestructive: true,
                       ),
                       const SizedBox(width: 5),
-                      _buildToolButton(Icons.zoom_out, 'تصغير', () => _zoom(0.8)),
+                      _buildToolButton('تصغير', () => _zoom(0.8)),
                       const SizedBox(width: 5),
-                      _buildToolButton(Icons.zoom_in, 'تكبير', () => _zoom(1.2)),
+                      _buildToolButton('تكبير', () => _zoom(1.2)),
                     ],
                   ),
                 ),
@@ -2306,17 +2301,6 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
     );
   }
 
-  IconData _transitionIcon(String type) {
-    switch (type) {
-      case StoryTransition.slide:
-        return Icons.swap_horiz;
-      case StoryTransition.pop:
-        return Icons.open_in_full;
-      default:
-        return Icons.blur_on;
-    }
-  }
-
   List<Widget> _seamSlots() {
     final seams = _characterSeams();
     return [
@@ -2375,10 +2359,14 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                   borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                   border: Border.all(color: Colors.white, width: selected ? 2 : 1),
                 ),
-                child: Icon(
-                  _transitionIcon(_transitions[transitionIndex].type),
-                  size: 16,
-                  color: Colors.white,
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      StoryTransition.label(_transitions[transitionIndex].type),
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
               ),
             );
@@ -2394,7 +2382,12 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                   width: hot ? 2 : 1,
                 ),
               ),
-              child: const Icon(Icons.add, size: 14, color: AppColors.secondary),
+              child: const Center(
+                child: Text(
+                  '+',
+                  style: TextStyle(color: AppColors.secondary, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
           );
         },
@@ -2453,11 +2446,11 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
           ),
           if (c.hasHat) ...[
             const SizedBox(width: 4),
-            Icon(Icons.face_retouching_natural, size: 14, color: fg),
+            Text('قبعة', style: TextStyle(color: fg, fontSize: 10)),
           ],
           if (c.hasGlasses) ...[
             const SizedBox(width: 4),
-            Icon(Icons.visibility, size: 14, color: fg),
+            Text('نظارة', style: TextStyle(color: fg, fontSize: 10)),
           ],
         ],
       ),
@@ -2476,15 +2469,23 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
           width: isSelected ? 2.5 : 1,
         ),
       ),
-      child: Icon(
-        Icons.face_retouching_natural,
-        color: color.computeLuminance() > 0.55 ? Colors.black54 : Colors.white70,
-        size: 22,
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'قبعة',
+            style: TextStyle(
+              color: color.computeLuminance() > 0.55 ? Colors.black54 : Colors.white70,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildToolButton(IconData icon, String label, VoidCallback? onPressed, {bool isDestructive = false}) {
+  Widget _buildToolButton(String label, VoidCallback? onPressed, {bool isDestructive = false}) {
     final color = onPressed == null 
         ? Colors.black
         : (isDestructive ? Colors.redAccent : Colors.black);
@@ -2500,13 +2501,7 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 4),
-              Text(label, style: TextStyle(color: color, fontSize: 11)),
-            ],
-          ),
+          child: Text(label, style: TextStyle(color: color, fontSize: 11)),
         ),
       ),
     );
@@ -2533,7 +2528,6 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
             borderRadius: BorderRadius.circular(AppColors.timeline_radius),
             border: Border.all(color: AppColors.inputBorder),
           ),
-          child: const Icon(Icons.drag_indicator, size: 12, color: Colors.black),
         ),
       ),
     );
@@ -2729,8 +2723,6 @@ class _StoryTimelineEditorState extends State<StoryTimelineEditor> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.face_retouching_natural, size: 14, color: labelColor),
-                      const SizedBox(width: 4),
                       Text(
                         'قبعة',
                         style: TextStyle(
@@ -3313,7 +3305,6 @@ class _PaletteLaneState extends State<_PaletteLane> {
                                 borderRadius: BorderRadius.circular(AppColors.timeline_radius),
                                 border: Border.all(color: const Color(0xFF94A3B8)),
                               ),
-                              child: const Icon(Icons.drag_handle, size: 12, color: Color(0xFF94A3B8)),
                             ),
                           ),
                         ),

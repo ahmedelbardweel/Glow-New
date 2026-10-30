@@ -8,7 +8,10 @@ import '../../../../core/config/eleven_credit.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
+import '../../../../core/widgets/offline_aware_image.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
+import '../../../content/data/services/habits_pack_two.dart';
 import '../../../content/data/services/launch_admin_package.dart';
 import '../../../organization/presentation/widgets/create_organization_sheet.dart';
 import '../../../organization/presentation/widgets/staff_settings_sheet.dart';
@@ -50,10 +53,29 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
         .select('id,title,description,cover_url,status,version,draft_content,updated_at')
         .order('updated_at', ascending: false);
     if (!rows.any((row) => row['id'] == LaunchAdminPackage.id)) {
-      await LaunchAdminPackage.ensureCreated(client);
-      final starter = await client.from('content_packages').select()
-          .eq('id', LaunchAdminPackage.id).single();
-      rows.insert(0, starter);
+      try {
+        await LaunchAdminPackage.ensureCreated(client);
+        final starter = await client.from('content_packages').select()
+            .eq('id', LaunchAdminPackage.id).single();
+        rows.insert(0, starter);
+      } on PostgrestException catch (error) {
+        // PGRST202: launch_admin_package.sql has not been run on this project yet.
+        if (error.code != 'PGRST202') rethrow;
+        debugPrint('Starter package skipped: ${error.message}');
+      }
+    }
+    if (!rows.any((row) => row['id'] == HabitsPackTwo.id)) {
+      try {
+        if (await HabitsPackTwo.ensureCreated(client)) {
+          final pack = await client.from('content_packages').select()
+              .eq('id', HabitsPackTwo.id).single();
+          rows.insert(0, pack);
+        }
+      } on PostgrestException catch (error) {
+        // PGRST202: habits_pack_2.sql has not been run on this project yet.
+        if (error.code != 'PGRST202') rethrow;
+        debugPrint('Habits 6–20 package skipped: ${error.message}');
+      }
     }
     final packages = List<Map<String, dynamic>>.from(rows);
     final starterIndex = packages.indexWhere((row) => row['id'] == LaunchAdminPackage.id);
@@ -101,7 +123,7 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
       builder: (sheetContext) => const _PackageFormSheet(
         title: 'بكج جديد',
         subtitle: 'أنشئ بكجًا جديدًا لجمع العوالم والعادات قبل نشرها للمستخدمين',
-        submitLabel: 'إنشاء مسودة',
+        submitLabel: 'إنشاء البكج',
       ),
     );
     if (result == null || (result['title'] ?? '').trim().isEmpty || !mounted) return;
@@ -140,7 +162,7 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                'هل أنت متأكد من حذف البكج "$title"؟ سيتم حذف المسودة نهائياً.',
+                'هل أنت متأكد من حذف البكج "$title"؟ سيتم حذف البكج نهائياً.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppColors.secondary,
@@ -222,14 +244,10 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: FilledButton.tonalIcon(
+            child: FilledButton.tonal(
               onPressed: () {
                 context.push('/custom-character-creator');
               },
-              label: const Text(
-                'شخصيتك',
-                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 10),
-              ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primaryContainer,
                 foregroundColor: AppColors.onPrimaryContainer,
@@ -238,16 +256,27 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
                   borderRadius: BorderRadius.circular(AppColors.border_radius),
                 ),
               ),
+              child: const Text(
+                'شخصيتك',
+                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 10),
+              ),
             ),
           ),
-          IconButton(
-            tooltip: 'تحديث',
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             onPressed: _refresh,
-            icon: const Icon(Icons.refresh_rounded),
+            child: const Text('تحديث'),
           ),
-          IconButton(
-            tooltip: 'الإعدادات',
-            icon: const Icon(Icons.more_vert),
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             onPressed: () async {
               await AdminApiKeys.sync();
               if (!context.mounted) return;
@@ -289,6 +318,7 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
                 },
               );
             },
+            child: const Text('الإعدادات'),
           ),
 
         ],
@@ -300,14 +330,13 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppColors.border_radius),
         ),
-        icon: const Icon(Icons.add),
         label: const Text('بكج جديد', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _packages,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const ShimmerLoading(itemCount: 4);
           }
           if (snapshot.hasError) {
             return Center(
@@ -484,6 +513,8 @@ class _PackageCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  static const _peek = 58.0;
+
   @override
   Widget build(BuildContext context) {
     final draft = package['draft_content'];
@@ -493,199 +524,386 @@ class _PackageCard extends StatelessWidget {
       return sum + (world['habits'] as List).length;
     });
     final published = package['status'] == 'published';
+    final shown = worlds.whereType<Map>().take(3).toList();
+    final radius = AppColors.border_radius * 2;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppColors.border_radius),
-        border: Border.all(color: AppColors.inputBorder, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            onTap();
-          },
-          borderRadius: BorderRadius.circular(AppColors.border_radius),
-          child: Padding(
-            padding: const EdgeInsets.all(5),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${package['title'] ?? 'بكج بدون اسم'}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.onSurface,
+    void open() {
+      HapticFeedback.lightImpact();
+      onTap();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: GestureDetector(
+        onTap: open,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: 6,
+              right: 6,
+              top: 12,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  borderRadius: BorderRadius.circular(radius),
+                ),
+              ),
+            ),
+            if (shown.isEmpty)
+              const _PeekSlot(slot: 2, child: _EmptyPeekCard())
+            else
+              for (var i = 0; i < shown.length; i++)
+                _PeekSlot(
+                  slot: shown.length == 1 ? 2 : i,
+                  child: _PeekWorldCard(world: shown[i]),
+                ),
+            if (worlds.length > 3)
+              PositionedDirectional(
+                top: 0,
+                end: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(AppColors.border_radius * 3),
+                    border: Border.all(color: AppColors.surface, width: 2),
+                  ),
+                  child: Text(
+                    '+${worlds.length - 3}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(top: _peek),
+              child: PhysicalShape(
+                clipper: _PocketClipper(radius),
+                color: AppColors.surface,
+                elevation: 4,
+                shadowColor: Colors.black38,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: open,
+                    child: CustomPaint(
+                      painter: _StitchPainter(radius),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 24, 6, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${package['title'] ?? 'بكج بدون اسم'}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.onSurface,
+                                        ),
+                                      ),
+                                      if ((package['description'] ?? '').toString().isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${package['description']}',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                _StatusPill(published: published),
+                                PopupMenuButton<String>(
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    child: Text('خيارات', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                                  ),
+                                  onSelected: (val) {
+                                    if (val == 'edit') {
+                                      onEdit();
+                                    } else if (val == 'delete') {
+                                      onDelete();
+                                    }
+                                  },
+                                  itemBuilder: (ctx) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('تعديل البيانات'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('حذف البكج', style: TextStyle(color: AppColors.error)),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ),
-                          if ((package['description'] ?? '').toString().isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              '${package['description']}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.black54,
-                              ),
+                            const SizedBox(height: 8),
+                            const Divider(height: 1, color: AppColors.inputBorder),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                _Badge(
+                                  value: '${worlds.length}',
+                                  label: 'عوالم',
+                                  bgColor: AppColors.secondaryContainer,
+                                  fgColor: AppColors.onSecondaryContainer,
+                                ),
+                                const SizedBox(width: 8),
+                                _Badge(
+                                  value: '$missionCount',
+                                  label: 'عادات',
+                                  bgColor: AppColors.primaryContainer,
+                                  fgColor: AppColors.onPrimaryContainer,
+                                ),
+                                const Spacer(),
+                                Text(
+                                  'الإصدار ${package['version'] ?? 0}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black45,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                    _StatusPill(published: published),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, size: 25, color: Colors.black54),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppColors.border_radius),
-                      ),
-                      onSelected: (val) {
-                        if (val == 'edit') {
-                          onEdit();
-                        } else if (val == 'delete') {
-                          onDelete();
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_outlined, size: 18),
-                              SizedBox(width: 8),
-                              Text('تعديل البيانات'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                              SizedBox(width: 8),
-                              Text('حذف البكج', style: TextStyle(color: AppColors.error)),
-                            ],
-                          ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: _peek + 1,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.surface, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.18),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
-                  ],
-                ),
-                if (worlds.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (var i = 0; i < worlds.length && i < 3; i++)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondaryContainer.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(AppColors.border_radius),
-                            border: Border.all(color: AppColors.inputBorder),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.public, size: 12, color: AppColors.secondary),
-                              const SizedBox(width: 4),
-                              Text(
-                                worlds[i] is Map ? '${worlds[i]['title'] ?? 'عالم'}' : 'عالم',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.secondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (worlds.length > 3)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondaryContainer.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(AppColors.border_radius),
-                          ),
-                          child: Text(
-                            '+${worlds.length - 3}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        ),
-                    ],
                   ),
-                ],
-                const SizedBox(height: 5),
-                const Divider(height: 1, color: AppColors.inputBorder),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    _Badge(
-                      icon: Icons.public_rounded,
-                      value: '${worlds.length}',
-                      label: 'عوالم',
-                      bgColor: AppColors.secondaryContainer,
-                      fgColor: AppColors.onSecondaryContainer,
-                    ),
-                    const SizedBox(width: 8),
-                    _Badge(
-                      icon: Icons.auto_awesome_rounded,
-                      value: '$missionCount',
-                      label: 'عادات',
-                      bgColor: AppColors.primaryContainer,
-                      fgColor: AppColors.onPrimaryContainer,
-                    ),
-                    const Spacer(),
-                    Text(
-                      'الإصدار ${package['version'] ?? 0}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black45,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      size: 13,
-                      color: Colors.black38,
-                    ),
-                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
+}
+
+/// Places a world card sticking out of the wallet; slots 0 and 1 fan to the sides, slot 2 sits in front.
+class _PeekSlot extends StatelessWidget {
+  const _PeekSlot({required this.slot, required this.child});
+
+  final int slot;
+  final Widget child;
+
+  static const _tops = [2.0, 8.0, 16.0];
+  static const _angles = [-0.06, 0.05, -0.012];
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+        top: _tops[slot],
+        left: 0,
+        right: 0,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth * 0.56;
+            final start = switch (slot) {
+              0 => constraints.maxWidth * 0.08,
+              1 => constraints.maxWidth * 0.36,
+              _ => (constraints.maxWidth - width) / 2,
+            };
+            return Align(
+              alignment: AlignmentDirectional.topStart,
+              child: Padding(
+                padding: EdgeInsetsDirectional.only(start: start),
+                child: Transform.rotate(
+                  angle: _angles[slot],
+                  alignment: Alignment.bottomCenter,
+                  child: SizedBox(width: width, height: 90, child: child),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+}
+
+class _PeekWorldCard extends StatelessWidget {
+  const _PeekWorldCard({required this.world});
+
+  final Map world;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = '${world['image_url'] ?? ''}';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppColors.border_radius * 1.6),
+        border: Border.all(color: AppColors.surface, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppColors.border_radius * 1.2),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (image.isNotEmpty)
+              OfflineAwareImage(
+                imageUrl: image,
+                width: double.infinity,
+                height: 90,
+                fit: BoxFit.cover,
+                errorWidget: Container(color: AppColors.primaryContainer),
+              )
+            else
+              Container(color: AppColors.primaryContainer),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.center,
+                  colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+              child: Text(
+                '${world['title'] ?? 'عالم'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyPeekCard extends StatelessWidget {
+  const _EmptyPeekCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.only(top: 8),
+        alignment: Alignment.topCenter,
+        decoration: BoxDecoration(
+          color: AppColors.surface.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(AppColors.border_radius * 1.6),
+          border: Border.all(color: Colors.white38, width: 1.5),
+        ),
+        child: const Text(
+          'لا توجد عوالم بعد',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white70),
+        ),
+      );
+}
+
+/// Front pocket of the wallet: rounded body with a soft dip in the middle of the top edge.
+Path _pocketTop(Size size, double radius, double inset) {
+  final mid = size.width / 2;
+  const dip = 12.0;
+  return Path()
+    ..moveTo(radius, inset)
+    ..lineTo(mid - 70, inset)
+    ..cubicTo(mid - 38, inset, mid - 34, inset + dip, mid, inset + dip)
+    ..cubicTo(mid + 34, inset + dip, mid + 38, inset, mid + 70, inset)
+    ..lineTo(size.width - radius, inset);
+}
+
+class _PocketClipper extends CustomClipper<Path> {
+  const _PocketClipper(this.radius);
+
+  final double radius;
+
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(0, radius)
+    ..quadraticBezierTo(0, 0, radius, 0)
+    ..extendWithPath(_pocketTop(size, radius, 0), Offset.zero)
+    ..quadraticBezierTo(size.width, 0, size.width, radius)
+    ..lineTo(size.width, size.height - radius)
+    ..quadraticBezierTo(size.width, size.height, size.width - radius, size.height)
+    ..lineTo(radius, size.height)
+    ..quadraticBezierTo(0, size.height, 0, size.height - radius)
+    ..close();
+
+  @override
+  bool shouldReclip(_PocketClipper oldClipper) => oldClipper.radius != radius;
+}
+
+class _StitchPainter extends CustomPainter {
+  const _StitchPainter(this.radius);
+
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3
+      ..strokeCap = StrokeCap.round
+      ..color = AppColors.secondary.withOpacity(0.22);
+    for (final metric in _pocketTop(size, radius + 4, 7).computeMetrics()) {
+      for (var d = 0.0; d < metric.length; d += 9) {
+        canvas.drawPath(metric.extractPath(d, d + 5), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StitchPainter oldDelegate) => oldDelegate.radius != radius;
 }
 
 class _StatusPill extends StatelessWidget {
@@ -705,7 +923,7 @@ class _StatusPill extends StatelessWidget {
           children: [
             const SizedBox(width: 4),
             Text(
-              published ? 'منشور' : 'مسودة',
+              published ? 'منشور' : 'لم يتم نشره',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
@@ -719,14 +937,12 @@ class _StatusPill extends StatelessWidget {
 
 class _Badge extends StatelessWidget {
   const _Badge({
-    required this.icon,
     required this.value,
     required this.label,
     required this.bgColor,
     required this.fgColor,
   });
 
-  final IconData icon;
   final String value;
   final String label;
   final Color bgColor;
@@ -739,20 +955,13 @@ class _Badge extends StatelessWidget {
           color: bgColor,
           borderRadius: BorderRadius.circular(AppColors.border_radius),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: fgColor),
-            const SizedBox(width: 4),
-            Text(
-              '$value $label',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: fgColor,
-              ),
-            ),
-          ],
+        child: Text(
+          '$value $label',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: fgColor,
+          ),
         ),
       );
 }

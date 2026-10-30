@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection_container.dart';
@@ -201,7 +202,8 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
       if (bundled != null) {
         final bytes = await rootBundle.load('assets/$bundled');
         final directory = await getTemporaryDirectory();
-        final file = File('${directory.path}/${widget.storyToEdit!.id}_launch.wav');
+        final extension = bundled.substring(bundled.lastIndexOf('.'));
+        final file = File('${directory.path}/${widget.storyToEdit!.id}_launch$extension');
         await file.writeAsBytes(bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes), flush: true);
         if (!mounted) return;
         _audioFile = file;
@@ -1061,7 +1063,15 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
           leading: _step == 1
-              ? BackButton(onPressed: () => setState(() => _step = 0))
+              ? TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => setState(() => _step = 0),
+                  child: const Text('رجوع'),
+                )
               : null,
           title: Text(
             _step == 1
@@ -1074,10 +1084,14 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
           surfaceTintColor: Colors.white,
           actions: [
             if (_step == 1)
-              IconButton(
-                tooltip: 'تحليل المعنى',
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: _montageBusy ? null : _analyzeMontage,
-                icon: const Icon(Icons.auto_awesome),
+                child: const Text('تحليل المعنى'),
               ),
           ],
         ),
@@ -1124,17 +1138,21 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                     children: [
                       Expanded(
                         child: _preparingEdit
-                            ? const Center(child: CircularProgressIndicator())
+                            ? const ShimmerLoading(type: ShimmerType.form, itemCount: 4)
                             : ListView(
                                 children: [
                                   if (_step == 0) ...[
                                     AdminVoiceField(
                                       controller: _titleController,
                                       hint: 'عنوان القصة',
-                                      beside: IconButton.filledTonal(
+                                      beside: FilledButton.tonal(
                                         onPressed: _addLine,
-                                        icon: const Icon(Icons.add),
-                                        tooltip: 'إضافة جملة',
+                                        style: FilledButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                          minimumSize: const Size(0, 36),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        child: const Text('إضافة جملة'),
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -1149,10 +1167,17 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                             decoration: InputDecoration(
                                               hintText: 'الوصف. كل جملة تنتهي بـ /اسم_الشخصية\nمثال: في يوم من الأيام كان الأصدقاء يلعبون /سورت',
                                               alignLabelWithHint: true,
-                                              suffixIcon: IconButton(
-                                                icon: const Icon(Icons.person_add_alt_1_rounded, color: AppColors.primary),
-                                                tooltip: 'اختر شخصية /',
+                                              suffixIcon: TextButton(
+                                                style: TextButton.styleFrom(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                  minimumSize: const Size(0, 36),
+                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                ),
                                                 onPressed: () => _openCharacterPickerBottomSheet(isAutoSlash: false),
+                                                child: const Text(
+                                                  'شخصية',
+                                                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -1177,7 +1202,6 @@ class _AddStoryScreenState extends State<AddStoryScreen> {
                                     Row(
                                       children: [
                                         ActionChip(
-                                          avatar: const Icon(Icons.alternate_email, size: 16, color: AppColors.primary),
                                           label: const Text(
                                             'اختر شخصية للسطر (/)',
                                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
@@ -1301,7 +1325,10 @@ class _MontageAiVeilState extends State<_MontageAiVeil> with SingleTickerProvide
                   child: Transform.scale(scale: 0.92 + (0.16 * t), child: child),
                 );
               },
-              child: const Icon(Icons.auto_awesome, size: 64, color: AppColors.secondary),
+              child: const Text(
+                'جاري التحضير...',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.secondary),
+              ),
             ),
           ),
         ),
@@ -1353,19 +1380,6 @@ class _CharacterPickerSheet extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
-                  borderRadius: radius,
-                ),
-                child: const Icon(
-                  Icons.alternate_email,
-                  color: AppColors.onPrimaryContainer,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1385,9 +1399,14 @@ class _CharacterPickerSheet extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: AppColors.secondary),
+                child: const Text('إغلاق', style: TextStyle(color: AppColors.secondary)),
               ),
             ],
           ),
@@ -1462,16 +1481,8 @@ class _CharacterPickerSheet extends StatelessWidget {
                       ),
                     ),
                     if (kIsWeb)
-                      FilledButton.tonalIcon(
+                      FilledButton.tonal(
                         onPressed: onOpenCreator,
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text(
-                          'اصنع شخصية +',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primaryContainer,
                           foregroundColor: AppColors.onPrimaryContainer,
@@ -1480,6 +1491,13 @@ class _CharacterPickerSheet extends StatelessWidget {
                             vertical: 6,
                           ),
                           shape: RoundedRectangleBorder(borderRadius: radius),
+                        ),
+                        child: const Text(
+                          'اصنع شخصية +',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                   ],
@@ -1496,12 +1514,6 @@ class _CharacterPickerSheet extends StatelessWidget {
                     child: Center(
                       child: Column(
                         children: [
-                          const Icon(
-                            Icons.palette_outlined,
-                            size: 32,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(height: 6),
                           const Text(
                             'لم تصنع شخصيات خاصة بعد',
                             style: TextStyle(
@@ -1574,37 +1586,32 @@ class _CharacterPickerSheet extends StatelessWidget {
                                   fontSize: 13,
                                 ),
                               ),
-                              if (c.hasHat) ...[
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.face_retouching_natural,
-                                  size: 14,
-                                  color: AppColors.secondary,
+                              if (c.hasHat || c.hasGlasses)
+                                Text(
+                                  ' · ${[if (c.hasHat) 'قبعة', if (c.hasGlasses) 'نظارة'].join(' · ')}',
+                                  style: TextStyle(
+                                    color: AppColors.secondary.withValues(alpha: 0.7),
+                                    fontSize: 11,
+                                  ),
                                 ),
-                              ],
-                              if (c.hasGlasses) ...[
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.visibility,
-                                  size: 14,
-                                  color: AppColors.secondary,
-                                ),
-                              ],
                               if (onEditCharacter != null) ...[
                                 const SizedBox(width: 6),
                                 InkWell(
                                   onTap: () => onEditCharacter!(c),
                                   borderRadius: radius,
                                   child: Container(
-                                    padding: const EdgeInsets.all(4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: AppColors.secondaryContainer,
                                       borderRadius: radius,
                                     ),
-                                    child: const Icon(
-                                      Icons.edit_outlined,
-                                      size: 13,
-                                      color: AppColors.onSecondaryContainer,
+                                    child: const Text(
+                                      'تعديل',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.onSecondaryContainer,
+                                      ),
                                     ),
                                   ),
                                 ),

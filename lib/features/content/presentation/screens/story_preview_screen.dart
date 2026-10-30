@@ -254,13 +254,18 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen>
                         Row(
                           children: [
                             if (_hasAudioUrl)
-                              IconButton.filledTonal(
-                                icon: Icon(
-                                  (_loadingAudio ? _playRequested : _isPlaying)
-                                      ? Icons.pause
-                                      : Icons.play_arrow,
+                              FilledButton.tonal(
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  minimumSize: const Size(0, 36),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 onPressed: _togglePlayPause,
+                                child: Text(
+                                  (_loadingAudio ? _playRequested : _isPlaying)
+                                      ? 'إيقاف'
+                                      : 'تشغيل',
+                                ),
                               ),
                             Expanded(
                               child: Text(
@@ -308,12 +313,10 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen>
               // Button Outside the Card
               SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
+                child: FilledButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  icon: const Icon(Icons.check),
-                  label: const Text('فهمت القصة!'),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -322,6 +325,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen>
                       ),
                     ),
                   ),
+                  child: const Text('فهمت القصة!'),
                 ),
               ),
             ],

@@ -235,11 +235,6 @@ class _DayCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                quiet ? Icons.remove_circle_outline : Icons.arrow_forward_ios,
-                color: AppColors.secondary,
-                size: quiet ? 22 : 16,
-              ),
             ],
           ),
         ),

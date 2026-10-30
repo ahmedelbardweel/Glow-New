@@ -11,6 +11,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_qr_scanner.dart';
 import '../../../../core/widgets/custom_loader.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../data/account_transfer.dart';
 import '../../data/child_account_service.dart';
 import '../../data/models/device_child_account.dart';
@@ -164,7 +165,9 @@ class _TransferQrState extends State<_TransferQr> {
                       ),
                     );
                   }
-                  if (_error == null) return const Center(child: CustomLoader());
+                  if (_error == null) {
+                    return Center(child: ShimmerBox(width: side, height: side, animate: true));
+                  }
                   return Center(
                     child: Text(
                       _error!,

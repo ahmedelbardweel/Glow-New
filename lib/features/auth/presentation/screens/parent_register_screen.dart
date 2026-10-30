@@ -81,8 +81,6 @@ class _ParentRegisterScreenState extends State<ParentRegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.family_restroom, size: 80, color: Colors.orange),
-                const SizedBox(height: 16),
                 Text(
                   'حساب جديد لولي الأمر فقط. بعد إنشائه تدخل بالبريد وكلمة المرور.',
                   textAlign: TextAlign.center,
@@ -94,7 +92,6 @@ class _ParentRegisterScreenState extends State<ParentRegisterScreen> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     hintText: 'البريد الإلكتروني',
-                    prefixIcon: Icon(Icons.email),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -103,7 +100,6 @@ class _ParentRegisterScreenState extends State<ParentRegisterScreen> {
                   obscureText: true,
                   decoration: const InputDecoration(
                     hintText: 'كلمة المرور',
-                    prefixIcon: Icon(Icons.lock),
                   ),
                 ),
                 const SizedBox(height: 32),

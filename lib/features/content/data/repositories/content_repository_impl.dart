@@ -277,6 +277,7 @@ class ContentRepositoryImpl implements ContentRepository {
         badgeName: matchedMission?.badgeName,
         starsReward: matchedMission?.starsReward,
       );
+      await localDataSource.addPendingCompletion(childId, missionId);
 
       // 3. Sync to Supabase in background if connected, otherwise queue for later
       if (await networkInfo.isConnected) {
@@ -306,7 +307,7 @@ class ContentRepositoryImpl implements ContentRepository {
           .getCompletedMissions(childId)
           .timeout(const Duration(seconds: 4));
       await localDataSource.cacheChildProgress(childId, progressList);
-      return Right(progressList);
+      return Right(await localDataSource.getCachedChildProgress(childId));
     } catch (_) {
       return Right(cachedProgress);
     }

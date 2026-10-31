@@ -213,15 +213,9 @@ class SyncService {
           await remoteDataSource.completeMission(mId, cId);
           await localDataSource.removePendingCompletion(cId, mId);
         } catch (e) {
-          syncState.value = SyncStatusState(
-            status: SyncStatus.error,
-            message: userMessage(
-              e,
-              fallback: 'تعذر حفظ الإنجاز. حاول مرة أخرى.',
-            ),
-          );
-          _isSyncRunning = false;
-          return;
+          // Bundled missions may not exist on the server yet. Keep their
+          // durable retry entry and continue downloading published content.
+          debugPrint('Completion remains pending for retry: $e');
         }
       }
 

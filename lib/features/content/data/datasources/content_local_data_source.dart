@@ -177,7 +177,19 @@ class ContentLocalDataSourceImpl implements ContentLocalDataSource {
   // Child Progress
   @override
   Future<void> cacheChildProgress(String childId, List<ChildProgressModel> progressList) async {
-    final list = progressList.map((p) => p.toLocalJson()).toList();
+    final local = await getCachedChildProgress(childId);
+    final merged = {for (final item in local) item.missionId: item};
+    for (final item in progressList) {
+      final previous = merged[item.missionId];
+      merged[item.missionId] = ChildProgressModel(
+        id: item.id, childId: childId, missionId: item.missionId,
+        completedAt: item.completedAt,
+        missionTitle: item.missionTitle ?? previous?.missionTitle,
+        badgeName: item.badgeName ?? previous?.badgeName,
+        starsReward: item.starsReward ?? previous?.starsReward,
+      );
+    }
+    final list = merged.values.map((p) => p.toLocalJson()).toList();
     await progressBox.put('progress_$childId', json.encode(list));
   }
 
@@ -187,7 +199,15 @@ class ContentLocalDataSourceImpl implements ContentLocalDataSource {
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = json.decode(raw) as List;
-      return list.map((item) => ChildProgressModel.fromJson(Map<String, dynamic>.from(item))).toList();
+      final missions = {for (final mission in await getAllCachedMissions()) mission.id: mission};
+      return list.map((item) {
+        final row = Map<String, dynamic>.from(item);
+        final mission = missions[row['mission_id']];
+        row['stars_reward'] ??= mission?.starsReward;
+        row['badge_name'] ??= mission?.badgeName;
+        row['mission_title'] ??= mission?.title;
+        return ChildProgressModel.fromJson(row);
+      }).toList();
     } catch (_) {
       return [];
     }

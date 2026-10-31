@@ -8,6 +8,7 @@ import '../../../../core/errors/user_message.dart';
 import '../../../../core/session/app_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/mission_entity.dart';
+import '../../domain/repositories/content_repository.dart';
 import '../bloc/content_bloc.dart';
 import '../bloc/content_event.dart';
 import '../bloc/content_state.dart';
@@ -95,10 +96,19 @@ class _ChildQuizScreenState extends State<ChildQuizScreen> {
               badgeName: widget.mission.badgeName,
               stars: widget.mission.starsReward,
             );
-            sl<AuthLocalDataSource>().getLastChild().then((cachedChild) {
+            sl<AuthLocalDataSource>().getLastChild().then((cachedChild) async {
               final childId = cachedChild?.id ?? sl<AppSession>().userId;
               if (childId != null) {
-                _contentBloc.add(ContentEvent.completeMission(widget.mission.id, childId));
+                final result = await sl<ContentRepository>().completeMission(widget.mission.id, childId);
+                if (!mounted) return;
+                final failed = result.fold((failure) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userMessage(failure.message))));
+                  return true;
+                }, (_) => false);
+                if (failed) return;
+              } else {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديد حساب الطفل لحفظ الإنجاز.')));
+                return;
               }
               if (mounted) {
                 context.go('/child/mission-complete', extra: widget.mission);

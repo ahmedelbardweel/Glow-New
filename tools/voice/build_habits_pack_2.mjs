@@ -34,6 +34,7 @@ const SAMPLE_RATE = 22050;
 const GAP_SECONDS = 0.25;
 const MP3_KBPS = 48;
 const CACHE_DIR = 'tools/voice/.audio_cache';
+const CACHE_ONLY = process.argv.includes('--cache-only');
 
 const PREFIX = 'a2000000-0000-4000-8000-';
 const WORLD_ID = `${PREFIX}000000000001`;
@@ -114,11 +115,13 @@ async function tts(characterId, text) {
     const cached = await readFile(cachePath);
     if (cached.length > 512) return cached;
   } catch {}
+  if (CACHE_ONLY) throw new Error(`Missing cached speech: ${characterId} ${key}`);
   for (let attempt = 1; attempt <= 5; attempt++) {
     const res = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${VOICES[characterId]}?output_format=pcm_${SAMPLE_RATE}`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(60000),
         headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: clean, model_id: 'eleven_multilingual_v2' }),
       },
@@ -160,11 +163,21 @@ async function voiceHabit(habit) {
   const blocks = [];
   const motionBlocks = [];
   const transitions = [];
+  const clips = new Array(habit.dialogue.length);
+  let nextLine = 0;
+  await Promise.all(Array.from({ length: 2 }, async () => {
+    while (nextLine < habit.dialogue.length) {
+      const index = nextLine++;
+      const line = habit.dialogue[index];
+      clips[index] = await tts(line.characterId, line.text);
+      console.log(`  habit ${habit.num} voice ${index + 1}/${habit.dialogue.length}`);
+    }
+  }));
   let time = 0;
   for (let i = 0; i < habit.dialogue.length; i++) {
     const { text, characterId } = habit.dialogue[i];
     process.stdout.write(`  habit ${habit.num} line ${i + 1}/${habit.dialogue.length} ${characterId}\r`);
-    const clip = await tts(characterId, text);
+    const clip = clips[i];
     const start = Math.round(time * 100) / 100;
     const end = Math.round((time + clip.length / bytesPerSecond) * 100) / 100;
     blocks.push({ characterId, startTime: start, endTime: end });
@@ -173,7 +186,7 @@ async function voiceHabit(habit) {
       transitions.push({ time: start, duration: 0.5, type: i % 2 === 0 ? 'slide' : 'pop' });
     }
     pcm.push(clip, gap);
-    time = end + GAP_SECONDS;
+    time += clip.length / bytesPerSecond + GAP_SECONDS;
   }
   const totalDuration = Math.round(time * 100) / 100;
   const mp3 = await encodeMp3(Buffer.concat(pcm));
@@ -198,8 +211,9 @@ async function voiceHabit(habit) {
 async function main() {
   const dir = process.argv[2];
   const dry = process.argv.includes('--dry');
+  const prepare = process.argv.includes('--prepare');
   if (!dir) throw new Error('Usage: node tools/voice/build_habits_pack_2.mjs <scripts_dir> [--dry]');
-  if (!dry && !process.env.ELEVENLABS_API_KEY) {
+  if (!dry && !prepare && !CACHE_ONLY && !process.env.ELEVENLABS_API_KEY) {
     throw new Error('Set ELEVENLABS_API_KEY in this terminal first.');
   }
 
@@ -225,6 +239,15 @@ async function main() {
   }
   console.log(`\n${habits.length} habits, ~${characters} characters of speech, ${problems} with problems`);
   if (problems) throw new Error('Fix the files above before generating voice.');
+  if (prepare) {
+    await mkdir('content_sources/habits_06_20', { recursive: true });
+    for (const file of files) {
+      await writeFile(path.join('content_sources/habits_06_20', file), await readFile(path.join(dir, file)));
+    }
+    await writeFile('content_sources/habits_06_20/prepared.json', JSON.stringify({ status: 'awaiting_voice', speechCharacters: characters, habits }, null, 2));
+    console.log('Prepared source content. Voice has not been generated.');
+    return;
+  }
   if (dry) return;
 
   await mkdir(CACHE_DIR, { recursive: true });

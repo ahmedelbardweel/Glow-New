@@ -8,7 +8,7 @@ import '../../../../core/config/eleven_credit.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
-import '../../../../core/widgets/offline_aware_image.dart';
+import '../widgets/package_wallet_card.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../auth/data/datasources/auth_local_data_source.dart';
 import '../../../content/data/services/habits_pack_two.dart';
@@ -42,7 +42,8 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
     }
     if (AdminApiKeys.geminiExhausted) parts.add('Gemini خلص الرصيد');
     parts.insert(0, AdminApiKeys.montageChoice.label);
-    if (parts.length == 1) return 'المونتاج: ${AdminApiKeys.montageChoice.label}';
+    if (parts.length == 1)
+      return 'المونتاج: ${AdminApiKeys.montageChoice.label}';
     return parts.join(' · ');
   }
 
@@ -50,13 +51,18 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
     final client = sl<SupabaseClient>();
     final rows = await client
         .from('content_packages')
-        .select('id,title,description,cover_url,status,version,draft_content,updated_at')
+        .select(
+          'id,title,description,cover_url,status,version,draft_content,updated_at',
+        )
         .order('updated_at', ascending: false);
     if (!rows.any((row) => row['id'] == LaunchAdminPackage.id)) {
       try {
         await LaunchAdminPackage.ensureCreated(client);
-        final starter = await client.from('content_packages').select()
-            .eq('id', LaunchAdminPackage.id).single();
+        final starter = await client
+            .from('content_packages')
+            .select()
+            .eq('id', LaunchAdminPackage.id)
+            .single();
         rows.insert(0, starter);
       } on PostgrestException catch (error) {
         // PGRST202: launch_admin_package.sql has not been run on this project yet.
@@ -67,8 +73,11 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
     if (!rows.any((row) => row['id'] == HabitsPackTwo.id)) {
       try {
         if (await HabitsPackTwo.ensureCreated(client)) {
-          final pack = await client.from('content_packages').select()
-              .eq('id', HabitsPackTwo.id).single();
+          final pack = await client
+              .from('content_packages')
+              .select()
+              .eq('id', HabitsPackTwo.id)
+              .single();
           rows.insert(0, pack);
         }
       } on PostgrestException catch (error) {
@@ -78,30 +87,42 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
       }
     }
     final packages = List<Map<String, dynamic>>.from(rows);
-    final starterIndex = packages.indexWhere((row) => row['id'] == LaunchAdminPackage.id);
+    final starterIndex = packages.indexWhere(
+      (row) => row['id'] == LaunchAdminPackage.id,
+    );
     if (starterIndex > 0) packages.insert(0, packages.removeAt(starterIndex));
     final worldIds = <String>{};
     for (final package in packages) {
       final draft = package['draft_content'];
       if (draft is! Map || draft['worlds'] is! List) continue;
       for (final world in draft['worlds'] as List) {
-        if (world is Map && world['id'] is String) worldIds.add(world['id'] as String);
+        if (world is Map && world['id'] is String)
+          worldIds.add(world['id'] as String);
       }
     }
     if (worldIds.isNotEmpty) {
       // One aggregate request for every card, rather than loading each habit.
-      final counts = await client.from('worlds').select('id,missions(count)')
+      final counts = await client
+          .from('worlds')
+          .select('id,missions(count)')
           .inFilter('id', worldIds.toList());
       final byWorld = <String, int>{};
       for (final row in counts) {
         final missions = row['missions'] as List;
-        byWorld[row['id'] as String] = missions.isEmpty ? 0 : (missions.first['count'] as num).toInt();
+        byWorld[row['id'] as String] = missions.isEmpty
+            ? 0
+            : (missions.first['count'] as num).toInt();
       }
       for (final package in packages) {
         final draft = package['draft_content'];
-        final worlds = draft is Map && draft['worlds'] is List ? draft['worlds'] as List : const [];
-        package['_mission_count'] = worlds.fold<int>(0,
-            (count, world) => count + (world is Map ? byWorld[world['id']] ?? 0 : 0));
+        final worlds = draft is Map && draft['worlds'] is List
+            ? draft['worlds'] as List
+            : const [];
+        package['_mission_count'] = worlds.fold<int>(
+          0,
+          (count, world) =>
+              count + (world is Map ? byWorld[world['id']] ?? 0 : 0),
+        );
       }
     }
     return packages;
@@ -122,18 +143,24 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
       avoidKeyboard: true,
       builder: (sheetContext) => const _PackageFormSheet(
         title: 'بكج جديد',
-        subtitle: 'أنشئ بكجًا جديدًا لجمع العوالم والعادات قبل نشرها للمستخدمين',
+        subtitle:
+            'أنشئ بكجًا جديدًا لجمع العوالم والعادات قبل نشرها للمستخدمين',
         submitLabel: 'إنشاء البكج',
       ),
     );
-    if (result == null || (result['title'] ?? '').trim().isEmpty || !mounted) return;
+    if (result == null || (result['title'] ?? '').trim().isEmpty || !mounted)
+      return;
     try {
-      final row = await sl<SupabaseClient>().from('content_packages').insert({
-        'title': result['title']!.trim(),
-        'description': (result['description'] ?? '').trim(),
-        'created_by': sl<SupabaseClient>().auth.currentUser?.id,
-        'draft_content': {'worlds': []},
-      }).select('id').single();
+      final row = await sl<SupabaseClient>()
+          .from('content_packages')
+          .insert({
+            'title': result['title']!.trim(),
+            'description': (result['description'] ?? '').trim(),
+            'created_by': sl<SupabaseClient>().auth.currentUser?.id,
+            'draft_content': {'worlds': []},
+          })
+          .select('id')
+          .single();
       await _refresh();
       if (mounted) context.push('/admin/packages/${row['id']}');
     } catch (error) {
@@ -164,9 +191,9 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
               Text(
                 'هل أنت متأكد من حذف البكج "$title"؟ سيتم حذف البكج نهائياً.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.secondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.secondary),
               ),
               const Spacer(),
               FilledButton(
@@ -175,11 +202,16 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppColors.border_radius),
+                    borderRadius: BorderRadius.circular(
+                      AppColors.border_radius,
+                    ),
                   ),
                 ),
                 onPressed: () => Navigator.of(sheetContext).pop(true),
-                child: const Text('حذف البكج', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                child: const Text(
+                  'حذف البكج',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
               ),
             ],
           ),
@@ -191,9 +223,9 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
       await sl<SupabaseClient>().from('content_packages').delete().eq('id', id);
       await _refresh();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حذف البكج بنجاح')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم حذف البكج بنجاح')));
       }
     } catch (error) {
       _showError(error);
@@ -214,13 +246,17 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
         submitLabel: 'حفظ التعديلات',
       ),
     );
-    if (result == null || (result['title'] ?? '').trim().isEmpty || !mounted) return;
+    if (result == null || (result['title'] ?? '').trim().isEmpty || !mounted)
+      return;
     try {
-      await sl<SupabaseClient>().from('content_packages').update({
-        'title': result['title']!.trim(),
-        'description': (result['description'] ?? '').trim(),
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', package['id']);
+      await sl<SupabaseClient>()
+          .from('content_packages')
+          .update({
+            'title': result['title']!.trim(),
+            'description': (result['description'] ?? '').trim(),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', package['id']);
       await _refresh();
     } catch (error) {
       _showError(error);
@@ -229,9 +265,9 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
 
   void _showError(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('تعذر تنفيذ العملية: $error')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('تعذر تنفيذ العملية: $error')));
   }
 
   @override
@@ -239,44 +275,35 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('إدارة البكجات'),
+        title: const Text(
+          'إدارة البكجات',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        toolbarHeight: 72,
+        titleSpacing: 16,
+        actionsPadding: const EdgeInsetsDirectional.only(end: 12),
         centerTitle: false,
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: FilledButton.tonal(
-              onPressed: () {
-                context.push('/custom-character-creator');
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primaryContainer,
-                foregroundColor: AppColors.onPrimaryContainer,
-                padding: const EdgeInsets.symmetric(horizontal: 5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppColors.border_radius),
-                ),
-              ),
-              child: const Text(
-                'شخصيتك',
-                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 10),
-              ),
+          IconButton.filledTonal(
+            tooltip: 'شخصيتك',
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.primaryContainer,
+              foregroundColor: AppColors.onPrimaryContainer,
             ),
+            onPressed: () => context.push('/custom-character-creator'),
+            icon: const Icon(Icons.face_retouching_natural_rounded, size: 22),
           ),
-          TextButton(
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: const Size(0, 36),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'تحديث البكجات',
             onPressed: _refresh,
-            child: const Text('تحديث'),
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.secondary),
           ),
-          TextButton(
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: const Size(0, 36),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'الإعدادات',
             onPressed: () async {
               await AdminApiKeys.sync();
               if (!context.mounted) return;
@@ -318,9 +345,11 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
                 },
               );
             },
-            child: const Text('الإعدادات'),
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              color: AppColors.secondary,
+            ),
           ),
-
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -330,7 +359,10 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppColors.border_radius),
         ),
-        label: const Text('بكج جديد', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: const Text(
+          'بكج جديد',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _packages,
@@ -357,9 +389,11 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               itemCount: items.length,
-              itemBuilder: (context, index) => _PackageCard(
+              itemBuilder: (context, index) => PackageWalletCard(
                 package: items[index],
-                onTap: () => context.push('/admin/packages/${items[index]['id']}').then((_) => _refresh()),
+                onTap: () => context
+                    .push('/admin/packages/${items[index]['id']}')
+                    .then((_) => _refresh()),
                 onEdit: () => _editPackageMeta(items[index]),
                 onDelete: () => _deletePackage(
                   items[index]['id'].toString(),
@@ -374,26 +408,26 @@ class _ContentPackagesScreenState extends State<ContentPackagesScreen> {
   }
 
   Widget _emptyState() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 20),
-              const Text(
-                'لا توجد بكجات محتوى حتى الآن',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'أنشئ بكجًا واجمع فيه العوالم والعادات والقصص قبل نشرها للمستخدمين.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 20),
+          const Text(
+            'لا توجد بكجات محتوى حتى الآن',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-        ),
-      );
+          const SizedBox(height: 8),
+          const Text(
+            'أنشئ بكجًا واجمع فيه العوالم والعادات والقصص قبل نشرها للمستخدمين.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.black54),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _PackageFormSheet extends StatefulWidget {
@@ -490,337 +524,9 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
               },
               child: Text(
                 widget.submitLabel,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PackageCard extends StatelessWidget {
-  const _PackageCard({
-    required this.package,
-    required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Map<String, dynamic> package;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  static const _peek = 58.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final draft = package['draft_content'];
-    final worlds = draft is Map && draft['worlds'] is List ? draft['worlds'] as List : const [];
-    final missionCount = package['_mission_count'] as int? ?? worlds.fold<int>(0, (sum, world) {
-      if (world is! Map || world['habits'] is! List) return sum;
-      return sum + (world['habits'] as List).length;
-    });
-    final published = package['status'] == 'published';
-    final shown = worlds.whereType<Map>().take(3).toList();
-    final radius = AppColors.border_radius * 2;
-
-    void open() {
-      HapticFeedback.lightImpact();
-      onTap();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: GestureDetector(
-        onTap: open,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              left: 6,
-              right: 6,
-              top: 12,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.secondary,
-                  borderRadius: BorderRadius.circular(radius),
-                ),
-              ),
-            ),
-            if (shown.isEmpty)
-              const _PeekSlot(slot: 2, child: _EmptyPeekCard())
-            else
-              for (var i = 0; i < shown.length; i++)
-                _PeekSlot(
-                  slot: shown.length == 1 ? 2 : i,
-                  child: _PeekWorldCard(world: shown[i]),
-                ),
-            if (worlds.length > 3)
-              PositionedDirectional(
-                top: 0,
-                end: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(AppColors.border_radius * 3),
-                    border: Border.all(color: AppColors.surface, width: 2),
-                  ),
-                  child: Text(
-                    '+${worlds.length - 3}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(top: _peek),
-              child: PhysicalShape(
-                clipper: _PocketClipper(radius),
-                color: AppColors.surface,
-                elevation: 4,
-                shadowColor: Colors.black38,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: open,
-                    child: CustomPaint(
-                      painter: _StitchPainter(radius),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 24, 6, 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${package['title'] ?? 'بكج بدون اسم'}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.onSurface,
-                                        ),
-                                      ),
-                                      if ((package['description'] ?? '').toString().isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${package['description']}',
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                _StatusPill(published: published),
-                                PopupMenuButton<String>(
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                    child: Text('خيارات', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(AppColors.border_radius),
-                                  ),
-                                  onSelected: (val) {
-                                    if (val == 'edit') {
-                                      onEdit();
-                                    } else if (val == 'delete') {
-                                      onDelete();
-                                    }
-                                  },
-                                  itemBuilder: (ctx) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('تعديل البيانات'),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('حذف البكج', style: TextStyle(color: AppColors.error)),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            const Divider(height: 1, color: AppColors.inputBorder),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                _Badge(
-                                  value: '${worlds.length}',
-                                  label: 'عوالم',
-                                  bgColor: AppColors.secondaryContainer,
-                                  fgColor: AppColors.onSecondaryContainer,
-                                ),
-                                const SizedBox(width: 8),
-                                _Badge(
-                                  value: '$missionCount',
-                                  label: 'عادات',
-                                  bgColor: AppColors.primaryContainer,
-                                  fgColor: AppColors.onPrimaryContainer,
-                                ),
-                                const Spacer(),
-                                Text(
-                                  'الإصدار ${package['version'] ?? 0}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black45,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: _peek + 1,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                child: Center(
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surface, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.18),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Places a world card sticking out of the wallet; slots 0 and 1 fan to the sides, slot 2 sits in front.
-class _PeekSlot extends StatelessWidget {
-  const _PeekSlot({required this.slot, required this.child});
-
-  final int slot;
-  final Widget child;
-
-  static const _tops = [2.0, 8.0, 16.0];
-  static const _angles = [-0.06, 0.05, -0.012];
-
-  @override
-  Widget build(BuildContext context) => Positioned(
-        top: _tops[slot],
-        left: 0,
-        right: 0,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth * 0.56;
-            final start = switch (slot) {
-              0 => constraints.maxWidth * 0.08,
-              1 => constraints.maxWidth * 0.36,
-              _ => (constraints.maxWidth - width) / 2,
-            };
-            return Align(
-              alignment: AlignmentDirectional.topStart,
-              child: Padding(
-                padding: EdgeInsetsDirectional.only(start: start),
-                child: Transform.rotate(
-                  angle: _angles[slot],
-                  alignment: Alignment.bottomCenter,
-                  child: SizedBox(width: width, height: 90, child: child),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-}
-
-class _PeekWorldCard extends StatelessWidget {
-  const _PeekWorldCard({required this.world});
-
-  final Map world;
-
-  @override
-  Widget build(BuildContext context) {
-    final image = '${world['image_url'] ?? ''}';
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppColors.border_radius * 1.6),
-        border: Border.all(color: AppColors.surface, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppColors.border_radius * 1.2),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (image.isNotEmpty)
-              OfflineAwareImage(
-                imageUrl: image,
-                width: double.infinity,
-                height: 90,
-                fit: BoxFit.cover,
-                errorWidget: Container(color: AppColors.primaryContainer),
-              )
-            else
-              Container(color: AppColors.primaryContainer),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.center,
-                  colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-              child: Text(
-                '${world['title'] ?? 'عالم'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
                 ),
               ),
             ),
@@ -829,139 +535,4 @@ class _PeekWorldCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _EmptyPeekCard extends StatelessWidget {
-  const _EmptyPeekCard();
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.only(top: 8),
-        alignment: Alignment.topCenter,
-        decoration: BoxDecoration(
-          color: AppColors.surface.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(AppColors.border_radius * 1.6),
-          border: Border.all(color: Colors.white38, width: 1.5),
-        ),
-        child: const Text(
-          'لا توجد عوالم بعد',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white70),
-        ),
-      );
-}
-
-/// Front pocket of the wallet: rounded body with a soft dip in the middle of the top edge.
-Path _pocketTop(Size size, double radius, double inset) {
-  final mid = size.width / 2;
-  const dip = 12.0;
-  return Path()
-    ..moveTo(radius, inset)
-    ..lineTo(mid - 70, inset)
-    ..cubicTo(mid - 38, inset, mid - 34, inset + dip, mid, inset + dip)
-    ..cubicTo(mid + 34, inset + dip, mid + 38, inset, mid + 70, inset)
-    ..lineTo(size.width - radius, inset);
-}
-
-class _PocketClipper extends CustomClipper<Path> {
-  const _PocketClipper(this.radius);
-
-  final double radius;
-
-  @override
-  Path getClip(Size size) => Path()
-    ..moveTo(0, radius)
-    ..quadraticBezierTo(0, 0, radius, 0)
-    ..extendWithPath(_pocketTop(size, radius, 0), Offset.zero)
-    ..quadraticBezierTo(size.width, 0, size.width, radius)
-    ..lineTo(size.width, size.height - radius)
-    ..quadraticBezierTo(size.width, size.height, size.width - radius, size.height)
-    ..lineTo(radius, size.height)
-    ..quadraticBezierTo(0, size.height, 0, size.height - radius)
-    ..close();
-
-  @override
-  bool shouldReclip(_PocketClipper oldClipper) => oldClipper.radius != radius;
-}
-
-class _StitchPainter extends CustomPainter {
-  const _StitchPainter(this.radius);
-
-  final double radius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3
-      ..strokeCap = StrokeCap.round
-      ..color = AppColors.secondary.withOpacity(0.22);
-    for (final metric in _pocketTop(size, radius + 4, 7).computeMetrics()) {
-      for (var d = 0.0; d < metric.length; d += 9) {
-        canvas.drawPath(metric.extractPath(d, d + 5), paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_StitchPainter oldDelegate) => oldDelegate.radius != radius;
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.published});
-  final bool published;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: EdgeInsets.only(top: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: published ? AppColors.tertiaryContainer : AppColors.primaryContainer,
-          borderRadius: BorderRadius.circular(AppColors.border_radius),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(width: 4),
-            Text(
-              published ? 'منشور' : 'لم يتم نشره',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: published ? AppColors.onTertiaryContainer : AppColors.onPrimaryContainer,
-              ),
-            ),
-          ],
-        ),
-      );
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({
-    required this.value,
-    required this.label,
-    required this.bgColor,
-    required this.fgColor,
-  });
-
-  final String value;
-  final String label;
-  final Color bgColor;
-  final Color fgColor;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(AppColors.border_radius),
-        ),
-        child: Text(
-          '$value $label',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: fgColor,
-          ),
-        ),
-      );
 }
